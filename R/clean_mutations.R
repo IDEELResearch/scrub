@@ -9,6 +9,8 @@
 #' @return A cleaned mutation name string in the format "gene:codon:amino" for mutations or 
 #' "gene:WT" for wild-type (WT) or "gene:CNV" for copy number variants.
 #' 
+#' @export
+#' 
 #' @examples
 #' clean_mutations("mdr1-86Y")  # returns "mdr1:86:Y"
 #' clean_mutations("k13-WT")    # returns "k13:WT"
