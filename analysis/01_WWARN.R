@@ -1,5 +1,5 @@
 library(tidyverse)
-source("functions/clean-mutations.R")
+devtools::load_all()
 
 # A. ART
 # ---------------------------------------------------- o
@@ -8,7 +8,7 @@ source("functions/clean-mutations.R")
 
 # as of 2 Jan 2024 ART-R markers (valid and candidate)
 ## when we have new candidates of validated markers, simply update the csv
-validated <- read_csv("data-raw/mutation_dictionary.csv")
+validated <- read_csv("analysis/data-raw/mutation_dictionary.csv")
 validated <- validated %>%
   dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
 validated_mut <- paste0(validated$mut, collapse = "|")
@@ -1010,5 +1010,5 @@ pfpm23ww_final_res_df <- pfpm23res %>% filter(mut == "pm23_CNV") %>%
 
 # bring it all back together
 wwarn_res_df <- rbind(crtww_final_res_df, mdr1ww_final_res_df, k13ww_final_res_df)
-saveRDS(wwarn_res_df, here::here("data-out/wwarn_res_df.rds"))
+saveRDS(wwarn_res_df, here::here("data-derived/wwarn_res_df.rds"))
 
