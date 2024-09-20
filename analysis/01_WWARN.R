@@ -119,6 +119,7 @@ k13ww_res_df_spl <- split(k13ww_res_df, k13ww_res_df$uuid)
 # for each poor uuid (i.e. mixed infections or other errors) correct these
 # in as best a way as possible
 k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
+k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
   lapply(function(x){
     
     # Error 1: Different ns
