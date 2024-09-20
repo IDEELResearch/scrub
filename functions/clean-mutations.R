@@ -2,6 +2,7 @@
 # format that we decided upon
 
 clean_mutations <- function(string) {
+  string <- str_replace_all(string, "_", "-")
   gene <- str_split(string,"-")[[1]][1]
   mut <- str_split(string,"-")[[1]][2]
   amino <- gsub("[^a-zA-Z/|]", "", mut) # add symbols indicating mixed infections

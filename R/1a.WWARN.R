@@ -1,4 +1,5 @@
 library(tidyverse)
+source("functions/clean-mutations.R")
 
 # A. ART
 # ---------------------------------------------------- o
@@ -239,15 +240,18 @@ prev_check_new <- k13ww_res_df_new %>%
 all(abs(prev_check_new$prev - 1) < 0.000001)
 
 # and group by to record prevalence of k13 valid mutations
+# this is where the code starts to deviate from {arms}
 k13ww_final_res_df <- k13ww_res_df_new %>%
   select(-include, -val, -uuid) %>%
   group_by(across(c(-x, -n, -prev, -mut))) %>%
   summarise(n = sum(unique(n)), x = n - sum(x[mut == "WT"]), prev = x/n) %>%
-  mutate(mut = "k13_valid") %>%
+  mutate(mut = sub("k13-", "", gene_mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, gene_mut, annotation, database, pmid, url, source) %>%
-  ungroup
+  ungroup %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(gene_mut = clean_mutations(gene_mut))
 
 
 # ---------------------------------------------------- o
@@ -746,7 +750,9 @@ crtww_final_res_df <-
                              x, n, prev, gene, mut, database, pmid, url, source)
   }) %>% do.call(rbind,.) %>%
   ungroup %>%
-  mutate(mut = replace(mut, mut == "pfcrt 76T", "crt_76T"))
+  mutate(mut = replace(mut, mut == "pfcrt 76T", "crt-76T")) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(gene_mut = clean_mutations(mut))
 
 
 # and the sanity check
