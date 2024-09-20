@@ -18,11 +18,11 @@
 #'
 clean_mutations <- function(string) {
   # Replace underscores with hyphens
-  string <- str_replace_all(string, "_", "-")
+  string <- stringr::str_replace_all(string, "_", "-")
   
   # Split the string into gene and mutation
-  gene <- str_split(string, "-")[[1]][1]
-  mut <- str_split(string, "-")[[1]][2]
+  gene <- stringr::str_split(string, "-")[[1]][1]
+  mut <- stringr::str_split(string, "-")[[1]][2]
   
   # Extract only letters and specific symbols from the mutation part (e.g., mixed infections)
   amino <- gsub("[^a-zA-Z/|]", "", mut)
@@ -34,7 +34,7 @@ clean_mutations <- function(string) {
     gene_mut <- paste0(gene, ":", amino)
   } else {
     # Extract the codon as a number and combine with the amino acid mutation
-    codon <- parse_number(mut)
+    codon <- readr::parse_number(mut)
     gene_mut <- paste0(gene, ":", codon, ":", amino)
   }
   

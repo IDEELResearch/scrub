@@ -15,18 +15,12 @@ validated_mut <- paste0(validated$mut, collapse = "|")
 
 
 # read in WWARN study info
-k13ww <- readxl::read_xls("data-raw/WWARN_K13_database_04-12-2033.xls", sheet = 1)
-pdww <- readxl::read_xls("data-raw/WWARN_partnerdrug_database_04-12-2023.xls", sheet = 1)
+k13ww <- readxl::read_xls("analysis/data-raw/WWARN_K13_database_04-12-2033.xls", sheet = 1)
+pdww <- readxl::read_xls("analysis/data-raw/WWARN_partnerdrug_database_04-12-2023.xls", sheet = 1)
 
-# right will need to find admin 1 globally based on lat long. Grab from hrp2 work
-# make sure we don't lose the lat long
-# code doesn't run for me so using downloaded files locally
-# ("https://github.com/OJWatson/hrpup/blob/main/analysis/data_derived/R6_WHO_Compliant_map.rds?raw=true", destfile = tf)
-goodmap <- readRDS("data-raw/R6_WHO_Compliant_map.rds")
-# ("https://github.com/OJWatson/hrpup/blob/main/analysis/data_derived/scenario_maps.rds?raw=true", destfile = tf)
-map_with_nms <- readRDS("data-raw/scenario_maps.rds")
-goodmap <- left_join(goodmap$.__enclos_env__$private$map, map_with_nms$map %>% sf::st_drop_geometry(), by = "id_1")
-goodmap <- sf::st_make_valid(goodmap)
+# We need to find admin 1 globally based on lat long.
+# file sourced from Malaria Atlas Project
+goodmap <- readRDS("analysis/data-raw/admin1_map.rds")
 
 # create coords
 k13coords <- sf::st_as_sf(k13ww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
