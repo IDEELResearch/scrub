@@ -9,7 +9,10 @@ clean_mutations <- function(string) {
   
   if(amino == "WT") {
     gene_mut <- paste0(gene,":",amino)
-  } else {
+  } else if(amino == "CNV"){
+    gene_mut <- paste0(gene,":",amino)
+  } 
+  else {
     codon <- parse_number(mut)
     gene_mut <- paste0(gene,":",codon,":",amino)
   }
