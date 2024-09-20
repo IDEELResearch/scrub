@@ -740,7 +740,7 @@ pdcrtspl8 <- rbind(
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source)
 
-## Complete. Bring all together againb-------------------
+## Complete. Bring all together again-------------------
 
 crtww_final_res_df <-
   list(pdcrtspl1,pdcrtspl2,pdcrtspl3,pdcrtspl5, pdcrtspl6, pdcrtspl7, pdcrtspl8) %>%
@@ -948,7 +948,9 @@ mdr1ww_final_res_df <- rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrspli
   ungroup %>%
   mutate(mut = replace(mut, mut == "pfmdr1 86Y", "mdr1_86Y")) %>%
   mutate(mut = replace(mut, mut == "pfmdr1 184F", "mdr1_184F")) %>%
-  mutate(mut = replace(mut, mut == "pfmdr1 copy number >1", "mdr1_CNV"))
+  mutate(mut = replace(mut, mut == "pfmdr1 copy number >1", "mdr1_CNV")) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(gene_mut = clean_mutations(mut))
 
 # and the sanity check
 (rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrsplit5) %>%
