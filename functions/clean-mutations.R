@@ -4,7 +4,7 @@
 clean_mutations <- function(string) {
   gene <- str_split(string,"-")[[1]][1]
   mut <- str_split(string,"-")[[1]][2]
-  amino <- gsub("[^a-zA-Z]", "", mut)
+  amino <- gsub("[^a-zA-Z/|]", "", mut) # add symbols indicating mixed infections
   
   if(amino == "WT") {
     gene_mut <- paste0(gene,":",amino)
