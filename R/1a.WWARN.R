@@ -6,6 +6,14 @@ source("functions/clean-mutations.R")
 # 1. WWARN database compile ----
 # ---------------------------------------------------- o
 
+# as of 2 Jan 2024 ART-R markers (valid and candidate)
+## when we have new candidates of validated markers, simply update the csv
+validated <- read_csv("data-raw/mutation_dictionary.csv")
+validated <- validated %>%
+  dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
+validated_mut <- paste0(validated$mut, collapse = "|")
+
+
 # read in WWARN study info
 k13ww <- readxl::read_xls("data-raw/WWARN_K13_database_04-12-2033.xls", sheet = 1)
 pdww <- readxl::read_xls("data-raw/WWARN_partnerdrug_database_04-12-2023.xls", sheet = 1)
@@ -90,11 +98,6 @@ pooruuid <- prev_checks$uuid[which(!(abs(prev_checks$prev - 1) < 0.000001))]
 # using the clearance phenotype and marker information
 
 # A. ART
-# as of 2 Jan 2024 ART-R markers (valid and candidate)
-validated <- read_csv("data-raw/mutation_dictionary.csv")
-validated <- validated %>%
-  dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
-validated_mut <- paste0(validated$mut, collapse = "|")
 
 k13ww_res_df <- k13wwdf %>%
   # no longer need res scores and instead are pulling in from the validated csv
@@ -499,8 +502,7 @@ pdcrt <- pdwwspl$crt %>%
 pdcrt <- pdcrt %>%
   group_by(across(c(-x,-prev, -mut, -rowid, -mix))) %>%
   mutate(uuid = cur_group_id()) %>%
-  ungroup()
-
+  ungroup() 
 # need to figure out how they have entered the EH 72
 
 ### TYPE 1 ------------------------------
@@ -750,10 +752,12 @@ crtww_final_res_df <-
                              x, n, prev, gene, mut, database, pmid, url, source)
   }) %>% do.call(rbind,.) %>%
   ungroup %>%
-  mutate(mut = replace(mut, mut == "pfcrt 76T", "crt-76T")) %>%
+  mutate(mut = replace(mut, mut == "pfcrt 76T", "crt_76T")) %>%
+  dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
+  dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::rowwise() %>%
-  dplyr::mutate(gene_mut = clean_mutations(mut))
-
+  dplyr::mutate(gene_mut = clean_mutations(gene_mut)) %>%
+  dplyr::relocate(names(k13ww_final_res_df))
 
 # and the sanity check
 (list(pdcrtspl1,pdcrtspl2,pdcrtspl3,pdcrtspl5, pdcrtspl6, pdcrtspl7, pdcrtspl8) %>%
@@ -949,8 +953,11 @@ mdr1ww_final_res_df <- rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrspli
   mutate(mut = replace(mut, mut == "pfmdr1 86Y", "mdr1_86Y")) %>%
   mutate(mut = replace(mut, mut == "pfmdr1 184F", "mdr1_184F")) %>%
   mutate(mut = replace(mut, mut == "pfmdr1 copy number >1", "mdr1_CNV")) %>%
+  dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
+  dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::rowwise() %>%
-  dplyr::mutate(gene_mut = clean_mutations(mut))
+  dplyr::mutate(gene_mut = clean_mutations(gene_mut)) %>%
+  dplyr::relocate(names(k13ww_final_res_df))
 
 # and the sanity check
 (rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrsplit5) %>%
@@ -1003,5 +1010,5 @@ pfpm23ww_final_res_df <- pfpm23res %>% filter(mut == "pm23_CNV") %>%
 
 # bring it all back together
 wwarn_res_df <- rbind(crtww_final_res_df, mdr1ww_final_res_df, k13ww_final_res_df)
-saveRDS(wwarn_res_df, here::here("analysis/data-derived/wwarn_res_df.rds"))
+saveRDS(wwarn_res_df, here::here("data-out/wwarn_res_df.rds"))
 
