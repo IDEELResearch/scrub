@@ -1,6 +1,6 @@
 ## reading in the tsv's routinely fixing the formatting
 # read in all three tsv's from the filepaths passed and then reformat into a list of dataframes for stave
-
+# currently only works for long tsv's - I think we shouldn't have any wide format
 read_geoff <- function(study_path, site_path, prev_path) {
   study <- readr::read_tsv(file = study_path, show_col_types = FALSE)
   site <- readr::read_tsv(file = site_path, show_col_types = FALSE)
@@ -37,8 +37,8 @@ read_geoff <- function(study_path, site_path, prev_path) {
                   long = lon_e)
   
   counts <- site_prev %>%
-    dplyr::mutate(study_id = study_id) %>%
-    dplyr::select(survey_id, gene_mutation, mutant_num, total_num)
+    dplyr::mutate(study_uid = study_id) %>%
+    dplyr::select(study_uid, survey_id, gene_mutation, mutant_num, total_num)
   
   return(list(studies_dataframe = studies, 
               surveys_dataframe = surveys, 
