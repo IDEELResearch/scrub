@@ -16,7 +16,9 @@ Imports:
     ggplot2,
     here,
     magrittr,
-    ragg
+    ragg,
+    readr,
+    stringr
 Suggests:
     knitr,
     rmarkdown,

@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# scrub <img src="https://raw.githubusercontent.com/IDEELResearch/scrub/main/tools/logo.png" align="right" style="padding-left:10px;background-color:white;" />
+# scrub <img src="tools/logo.png" align="right" style="padding-left:10px;background-color:white;" width="150px" />
 
 <!-- badges: start -->
 
@@ -10,7 +10,7 @@
 status](https://github.com/IDEELResearch/scrub/workflows/R-CMD-check/badge.svg)](https://github.com/IDEELResearch/scrub/actions)
 <!-- badges: end -->
 
-## stich - Spatial Cleaned Resistance and Unified Base
+## {scrub} - Spatial Cleaned Resistance and Unified Base
 
 This is a working R compendium (think R package but for reproducible
 analysis). A good overview on research compendiums, see the [R for
