@@ -1,6 +1,12 @@
 ## reading in the tsv's routinely fixing the formatting
 # read in all three tsv's from the filepaths passed and then reformat into a list of dataframes for stave
 # currently only works for long tsv's - I think we shouldn't have any wide format
+
+# TODO: add all the zero prevalence genotypes from k13:codon-codon:* or k13:WT
+
+
+
+
 read_geoff <- function(study_path, site_path, prev_path) {
   study <- readr::read_tsv(file = study_path, show_col_types = FALSE)
   site <- readr::read_tsv(file = site_path, show_col_types = FALSE)
@@ -25,6 +31,7 @@ read_geoff <- function(study_path, site_path, prev_path) {
     dplyr::mutate(substudy = cur_group_id()) %>% # fix substudy numbering
     dplyr::mutate(survey_id = paste0(study_id,"-",author,"-",site_uid,"-",date_end)) # check what happens if date_end is a date and not a character string
   
+  # TODO: make a unique start end numbering and use that for the survey id 
   site_prev <- full_join(site, prev, by = "site_uid")
   surveys <- site_prev %>%
     dplyr::mutate(study_id = study_id) %>%
