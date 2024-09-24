@@ -27,7 +27,7 @@ read_geoff <- function(study_path, site_path, prev_path) {
   # surveys dataframe is a combination of sites and prevalence
   prev <- prev %>%
     dplyr::group_by(across(c(site_uid, date_start, date_end))) %>%
-    dplyr::mutate(substudy = cur_group_id()) %>% # fix substudy numbering
+    dplyr::mutate(substudy = cur_group_id()) %>% # TODO: change this
     dplyr::mutate(survey_id = paste0(study_id,"-",author,"-",site_uid,"-",date_end)) # check what happens if date_end is a date and not a character string
   
   # TODO: make a unique start end numbering and use that for the survey id 
