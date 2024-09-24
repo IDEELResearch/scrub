@@ -8,12 +8,12 @@ library(STAVE)
 # TODO: this will all need fixing once Bob fixes stave
 # TODO: all of the data should be combined into one and then cleaned and deduplicated before conversion to stave
 # read in data from databases (excluding geoff)
-wwarn_data <- readRDS("analysis/data-derived/wwarn_res_df.rds")
+wwarn_data <- readRDS("analysis/data-derived/wwarn_stave.RDS")
 
 # make an empty stave object
 stave <- STAVE::STAVE_object$new()
 # append WWARN data
-wwarn_stave <- wwarn_to_stave(wwarn_data = wwarn_data)
+wwarn_stave <- wwarn_to_stave(wwarn = wwarn_data)
 stave <- stave$append_data(studies_dataframe = wwarn_stave$studies_dataframe,
                            surveys_dataframe = wwarn_stave$surveys_dataframe,
                            counts_dataframe = wwarn_stave$counts_dataframe)

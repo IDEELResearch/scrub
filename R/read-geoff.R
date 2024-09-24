@@ -4,8 +4,7 @@
 
 # TODO: add all the zero prevalence genotypes from k13:codon-codon:* or k13:WT
 
-
-
+library(tidyverse)
 
 read_geoff <- function(study_path, site_path, prev_path) {
   study <- readr::read_tsv(file = study_path, show_col_types = FALSE)
@@ -22,7 +21,7 @@ read_geoff <- function(study_path, site_path, prev_path) {
   rownames(study) <- NULL
   studies <- study %>%
     # select the columns we want to keep [PRELIMINARY] -- this is determined by {stave} structure
-    select(c(study_uid, first_author_surname, publication_year, pmid, publication_status))  %>%
+    dplyr::select(c(study_uid, first_author_surname, publication_year, pmid, publication_status))  %>%
     dplyr::mutate(database = "geoff")
   
   # surveys dataframe is a combination of sites and prevalence
