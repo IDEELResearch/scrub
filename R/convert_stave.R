@@ -2,10 +2,11 @@
 
 wwarn_to_stave <- function(wwarn) {
   #TODO figure out how to extract the publication year from PMID
+  
   studies <- wwarn %>% 
     dplyr::select(c("study_ID","study_name","study_type","authors","publication_year","url")) %>%
     dplyr::distinct(study_ID, study_name, study_type, authors, publication_year, .keep_all = TRUE)
-
+  
   counts <- wwarn %>%
     dplyr::rename(survey_key = survey_id,
                   variant_string = gene_mut,
