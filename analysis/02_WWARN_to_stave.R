@@ -46,12 +46,43 @@ wwarn <- wwarn_data %>%
   dplyr::ungroup() %>% 
   dplyr::mutate(long = as.numeric(long),
                 lat = as.numeric(lat)) %>%
-  dplyr::mutate(long = long%%360) %>%
   dplyr::rename(study_ID = study_uid) %>%
   dplyr::mutate(study_ID = paste0(study_ID, "_", authors),
                 study_name = study_ID,
                 study_type = "peer_reviewed") %>%
   dplyr::mutate(study_ID = iconv(study_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
   dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) 
+
+# fix the wildtype mutations
+wt_studies <- wwarn %>%
+  dplyr::filter(gene_mut == "k13:WT") %>%
+  dplyr::pull(study_ID) %>% unique()
+
+# for each of these studies find out what the wildtype encoding should be
+wt_mutations <- data.frame(study_ID = wt_studies,
+                           mutations = rep("", length = length(wt_studies)))
+
+for(i in 1:length(wt_studies)) {
+  muts <- wwarn %>%
+    dplyr::filter(study_ID == wt_studies[i]) %>%
+    dplyr::select(study_ID, gene_mut) %>%
+    dplyr::filter(str_detect(gene_mut, "k13")) %>%
+    dplyr::mutate(codons = gsub("k13:","", gene_mut)) %>%
+    dplyr::mutate(codons = gsub("[A-Za-z]","", codons)) %>%
+    dplyr::mutate(codons = gsub(":","", codons)) %>%
+    dplyr::filter(codons != "") %>%
+    dplyr::pull(codons) %>% parse_number() %>% unique() %>% sort()
+  wt_mutations$mutations[i] <- paste0("k13:",paste(muts, collapse = "_"),":*")
+  
+}
+
+wwarn_mut <- wwarn %>% dplyr::filter((gene_mut == "k13:WT") == FALSE)
+wwarn_wt <- wwarn %>% dplyr::filter((gene_mut == "k13:WT")) %>%
+  dplyr::left_join(wt_mutations, by = "study_ID") %>%
+  dplyr::filter(mutations != "k13::") %>%
+  dplyr::mutate(gene_mut = mutations) %>%
+  dplyr::select(-mutations)
+
+wwarn <- rbind(wwarn_mut, wwarn_wt) 
 
 saveRDS(wwarn, "analysis/data-derived/wwarn_stave.RDS")
