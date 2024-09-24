@@ -1,8 +1,8 @@
 ## example workflow to read in all the data files and convert them to a stave object
 devtools::load_all() # make sure all functions & packages are loaded that we need in this library
 
-# load stave - currently STAVE is empty 
-devtools::install_github("mrc-ide/STAVE")
+# load stave  
+# devtools::install_github("mrc-ide/STAVE")
 library(STAVE)
 
 # TODO: this will all need fixing once Bob fixes stave
