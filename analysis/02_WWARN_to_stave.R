@@ -1,4 +1,5 @@
 wwarn_data <- wwarn_res_df # readRDS("analysis/data-derived/wwarn_res_df.rds")
+ref_als <- read.csv("analysis/data-raw/k13_ref_protein_codon_dictionary.csv")
 
 wwarn <- wwarn_data %>%
   dplyr::group_by(pmid) %>%
@@ -51,7 +52,8 @@ wwarn <- wwarn_data %>%
                 study_name = study_ID,
                 study_type = "peer_reviewed") %>%
   dplyr::mutate(study_ID = iconv(study_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
-  dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) 
+  dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) #%>%
+  # dplyr::mutate(continent = countrycode:: )
 
 # fix the wildtype mutations
 wt_studies <- wwarn %>%
@@ -72,17 +74,28 @@ for(i in 1:length(wt_studies)) {
     dplyr::mutate(codons = gsub(":","", codons)) %>%
     dplyr::filter(codons != "") %>%
     dplyr::pull(codons) %>% parse_number() %>% unique() %>% sort()
+  # TODO: figure out how to add the reference allelles here 
   wt_mutations$mutations[i] <- paste0("k13:",paste(muts, collapse = "_"),":*")
   
 }
 
-wwarn_mut <- wwarn %>% dplyr::filter((gene_mut == "k13:WT") == FALSE)
+wwarn_mut <- wwarn %>% dplyr::filter((gene_mut == "k13:WT") == FALSE) %>%
+  dplyr::filter(gene_mut != "k13:470:X") %>%
+  dplyr::distinct(survey_id, gene_mut, .keep_all = TRUE)
 wwarn_wt <- wwarn %>% dplyr::filter((gene_mut == "k13:WT")) %>%
   dplyr::left_join(wt_mutations, by = "study_ID") %>%
   dplyr::filter(mutations != "k13::") %>%
   dplyr::mutate(gene_mut = mutations) %>%
   dplyr::select(-mutations)
 
-wwarn <- rbind(wwarn_mut, wwarn_wt) 
+# survey keys to remove to avoid errors with the 
+# these are errors in WWARN itself - see Asua 2021 extractions
+# TODO: figure out what they've done here
+# remove_surveys <- wwarn_mut$survey_id[c(3521, 2965, 2995, 3031, 2500, 2795, 2479, 3142, 3161, 3165, 3261, 3507, 2734, 2717, 2491, 3841, 3844, 3855, 3859, 3867, 3883, 3885, 3889, 3895, 3900, 3909, 3918, 3922, 3934, 3947, 3949, 2691, 3596, 3755, 3757,
+#                                         2911, 2941, 3440, 3695, 3698, 3709, 3713, 3721, 3737, 3739, 3743, 3749, 3754, 3763, 3772, 3776, 3788, 3801, 3803, 2696, 3609, 3611, 3512, 3086, 3105, 3109, 3199, 2975, 2749, 2469, 3426, 2664, 2478,
+#                                         2883, 2913, 3327, 3571, 3574, 3585, 3589, 3597, 3613, 3615, 3619, 3625, 3630, 3639, 3648, 3652, 3664, 3677, 3679, 2682, 3392, 3058, 3077, 3081, 3143, 2947, 2735, 2464, 2652, 2472)]
+
+# wwarn <- rbind(wwarn_mut, wwarn_wt) 
+wwarn <- wwarn_mut %>% dplyr::filter((survey_id %in% remove_surveys) == FALSE)
 
 saveRDS(wwarn, "analysis/data-derived/wwarn_stave.RDS")

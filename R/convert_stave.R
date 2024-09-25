@@ -16,7 +16,8 @@ wwarn_to_stave <- function(wwarn) {
     # TODO: figure out why some of these are not integers and how to fix them
     dplyr::mutate(variant_num = floor(variant_num)) %>%
     dplyr::filter(variant_string != "mdr1:CNV") %>%
-    dplyr::select(survey_key, variant_string, variant_num, total_num) 
+    dplyr::select(survey_key, variant_string, variant_num, total_num) %>%
+    dplyr::distinct(survey_key, variant_string, .keep_all = TRUE)
   
   
   ### surveys id -- in WWARN a lot of data points are multisite 
@@ -41,7 +42,8 @@ wwarn_to_stave <- function(wwarn) {
                   time_notes = "automated midpoint") %>%
     dplyr::select(study_key, survey_ID, country_name, site_name,
                   lat, lon, spatial_notes, collection_start, collection_end, 
-                  collection_day, time_notes)
+                  collection_day, time_notes) %>%
+    dplyr::distinct(study_key, survey_ID, .keep_all = TRUE)
   
   studies <- studies %>%
     dplyr::filter(study_ID %in% surveys$study_key)  

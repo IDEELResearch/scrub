@@ -18,7 +18,8 @@ Imports:
     magrittr,
     ragg,
     readr,
-    stringr
+    stringr,
+    tidyverse
 Suggests:
     knitr,
     rmarkdown,
