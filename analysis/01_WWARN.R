@@ -44,6 +44,8 @@ pdww$admin_1 <- goodmap$name_1[pdins]
 # ---------------------------------------------------- o
 
 # sort names as wanted
+set.seed(123L)
+
 k13wwdf <- k13ww %>%
   rename(admin_0 = country) %>%
   mutate(iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c")) %>%
@@ -62,11 +64,10 @@ k13wwdf <- k13ww %>%
   rename(source = authors) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source,
-         val) %>%
-  group_by(across(c(-x, -n, -prev, -mut, -val))) %>%
+         x, n, prev, gene, mut, database, pmid, url, source, val) %>%
+  group_by(across(c(-x, -n, -prev, -val))) %>%
   mutate(uuid = cur_group_id()) %>%
-  ungroup
+  ungroup()
 
 
 # for the final grouping to work the following needs to have all prev summing to 1
@@ -102,11 +103,9 @@ k13ww_res_df <- k13wwdf %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::mutate(annotation = if_else(mut == "WT", "wildtype", annotation)) %>%
   dplyr::mutate(annotation = if_else(is.na(annotation), "unknown", annotation)) %>%
-  # group by codon position
-  dplyr::mutate(codon = gsub("k13-","", gene_mut)) %>%
-  dplyr::mutate(codon = if_else(codon == "WT", "0", codon)) %>%
-  dplyr::mutate(codon = parse_number(codon)) %>% 
-  group_by(across(c(-x, -n, -prev, mut, gene_mut))) %>% # want to make sure we group by everything except mut, prev, num, denom
+  # group by survey -- think this is still wrong...
+  # doesn't seem like enough uuid???
+  group_by(across(c(-x, -n, -prev, -mut, -val))) %>% # want to make sure we group by everything except mut, prev, num, denom
   mutate(uuid = cur_group_id()) %>%
   ungroup
 
@@ -119,6 +118,12 @@ k13ww_res_df_spl <- split(k13ww_res_df, k13ww_res_df$uuid)
 
 # for each poor uuid (i.e. mixed infections or other errors) correct these
 # in as best a way as possible
+
+# for using in debugging
+# x <- k13ww_res_df_spl[pooruuid[8]] %>% as.data.frame()
+# names(x) <- gsub("X1.", "", names(x))
+
+
 k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
   lapply(function(x){
     
