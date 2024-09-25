@@ -10,6 +10,8 @@ devtools::load_all()
 ## when we have new candidates of validated markers, simply update the csv
 validated <- read_csv("analysis/data-raw/mutation_dictionary.csv")
 validated <- validated %>%
+  dplyr::filter(mut != "CNV") %>% 
+  dplyr::filter(gene == "k13") %>% 
   dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
 validated_mut <- paste0(validated$mut, collapse = "|")
 
