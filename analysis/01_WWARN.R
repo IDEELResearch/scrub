@@ -8,10 +8,11 @@ devtools::load_all()
 
 # as of 2 Jan 2024 ART-R markers (valid and candidate)
 ## when we have new candidates of validated markers, simply update the csv
+## comparing against {arms} to figure out why these now fail
 validated <- read_csv("analysis/data-raw/mutation_dictionary.csv")
 validated <- validated %>%
   dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
-validated_mut <- paste0(validated$mut, collapse = "|")
+validated_mut <- paste0(validated$mut, collapse = "|") 
 
 
 # read in WWARN study info
@@ -71,7 +72,7 @@ k13wwdf <- k13ww %>%
 # for the final grouping to work the following needs to have all prev summing to 1
 # otherwise there is data entry
 prev_checks <- k13wwdf %>%
-  group_by(uuid) %>%
+  group_by(uuid, gene) %>%
   summarise(prev = sum(prev))
 
 # this is not true so we have inaccuracies in the WWARN data
@@ -88,8 +89,8 @@ pooruuid <- prev_checks$uuid[which(!(abs(prev_checks$prev - 1) < 0.000001))]
 # from the data as it is to identify which alleles go together as
 # they just report prevalence of each mutation
 
-# In response, let's assign each mutation as either WT or k13-valid
-# using the clearance phenotype and marker information
+# Lets now add the annotation to the genetic markers. We are no longer pooling all of the 
+# validated markers together but instead keeping individual marker information
 
 # A. ART
 
@@ -101,9 +102,15 @@ k13ww_res_df <- k13wwdf %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::mutate(annotation = if_else(mut == "WT", "wildtype", annotation)) %>%
   dplyr::mutate(annotation = if_else(is.na(annotation), "unknown", annotation)) %>%
-  group_by(across(c(-x, -n, -prev, -mut, -gene_mut, -annotation))) %>%
+  # group by codon position
+  dplyr::mutate(codon = gsub("k13-","", gene_mut)) %>%
+  dplyr::mutate(codon = if_else(codon == "WT", "0", codon)) %>%
+  dplyr::mutate(codon = parse_number(codon)) %>% 
+  group_by(across(c(-x, -n, -prev, mut, gene_mut))) %>% # want to make sure we group by everything except mut, prev, num, denom
   mutate(uuid = cur_group_id()) %>%
   ungroup
+
+# debug: prevalences still seem to make sense looking at uganda 
 
 # From this let's then split into the uuids and do some
 # data cleaning and checking
@@ -112,7 +119,6 @@ k13ww_res_df_spl <- split(k13ww_res_df, k13ww_res_df$uuid)
 
 # for each poor uuid (i.e. mixed infections or other errors) correct these
 # in as best a way as possible
-k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
 k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
   lapply(function(x){
     
