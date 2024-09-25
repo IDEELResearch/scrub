@@ -52,8 +52,7 @@ wwarn <- wwarn_data %>%
                 study_name = study_ID,
                 study_type = "peer_reviewed") %>%
   dplyr::mutate(study_ID = iconv(study_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
-  dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) #%>%
-  # dplyr::mutate(continent = countrycode:: )
+  dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID))
 
 # fix the wildtype mutations
 wt_studies <- wwarn %>%
