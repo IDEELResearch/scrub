@@ -112,6 +112,7 @@ k13ww_res_df_spl <- split(k13ww_res_df, k13ww_res_df$uuid)
 
 # for each poor uuid (i.e. mixed infections or other errors) correct these
 # in as best a way as possible
+# k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
 k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
   lapply(function(x){
     
@@ -233,12 +234,15 @@ prev_check_new <- k13ww_res_df_new %>%
   group_by(uuid) %>%
   summarise(prev = sum(prev))
 
-# this is now TRUE!!!
+# this is now TRUE!!! ## this is not true now though... 600+ fail
 all(abs(prev_check_new$prev - 1) < 0.000001)
+
+remove <- which((abs(prev_check_new$prev - 1) < 0.000001))
 
 # and group by to record prevalence of k13 valid mutations
 # this is where the code starts to deviate from {arms}
-k13ww_final_res_df <- k13ww_res_df_new %>%
+k13ww_final_res_df <- k13ww_res_df_new[-remove,] %>% #TODO: remove the indexing when this works
+  #TODO: debugging but filtering out the ones where the prev check fails now
   select(-include, -val, -uuid) %>%
   group_by(across(c(-x, -n, -prev, -mut))) %>%
   summarise(n = sum(unique(n)), x = n - sum(x[mut == "WT"]), prev = x/n) %>%
@@ -1004,5 +1008,4 @@ pfpm23ww_final_res_df <- pfpm23res %>% filter(mut == "pm23_CNV") %>%
 
 # bring it all back together
 wwarn_res_df <- rbind(crtww_final_res_df, mdr1ww_final_res_df, k13ww_final_res_df)
-saveRDS(wwarn_res_df, "analysis/data-derived/wwarn_res_df.rds")
-
+saveRDS(wwarn_res_df, here::here("analysis/data-derived/wwarn_res_df.rds"))

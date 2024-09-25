@@ -9,17 +9,17 @@ library(STAVE)
 # TODO: all of the data should be combined into one and then cleaned and deduplicated before conversion to stave
 # read in data from databases (excluding geoff)
 # wwarn_data <- readRDS("analysis/data-derived/wwarn_stave.RDS")
-wwarn_data <- wwarn
+# wwarn_data <- wwarn
 
 # make an empty stave object
 stave <- STAVE::STAVE_object$new()
 # append WWARN data
-wwarn_stave <- wwarn_to_stave(wwarn = wwarn_data)
-stave <- stave$append_data(studies_dataframe = wwarn_stave$studies_dataframe,
-                           surveys_dataframe = wwarn_stave$surveys_dataframe,
-                           counts_dataframe = wwarn_stave$counts_dataframe)
+wwarn_stave <- wwarn_to_stave(wwarn = wwarn)
+stave$append_data(studies_dataframe = wwarn_stave$studies_dataframe,
+                  surveys_dataframe = wwarn_stave$surveys_dataframe,
+                  counts_dataframe = wwarn_stave$counts_dataframe)
 
-saveRDS(stave, "analysis/data-derive/stave_wwarn.RDS")
+saveRDS(stave, "analysis/data-derived/stave_wwarn.RDS")
 
 # now convert all of the geoff objects into a list
 geoff_path <- "analysis/data-geoff/" # filepath to all of the geoff tsvs which are in separate folders
