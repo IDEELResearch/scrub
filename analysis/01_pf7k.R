@@ -124,16 +124,23 @@ k13_conv <- function(marker) {
   
 }
 
+# send example to Bob to comment on
+mdf %>% select(crt_K76T, mdr1_N86Y, mdr1_Y184F, mdr1_dup_call, k13_markers,pm2_dup_call) %>% 
+  unique() %>% 
+  write.csv("analysis/data-derived/pf7k_phase_examples.csv")
+
 # 6. convert our k13 markers into numeric for k13 valid markers
 mdf <- mdf %>%
   mutate(k13_valid = k13_conv(k13_markers))
 
 # pull the k13
+all_muts <- toupper(unlist(str_extract_all(mdf$k13_markers %>% unique, "\\w*")) %>% unique)
+all_muts <- all_muts[(!all_muts %in% c("WT","",NA))]
 pull_k13_muts <- function(marker) {
   
   muts <- str_extract_all(marker, paste0(validated, "|", tolower(validated)))[[1]]
   muts <- unique(toupper(muts))
-  dfmut <- data.frame("mut" = paste0("k13_",validated_prereg), "present" = 0)
+  dfmut <- data.frame("mut" = all_muts, "present" = 0)
   if(length(muts) > 0) {
   dfmut$present[grep(paste0(muts, collapse = "|"), dfmut$mut)] <- 1
   }
