@@ -1,6 +1,7 @@
 wwarn_data <- readRDS("analysis/data-derived/wwarn_res_df.rds")
 ref_als <- read.csv("analysis/data-raw/k13_ref_protein_codon_dictionary.csv")
 
+set.seed(1)
 wwarn <- wwarn_data %>%
   dplyr::group_by(pmid) %>%
   dplyr::mutate(study_uid = paste0("wwarn","_",sample(10000:99999,1, replace = FALSE))) %>%
@@ -52,7 +53,10 @@ wwarn <- wwarn_data %>%
                 study_name = study_ID,
                 study_type = "peer_reviewed") %>%
   dplyr::mutate(study_ID = iconv(study_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
-  dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID))
+  dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) %>% 
+  dplyr::mutate(continent = countrycode::countrycode(iso3c, origin = "iso3c", destination = "continent")) %>%
+  dplyr::filter(continent == "Africa")
+
 
 # fix the wildtype mutations
 wt_studies <- wwarn %>%
@@ -88,10 +92,7 @@ wwarn_wt <- wwarn %>% dplyr::filter((gene_mut == "k13:WT")) %>%
   dplyr::select(-mutations)
 
 # TODO: figure out why these are errors but just filter out for now so I can send an .rds
-remove <- wwarn_stave$counts_dataframe[c(3714, 3717, 3727, 3750, 3752, 3756, 3762, 3767, 
-                                         3776, 3785, 3789, 3801, 3813, 3815, 3486, 2490, 
-                                         2483, 2930, 3088, 3107, 3111, 3202, 2672, 3642, 
-                                         3644, 2772, 2982, 2715, 2698, 3417, 3405, 2471),] %>% 
+remove <- wwarn_stave$counts_dataframe[c(1791, 1692, 1735, 1718, 1936, 1939, 1949, 1972, 1974, 1978, 1984, 1989, 1998, 2007, 2011, 2023, 2035, 2037, 1861, 1566, 1873, 1585, 1578),] %>%
   pull(survey_key)
   
   
