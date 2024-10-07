@@ -19,7 +19,8 @@ Imports:
     ragg,
     readr,
     stringr,
-    tidyverse
+    tidyverse,
+    countrycode
 Suggests:
     knitr,
     rmarkdown,
