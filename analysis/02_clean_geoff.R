@@ -12,137 +12,7 @@ library(here)
 # 
 ################################################################################
 
-# Define functions
-
-# Collapse k13 range into a standard format
-collapse_k13_range <- function(gene_mutation) {
-  parts <- unlist(strsplit(gene_mutation, "[:-]"))
-  start_pos <- as.numeric(parts[2])
-  end_pos <- as.numeric(parts[3])
-  
-  # Filter the reference amino acids for the specified range
-  ref_amino_acids <- mutation_key %>%
-    filter(PROTEIN == "k13", CODON >= start_pos, CODON <= end_pos) %>%
-    arrange(CODON)
-  
-  # If no matching codons are found, return the original value and log the issue
-  if (nrow(ref_amino_acids) == 0) {
-    cat("Warning: No matching codons found for gene_mutation:", gene_mutation, "\n")
-    return(gene_mutation)
-  }
-  
-  # Concatenate codon positions and amino acids
-  codon_string <- paste(ref_amino_acids$CODON, collapse = "_")
-  amino_acid_string <- paste(ref_amino_acids$REF, collapse = "_")
-  collapsed_mutation <- paste("K13", codon_string, amino_acid_string, sep = ":")
-  
-  return(collapsed_mutation)
-}
-
-# Adjust invalid dates (e.g., 2019-02-31) with year-only, year-month, and full date support
-adjust_invalid_date <- function(date_str, is_start = TRUE) {
-  date_fixed <- suppressWarnings(
-    case_when(
-      grepl("^[0-9]{4}$", date_str) ~ {
-        if (is_start) ymd(paste0(date_str, "-01-01")) else ymd(paste0(date_str, "-12-31"))
-      },
-      grepl("^[0-9]{4}-[0-9]{2}$", date_str) ~ {
-        if (is_start) ymd(paste0(date_str, "-01")) else ceiling_date(ymd(paste0(date_str, "-01")), "month") - days(1)
-      },
-      grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", date_str) ~ ymd(date_str),
-      TRUE ~ as.Date(NA)
-    )
-  )
-  return(date_fixed)
-}
-
-# Function to check for gene name typos and print warnings
-check_gene_typos <- function(gene_column) {
-  # Define probable typos for k13, crt, and mdr1
-  probable_typos <- list(
-    "k13" = c("kelch13", "kelch 13", "kelch_13", "kelch", "kletch13", "klech 13"),
-    "crt" = c("ctr"),
-    "mdr1" = c("mrd1", "mdr")
-  )
-  
-  for (correct_gene in names(probable_typos)) {
-    typos_found <- gene_column[gene_column %in% probable_typos[[correct_gene]]]
-    if (length(typos_found) > 0) {
-      message(paste("Probable typo found for", correct_gene, ": did you mean", correct_gene, "?"))
-    }
-  }
-}
-
-# Correcting known bad strings in the substudy column and counting instances
-correct_substudy_entries <- function(substudy_column) {
-  # Correct entries and count the corrections
-  corrections <- list(
-    day0extracted = sum(grepl("^day 0$", substudy_column)),  # Count "day 0"
-    untreated_extracted = sum(grepl("^untreated_extracted$", substudy_column)),  # Count "untreated_extracted"
-    untreadextracted = sum(grepl("^untreadextracted$", substudy_column))  # Count "untreadextracted"
-  )
-  
-  # Perform the corrections
-  substudy_column <- gsub("^day 0$", "day0extracted", substudy_column)
-  substudy_column <- gsub("^untreated_extracted$", "untreatedextracted", substudy_column)
-  substudy_column <- gsub("^untreadextracted$", "untreatedextracted", substudy_column)
-  
-  # Print the corrections made and their counts
-  for (correction in names(corrections)) {
-    if (corrections[[correction]] > 0) {
-      message(paste("Corrected", corrections[[correction]], "instances of", correction))
-    }
-  }
-  
-  return(substudy_column)
-}
-
-# Check if all entries are valid for substudy
-check_substudy_entries <- function(substudy_column) {
-  # Correct bad strings first and track corrections
-  substudy_column <- correct_substudy_entries(substudy_column)
-  
-  # Define allowed categories
-  allowed_categories <- c(
-    "untreatedextracted", "untreatedcalculated", "day0extracted", "day0calculated",
-    "day3calculated", "day24calculated", "treatedextracted", "treatedcalculated"
-  )
-  
-  # Regular expression for "day X extracted" or "day X calculated"
-  day_extracted_calculated_pattern <- "^day[0-9]+(extracted|calculated)$"
-  
-  # Find any entries not matching the allowed categories or the day X extracted/calculated pattern
-  invalid_entries <- substudy_column[!substudy_column %in% allowed_categories & 
-                                       !grepl(day_extracted_calculated_pattern, substudy_column)]
-  
-  # If there are invalid entries, print them
-  if (length(invalid_entries) > 0) {
-    message("Invalid entries found in 'substudy':")
-    print(invalid_entries)
-  } else {
-    message("All 'substudy' entries are valid after corrections.")
-  }
-  
-  return(substudy_column)
-}
-
-# Function to create combined dataframe with all columns from the original master_table
-create_combined_df <- function(df, mapping, default_database = "GEOFF") {
-  result_df <- df  # Start with all columns from the original dataframe
-  for (new_col in names(mapping)) {
-    if (!is.na(mapping[[new_col]]) && mapping[[new_col]] %in% colnames(df)) {
-      result_df[[new_col]] <- df[[mapping[[new_col]]]]
-    } else if (new_col == "database") {
-      result_df[[new_col]] <- default_database
-    } else {
-      result_df[[new_col]] <- NA
-    }
-  }
-  return(result_df)
-}
-
-# Load data and perform operations
-# Load the combined geoff data table created in the first script
+# Load the combined all studies geoff data table created in the first script
 master_table <- readRDS(here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
 
 # Load mutation key for k13 reference ranges
@@ -222,10 +92,10 @@ column_mapping <- list(
 )
 
 # Create combined dataframe based on column mapping, keeping all original columns
-master_table_combined <- create_combined_df(master_table, column_mapping)
+master_table_renamed <- create_renamed_df(master_table, column_mapping)
 
 # Ensure consistent column types for merging
-master_table_combined <- master_table_combined %>%
+master_table_renamed <- master_table_renamed %>%
   mutate(
     study_start_year = as.character(study_start_year),
     study_end_year = as.character(study_end_year),
@@ -240,16 +110,16 @@ wwarn_res_df_cols <- c("iso3c", "admin_0", "admin_1", "site", "lat", "long", "ye
                        "gene", "mut", "gene_mut", "annotation", "database", 
                        "pmid", "url", "source")
 
-all_columns <- union(colnames(master_table_combined), wwarn_res_df_cols)
+all_columns <- union(colnames(master_table_renamed), wwarn_res_df_cols)
 
 # Fill any columns still required for wwarn rbind which have no comparable data in geoff with na to allow rbind later on
-for (col in setdiff(all_columns, colnames(master_table_combined))) {
-  master_table_combined[[col]] <- NA
+for (col in setdiff(all_columns, colnames(master_table_renamed))) {
+  master_table_renamed[[col]] <- NA
 }
 
 # Reorder columns to match the wwarn_res_df_cols structure
-master_table_combined <- master_table_combined[, all_columns]
+master_table_renamed <- master_table_renamed[, all_columns]
 
 # Save the final merged_df as an RDS file
-saveRDS(master_table_combined, here("analysis", "data-derived", "02_clean_geoffs_output_table.rds"))
+saveRDS(master_table_renamed, here("analysis", "data-derived", "02_clean_geoffs_output_table.rds"))
 print("Data saved. Ready for further analysis.")
