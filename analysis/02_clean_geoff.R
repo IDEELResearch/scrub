@@ -1,100 +1,129 @@
-## wwarn equivalent -- just here in case you need to borrow any of this
+# Load required libraries
+library(dplyr)
+library(lubridate)
+library(here)
 
-# wwarn <- wwarn_data %>%
-#   dplyr::group_by(pmid) %>%
-#   dplyr::mutate(study_uid = paste0("wwarn","_",sample(10000:99999,1, replace = FALSE))) %>%
-#   dplyr::ungroup() %>%
-#   dplyr::mutate(publication_status = "peer-reviewed", 
-#                 database = "wwarn",
-#                 publication_year = 1000) %>% # placeholder but this is so stave doesnt error
-#   dplyr::rowwise() %>%
-#   dplyr::mutate(source = str_split(source, " ")[[1]][1]) %>%
-#   dplyr::mutate(site_fixed = if_else(is.na(site), 
-#                                      gsub(" ","",admin_1), 
-#                                      gsub(" ", "", site)),
-#                 country_name = countrycode::countrycode(iso3c, # fix up top
-#                                                         origin = 'iso3c', 
-#                                                         destination = 'country.name')) %>%
-#   # manually fix the country names
-#   dplyr::mutate(country_name = if_else(country_name %in% c("Congo - Kinshasa",
-#                                                            "Congo - Brazzaville"),
-#                                        "Democratic Republic of the Congo", country_name)) %>%
-#   dplyr::mutate(country_name = if_else(country_name == "Côte d’Ivoire",
-#                                        "Côte d'Ivoire", country_name)) %>%
-#   dplyr::mutate(country_name = if_else(country_name == "Myanmar (Burma)",
-#                                        "Myanmar", country_name)) %>%
-#   dplyr::mutate(country_name = if_else(country_name == "São Tomé & Príncipe",
-#                                        "São Tomé and Príncipe", country_name)) %>%
-#   dplyr::mutate(country_name = if_else(country_name == "Cape Verde",
-#                                        "Cabo Verde", country_name)) %>%
-#   dplyr::ungroup() %>%
-#   dplyr::filter(country_name != "Eswatini") %>% 
-#   dplyr::mutate(study_end_year = if_else(is.na(study_end_year),
-#                                          as.numeric(year), study_end_year)) %>%
-#   dplyr::mutate(study_start_year = if_else(is.na(study_start_year),
-#                                            as.numeric(year), study_start_year)) %>%
-#   dplyr::filter(study_end_year != 3) %>% 
-#   dplyr::rename(first_author_surname = source) %>%
-#   dplyr::mutate(authors = stringr::word(first_author_surname,1)) %>%
-#   dplyr::ungroup() %>%
-#   dplyr::group_by(across(c(study_uid, site, study_end_year))) %>%
-#   dplyr::mutate(survey_id = paste0(study_uid,"_",authors,"_",site_fixed,"_",study_end_year)) %>%
-#   dplyr::ungroup() %>%
-#   dplyr::mutate(survey_id = gsub("[^a-zA-Z0-9_]", "", survey_id)) %>% # all the things throwing errors in stave
-#   dplyr::rowwise() %>%
-#   dplyr::mutate(survey_id = iconv(survey_id, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
-#   dplyr::ungroup() %>% 
-#   dplyr::mutate(long = as.numeric(long),
-#                 lat = as.numeric(lat)) %>%
-#   dplyr::rename(study_ID = study_uid) %>%
-#   dplyr::mutate(study_ID = paste0(study_ID, "_", authors),
-#                 study_name = study_ID,
-#                 study_type = "peer_reviewed") %>%
-#   dplyr::mutate(study_ID = iconv(study_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
-#   dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) #%>%
-# # dplyr::mutate(continent = countrycode:: )
-# 
-# # fix the wildtype mutations
-# wt_studies <- wwarn %>%
-#   dplyr::filter(gene_mut == "k13:WT") %>%
-#   dplyr::pull(study_ID) %>% unique()
-# 
-# # for each of these studies find out what the wildtype encoding should be
-# wt_mutations <- data.frame(study_ID = wt_studies,
-#                            mutations = rep("", length = length(wt_studies)))
-# 
-# for(i in 1:length(wt_studies)) {
-#   muts <- wwarn %>%
-#     dplyr::filter(study_ID == wt_studies[i]) %>%
-#     dplyr::select(study_ID, gene_mut) %>%
-#     dplyr::filter(str_detect(gene_mut, "k13")) %>%
-#     dplyr::mutate(codons = gsub("k13:","", gene_mut)) %>%
-#     dplyr::mutate(codons = gsub("[A-Za-z]","", codons)) %>%
-#     dplyr::mutate(codons = gsub(":","", codons)) %>%
-#     dplyr::filter(codons != "") %>%
-#     dplyr::pull(codons) %>% parse_number() %>% unique() %>% sort()
-#   # TODO: figure out how to add the reference allelles here 
-#   wt_mutations$mutations[i] <- paste0("k13:",paste(muts, collapse = "_"),":*")
-#   
-# }
-# 
-# wwarn_mut <- wwarn %>% dplyr::filter((gene_mut == "k13:WT") == FALSE) %>%
-#   dplyr::filter(gene_mut != "k13:470:X") %>%
-#   dplyr::distinct(survey_id, gene_mut, .keep_all = TRUE)
-# wwarn_wt <- wwarn %>% dplyr::filter((gene_mut == "k13:WT")) %>%
-#   dplyr::left_join(wt_mutations, by = "study_ID") %>%
-#   dplyr::filter(mutations != "k13::") %>%
-#   dplyr::mutate(gene_mut = mutations) %>%
-#   dplyr::select(-mutations)
-# 
-# # survey keys to remove to avoid errors with the 
-# # these are errors in WWARN itself - see Asua 2021 extractions
-# # TODO: figure out what they've done here
-# # remove_surveys <- wwarn_mut$survey_id[c(3521, 2965, 2995, 3031, 2500, 2795, 2479, 3142, 3161, 3165, 3261, 3507, 2734, 2717, 2491, 3841, 3844, 3855, 3859, 3867, 3883, 3885, 3889, 3895, 3900, 3909, 3918, 3922, 3934, 3947, 3949, 2691, 3596, 3755, 3757,
-# #                                         2911, 2941, 3440, 3695, 3698, 3709, 3713, 3721, 3737, 3739, 3743, 3749, 3754, 3763, 3772, 3776, 3788, 3801, 3803, 2696, 3609, 3611, 3512, 3086, 3105, 3109, 3199, 2975, 2749, 2469, 3426, 2664, 2478,
-# #                                         2883, 2913, 3327, 3571, 3574, 3585, 3589, 3597, 3613, 3615, 3619, 3625, 3630, 3639, 3648, 3652, 3664, 3677, 3679, 2682, 3392, 3058, 3077, 3081, 3143, 2947, 2735, 2464, 2652, 2472)]
-# 
-# # wwarn <- rbind(wwarn_mut, wwarn_wt) 
-# wwarn <- wwarn_mut %>% dplyr::filter((survey_id %in% remove_surveys) == FALSE)
-# 
-# saveRDS(wwarn, "analysis/data-derived/wwarn_stave.RDS")
+# Load the combined geoff data table created in the first script
+master_table <- readRDS(here("analysis", "data-derived", "combined_geoff_data_df.rds"))
+
+# Filter the combined geoff data table for untreated data only
+master_table <- master_table %>% filter(!substudy %in% c("treatedextracted", "treatedcalculated"))
+
+# Expand gene mutation ranges for reference range syntax)
+rows_to_transform <- master_table %>%
+  filter(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(gene_mutation)))
+
+indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table$gene_mutation)))
+
+master_table$gene_mutation[indices_to_transform] <- sapply(
+  master_table$gene_mutation[indices_to_transform],
+  collapse_k13_range
+)
+
+# Adjust and add dates and survey IDs
+master_table <- master_table %>%
+  mutate(
+    collection_start = adjust_invalid_date(date_start, is_start = TRUE),
+    collection_end = adjust_invalid_date(date_end, is_start = FALSE),
+    collection_day = case_when(
+      !is.na(collection_start) & !is.na(collection_end) ~ as.Date((as.numeric(collection_start) + as.numeric(collection_end)) / 2, origin = "1970-01-01"),
+      !is.na(collection_start) & is.na(collection_end) ~ collection_start,
+      is.na(collection_start) & !is.na(collection_end) ~ collection_end,
+      TRUE ~ NA_Date_
+    ),
+    collection_start = as.character(collection_start),
+    collection_end = as.character(collection_end),
+    collection_day = as.character(collection_day),
+    survey_ID = paste0(study_uid, "_", first_author_surname, "_", site_name, "_", publication_year, "_", sample(1:1000000, size = nrow(master_table), replace = FALSE)),
+    survey_ID = gsub("[^a-zA-Z0-9_]", "", survey_ID),
+    survey_ID = iconv(survey_ID, from = "UTF-8", to = "ASCII//TRANSLIT")
+  )
+
+# Extract gene and mutation identifiers
+master_table <- master_table %>%
+  mutate(
+    gene = sub(":.*", "", gene_mutation),
+    mut = sapply(strsplit(gene_mutation, ":"), function(x) paste(tail(x, 2), collapse = ":"))
+  )
+
+# Define a column mapping for geoff so that it matches columns in wwarn for merging later by Gina
+column_mapping <- list(
+  admin_0 = "country",
+  admin_1 = NA,
+  site = "site_name",
+  lat = "lat_n",
+  long = "lon_e",
+  year = "collection_day",
+  study_start_year = "date_start",
+  study_end_year = "date_end",
+  x = "mutant_num",
+  n = "total_num",
+  prev = NA,
+  gene = "gene",
+  mut = "mut",
+  gene_mut = "gene_mutation",
+  annotation = NA,
+  database = "database",
+  url = "study_url",
+  source = "publication_status",
+  iso3c = "iso3c",
+  pmid = "pmid"
+)
+
+# Create combined dataframe based on column mapping
+create_combined_df <- function(df, mapping, default_database = "GEOFF") {
+  result_df <- data.frame(matrix(ncol = length(mapping), nrow = nrow(df)))
+  colnames(result_df) <- names(mapping)
+  
+  for (new_col in names(mapping)) {
+    if (!is.na(mapping[[new_col]]) && mapping[[new_col]] %in% colnames(df)) {
+      result_df[[new_col]] <- df[[mapping[[new_col]]]]
+    } else if (new_col == "database") {
+      result_df[[new_col]] <- default_database
+    } else {
+      result_df[[new_col]] <- NA
+    }
+  }
+  return(result_df)
+}
+
+# Apply transformation
+master_table_combined <- create_combined_df(master_table, column_mapping)
+
+# Ensure consistent column types for binding
+master_table_combined <- master_table_combined %>%
+  mutate(
+    study_start_year = as.character(study_start_year),
+    study_end_year = as.character(study_end_year),
+    x = as.double(x),
+    n = as.double(n)
+  )
+
+# Add 'prev' column to master_table_combined by dividing x by n
+master_table_combined <- master_table_combined %>%
+  mutate(prev = if_else(n != 0, x / n, NA_real_))
+
+# Align columns in both dataframes for row binding
+all_columns <- union(colnames(master_table_combined), colnames(wwarn_res_df))
+
+# Add missing columns as NA to each dataframe
+for (col in setdiff(all_columns, colnames(master_table_combined))) {
+  master_table_combined[[col]] <- NA
+}
+
+for (col in setdiff(all_columns, colnames(wwarn_res_df))) {
+  wwarn_res_df[[col]] <- NA
+}
+
+# Reorder columns and bind rows
+master_table_combined <- master_table_combined[, all_columns]
+
+# Below line is Just for testing column name and col type compatibility after 
+# cleaning geoff to match OJ/Ginas warn cleaning:
+# wwarn_res_df <- wwarn_res_df[, all_columns]
+# merged_df <- bind_rows(master_table_combined, wwarn_res_df) # Merge geoff combined and wwarn into a single dataframe
+# saveRDS(merged_df, here("analysis", "data-derived", "merged_df.rds"))
+
+# Save the final merged_df as an RDS file
+saveRDS(master_table_combined, here("analysis", "data-derived", "master_table_combined.rds"))
+print("Data saved. Ready for further analysis.")
