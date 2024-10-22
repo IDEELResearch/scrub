@@ -12,11 +12,11 @@ library(here)
 # 
 ################################################################################
 
-# TODO: functions should always live in a separate script in the R directory
-# TODO: add function descriptions with comments for what you've done -- some of these don't make sense
-# TODO: a lot of these functions are redundant and should just be a few lines max of dplyr cleaning code 
+# TODO: functions should always live in a separate script in the R directory (GT: Sorry - I had meant to push a version with all functions removed here since I moved them to the /R directory with last push. Not sure what happened/why theyre still here.)
+# TODO: add function descriptions with comments for what you've done -- some of these don't make sense. (GT: I have descriptions in the roxygen headers in the funtions in the /R dir Are they informative enough?
+# TODO: a lot of these functions are redundant and should just be a few lines max of dplyr cleaning code # (GT: OK that sounds good - I see below which ones you mean. Am I right in thinking this can be low priority until after my deadline next friday?)
 #   (WWARN cleaning gives an idea of what this should look like)
-#   to me and I'm a little confused by what you've done and why
+#   to me and I'm a little confused by what you've done and why. (GT: I can add an outline. A lot of the wwarn cleaning seemed wwarn specific, I think I caught most of the things done in wwarn that apply here)
 # Define functions
 
 # Collapse k13 range into a standard format
@@ -46,7 +46,7 @@ collapse_k13_range <- function(gene_mutation) {
 }
 
 # Adjust invalid dates (e.g., 2019-02-31) with year-only, year-month, and full date support
-# TODO: this should be using date formats, not using grepl on characters. 
+# TODO: this should be using date formats, not using grepl on characters.  (GT: Sounds good - OK to make low priority till after next Friday or needed sooner?)
 adjust_invalid_date <- function(date_str, is_start = TRUE) {
   date_fixed <- suppressWarnings(
     case_when(
@@ -65,7 +65,7 @@ adjust_invalid_date <- function(date_str, is_start = TRUE) {
 
 # Function to check for gene name typos and print warnings
 # GCD this looks great too
-# TODO: in later iterations, you need to check unique(gene_column) to ensure you aren't missing any mistakes
+# TODO: in later iterations, you need to check unique(gene_column) to ensure you aren't missing any mistakes. (GT: Ok, I did this manually during dev - there will be a long text block printed with this since MIP studies report a lot of genes, can discuss ways to detect non-gene names probably using a table of valid genes.)
 check_gene_typos <- function(gene_column) {
   # Define probable typos for k13, crt, and mdr1
   probable_typos <- list(
@@ -83,7 +83,7 @@ check_gene_typos <- function(gene_column) {
 }
 
 # Correcting known bad strings in the substudy column and counting instances
-# TODO: this is a basic cleaning task and could be a few lines of dplyr -- generally want to avoid unnecessary functions
+# TODO: this is a basic cleaning task and could be a few lines of dplyr -- generally want to avoid unnecessary functions (GT: Sounds good, OK to make low priority?)
 correct_substudy_entries <- function(substudy_column) {
   # Correct entries and count the corrections
   corrections <- list(
@@ -108,7 +108,7 @@ correct_substudy_entries <- function(substudy_column) {
 }
 
 # Check if all entries are valid for substudy
-# TODO: again, this could be a few lines of just standard cleaning code - doesn't need to be a funtion at all
+# TODO: again, this could be a few lines of just standard cleaning code - doesn't need to be a funtion at all (GT: Sounds good, OK to make low priority?)
 # i.e. unique(substudy) to look at the data. clean in one mutate function in dplyr using if_else
 check_substudy_entries <- function(substudy_column) {
   # Correct bad strings first and track corrections
@@ -156,7 +156,7 @@ create_combined_df <- function(df, mapping, default_database = "GEOFF") {
 # Load data and perform operations
 # Load the combined geoff data table created in the first script
 # TODO: clean data-geoff to remove duplicate folders
-# TODO: general layout of files should be package loads, load data sets, source R scripts and then run the code. Functions should be living elsewhere
+# TODO: general layout of files should be package loads, load data sets, source R scripts and then run the code. Functions should be living elsewhere (GT: sounds good, functions are already in /R but left here somehow or maybe kept during merge?)
 master_table <- readRDS(here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
 
 # Load mutation key for k13 reference ranges
@@ -164,8 +164,8 @@ mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_diction
 mutation_key <- read.csv(mutation_key_path)
 
 # Filter the combined geoff data table for untreated data only
-# TODO: when we have more data, check this is actually all of the treated to exclude
-# TODO: check if the day3, day24 etc. are actually treated - may need a manual look
+# TODO: when we have more data, check this is actually all of the treated to exclude (GT: sounds good, will do a manual check when we have all of data validated for cleaning)
+# TODO: check if the day3, day24 etc. are actually treated - may need a manual look 
 master_table <- master_table %>% filter(!substudy %in% c("treatedextracted", "treatedcalculated"))
 
 # Expand gene mutation ranges for reference range syntax
@@ -221,8 +221,8 @@ column_mapping <- list(
   lat = "lat_n",
   long = "lon_e",
   year = "collection_day",
-  study_start_year = "date_start", #TODO: these should be collection start and end because this is what you've fixed
-  study_end_year = "date_end",
+  study_start_year = "collection_start", #TODO: these should be collection start and end because this is what you've fixed (GT: Thank you for catching this!)
+  study_end_year = "collection_end",
   x = "mutant_num",
   n = "total_num",
   prev = NA,
@@ -243,7 +243,7 @@ master_table_combined <- create_combined_df(master_table, column_mapping)
 # Ensure consistent column types for merging
 # TODO: this is my fault because WWARN data is still mid cleaning (waiting on OJ) but classes 
 #   should align with what you would expect. prev = number, dates are dates etc. rather than characters as in WWARN atm
-# TODO: column types don't need to be consistent - I will fix this in WWARN. Please especially fix the dates 
+# TODO: column types don't need to be consistent - I will fix this in WWARN. Please especially fix the dates (GT: OK, can this be handled by you since you will have all dataframes in hand to know which types all need to be converted to at once? Would also be helpful to know which cols will actually be kept for dedup so not spending time converting columns which will be dropped)
 master_table_combined <- master_table_combined %>%
   mutate(
     study_start_year = as.character(study_start_year), #TODO remove
