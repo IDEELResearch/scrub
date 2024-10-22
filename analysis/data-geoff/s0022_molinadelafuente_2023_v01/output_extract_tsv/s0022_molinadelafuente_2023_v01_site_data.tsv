@@ -1,0 +1,10 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Nambia	Nambia	Nambia	South Sudan	SSD	4.791284	28.369625	Found based on a map	manual	yes	health_facility	0.5		both				
+Momboi	Momboi	Momboi	South Sudan	SSD	4.75372	28.4405	https://www.geospatialhealth.net/gh/article/view/510/540	manual	yes	health_facility	0.5		both				
+Gitikiri	Gitikiri	Gitikiri	South Sudan	SSD	4.61423558164071	28.4878510579117	Found based on a map	manual	yes	health_facility	0.5		both				
+Bakiwiri	Bakiwiri	Bakiwiri	South Sudan	SSD	4.537781	28.33338	https://www.geospatialhealth.net/gh/article/view/510/540	manual	yes	health_facility	0.5		both				
+Yambio_State_Hospital	Yambio State Hospital	Yambio State Hospital	South Sudan	SSD	4.58135749074963	28.4054653600164	Yambio State Hospital	manual	yes	health_facility	0.5		both				
+Masumbu	Masumbu	Masumbu	South Sudan	SSD	4.5105	28.38536	https://www.geospatialhealth.net/gh/article/view/510/540	manual	yes	health_facility	0.5		both				
+Birisi	Birisi	Birisi	South Sudan	SSD	4.42634	28.40393	https://www.geospatialhealth.net/gh/article/view/510/540	manual	yes	health_facility	0.5		both				
+Bureangburu	Bureangburu	Bureangburu	South Sudan	SSD	4.85754	28.474614	Found based on a map	manual	yes	health_facility	0.5		both				
+Kasia	Kasia	Kasia	South Sudan	SSD	4.67221	28.6263	https://www.geospatialhealth.net/gh/article/view/510/540	manual	yes	health_facility	0.5		both				
