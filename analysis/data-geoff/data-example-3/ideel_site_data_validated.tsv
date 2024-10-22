@@ -1,0 +1,3 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+nairobi	Nairobi	Nairobi Hospital	Kenya	KEN	-1.292066	36.821945	Nairobi City	manual	no	TES			both	Nairobi County	1	99	TES and assembled data is unclear if this includes just day zero or potential reinfections
+arua	Arua	Arua_Clinic	Uganda	UGA	3.01909	30.91213	Arua District	manual	yes	Community			male	Arua Distrcit	1	99	study was prisioners purposefully exposed to malaria -- exclude this data as unethical
