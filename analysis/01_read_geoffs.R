@@ -3,6 +3,13 @@ library(dplyr)
 library(lubridate)
 library(here)
 
+################################################################################
+#
+# Script: 01_read_geoffs.R
+# Purpose: Combine all geoff studies into one dataframe
+#
+################################################################################
+
 # Define root directory and initialize empty dataframe for combined all studies wide table
 root_dir <- here("analysis", "data-geoff")
 master_table <- data.frame()
@@ -50,5 +57,5 @@ for (project_dir in study_folders) {
 }
 
 # Save the combined master table as an RDS file in the data-derived directory
-saveRDS(master_table, here("analysis", "data-derived", "combined_geoff_data_df.rds"))
+saveRDS(master_table, here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
 print("Master table saved. Ready for cleaning with 02_clean_geoffs.R.")
