@@ -12,9 +12,15 @@ library(here)
 # 
 ################################################################################
 
+# TODO: functions should always live in a separate script in the R directory
+# TODO: add function descriptions with comments for what you've done -- some of these don't make sense
+# TODO: a lot of these functions are redundant and should just be a few lines max of dplyr cleaning code 
+#   (WWARN cleaning gives an idea of what this should look like)
+#   to me and I'm a little confused by what you've done and why
 # Define functions
 
 # Collapse k13 range into a standard format
+# GCD this looks great
 collapse_k13_range <- function(gene_mutation) {
   parts <- unlist(strsplit(gene_mutation, "[:-]"))
   start_pos <- as.numeric(parts[2])
@@ -40,6 +46,7 @@ collapse_k13_range <- function(gene_mutation) {
 }
 
 # Adjust invalid dates (e.g., 2019-02-31) with year-only, year-month, and full date support
+# TODO: this should be using date formats, not using grepl on characters. 
 adjust_invalid_date <- function(date_str, is_start = TRUE) {
   date_fixed <- suppressWarnings(
     case_when(
@@ -57,6 +64,8 @@ adjust_invalid_date <- function(date_str, is_start = TRUE) {
 }
 
 # Function to check for gene name typos and print warnings
+# GCD this looks great too
+# TODO: in later iterations, you need to check unique(gene_column) to ensure you aren't missing any mistakes
 check_gene_typos <- function(gene_column) {
   # Define probable typos for k13, crt, and mdr1
   probable_typos <- list(
@@ -74,10 +83,11 @@ check_gene_typos <- function(gene_column) {
 }
 
 # Correcting known bad strings in the substudy column and counting instances
+# TODO: this is a basic cleaning task and could be a few lines of dplyr -- generally want to avoid unnecessary functions
 correct_substudy_entries <- function(substudy_column) {
   # Correct entries and count the corrections
   corrections <- list(
-    day0extracted = sum(grepl("^day 0$", substudy_column)),  # Count "day 0"
+    day0extracted = sum(grepl("^day 0$", substudy_column)),  # Count "day 0" 
     untreated_extracted = sum(grepl("^untreated_extracted$", substudy_column)),  # Count "untreated_extracted"
     untreadextracted = sum(grepl("^untreadextracted$", substudy_column))  # Count "untreadextracted"
   )
@@ -98,6 +108,8 @@ correct_substudy_entries <- function(substudy_column) {
 }
 
 # Check if all entries are valid for substudy
+# TODO: again, this could be a few lines of just standard cleaning code - doesn't need to be a funtion at all
+# i.e. unique(substudy) to look at the data. clean in one mutate function in dplyr using if_else
 check_substudy_entries <- function(substudy_column) {
   # Correct bad strings first and track corrections
   substudy_column <- correct_substudy_entries(substudy_column)
@@ -143,6 +155,8 @@ create_combined_df <- function(df, mapping, default_database = "GEOFF") {
 
 # Load data and perform operations
 # Load the combined geoff data table created in the first script
+# TODO: clean data-geoff to remove duplicate folders
+# TODO: general layout of files should be package loads, load data sets, source R scripts and then run the code. Functions should be living elsewhere
 master_table <- readRDS(here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
 
 # Load mutation key for k13 reference ranges
@@ -150,6 +164,8 @@ mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_diction
 mutation_key <- read.csv(mutation_key_path)
 
 # Filter the combined geoff data table for untreated data only
+# TODO: when we have more data, check this is actually all of the treated to exclude
+# TODO: check if the day3, day24 etc. are actually treated - may need a manual look
 master_table <- master_table %>% filter(!substudy %in% c("treatedextracted", "treatedcalculated"))
 
 # Expand gene mutation ranges for reference range syntax
@@ -166,13 +182,13 @@ master_table$collection_end <- sapply(master_table$date_end, adjust_invalid_date
 # Compute collection day
 master_table$collection_day <- sapply(1:nrow(master_table), function(i) {
   if (!is.na(master_table$collection_start[i]) & !is.na(master_table$collection_end[i])) {
-    return(as.Date(mean(c(as.numeric(master_table$collection_start[i]), as.numeric(master_table$collection_end[i]))), origin = "1970-01-01"))
+    return(as.Date(median(c(as.numeric(master_table$collection_start[i]), as.numeric(master_table$collection_end[i]))), origin = "1970-01-01"))
   } else if (!is.na(master_table$collection_start[i])) {
-    return(master_table$collection_start[i])
+    return(as.Date(master_table$collection_start[i]))
   } else if (!is.na(master_table$collection_end[i])) {
-    return(master_table$collection_end[i])
+    return(as.Date(master_table$collection_end[i]))
   } else {
-    return(NA)
+    return(as.Date(NA))
   }
 })
 
@@ -205,7 +221,7 @@ column_mapping <- list(
   lat = "lat_n",
   long = "lon_e",
   year = "collection_day",
-  study_start_year = "date_start",
+  study_start_year = "date_start", #TODO: these should be collection start and end because this is what you've fixed
   study_end_year = "date_end",
   x = "mutant_num",
   n = "total_num",
@@ -225,10 +241,13 @@ column_mapping <- list(
 master_table_combined <- create_combined_df(master_table, column_mapping)
 
 # Ensure consistent column types for merging
+# TODO: this is my fault because WWARN data is still mid cleaning (waiting on OJ) but classes 
+#   should align with what you would expect. prev = number, dates are dates etc. rather than characters as in WWARN atm
+# TODO: column types don't need to be consistent - I will fix this in WWARN. Please especially fix the dates 
 master_table_combined <- master_table_combined %>%
   mutate(
-    study_start_year = as.character(study_start_year),
-    study_end_year = as.character(study_end_year),
+    study_start_year = as.character(study_start_year), #TODO remove
+    study_end_year = as.character(study_end_year), #TODO remove
     x = as.double(x),
     n = as.double(n),
     prev = if_else(n != 0, x / n, NA_real_)
@@ -248,6 +267,7 @@ for (col in setdiff(all_columns, colnames(master_table_combined))) {
 }
 
 # Reorder columns to match the wwarn_res_df_cols structure
+# TODO: Gina to do - filter this so it's just the columns we can use to help deduplicate. Too many to visually be helpful right
 master_table_combined <- master_table_combined[, all_columns]
 
 # Save the final merged_df as an RDS file
