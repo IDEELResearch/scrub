@@ -1,9 +1,0 @@
-site_uid	substudy	date_start	date_end	gene_mutation	mutant_num	total_num
-gondar_zuria	untreatedextracted	2022	2023	CRT:76:T	363	438
-gondar_zuria	untreatedextracted	2022	2023	MDR1:86:Y	1	451
-gondar_zuria	untreatedextracted	2022	2023	K13:622:I	238	463
-gondar_zuria	untreatedextracted	2022	2023	K13:580:Y	2	462
-tach_armachiho	untreatedextracted	2022	2023	CRT:76:T	361	361
-tach_armachiho	untreatedextracted	2022	2023	MDR1:86:Y	1	357
-tach_armachiho	untreatedextracted	2022	2023	K13:622:I	131	370
-tach_armachiho	untreatedextracted	2022	2023	K13:580:Y	0	365
