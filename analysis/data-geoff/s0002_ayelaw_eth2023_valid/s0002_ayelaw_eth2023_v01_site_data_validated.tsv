@@ -1,0 +1,3 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+gondar_zuria	Gondar Zuria	Gondar Zuria	ETHIOPIA	ETH	12.6739	37.3435	Gondar Zuria	manual	no	health_facility	na	NA	both	Gondar Zuria	1.0	99.0	This is health facility based over year genomic surveillance of Pf DR in Ethiopia
+tach_armachiho	Tach Armachiho	Tach Armachiho	ETHIOPIA	ETH	13.02	37.166666	Tach Armachiho	manual	no	health_facility	1year	NA	both	Tach Armachiho	1.0	99.0	
