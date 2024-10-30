@@ -23,12 +23,30 @@ for (project_dir in study_folders) {
   print(paste("Processing project:", study_uid))
   
   # Identify file paths
-  study_overview_path <- Sys.glob(file.path(project_dir, "*_study_data_validated.tsv.gz"))
-  site_overview_path <- Sys.glob(file.path(project_dir, "*_site_data_validated.tsv.gz"))
-  prev_table_path <- Sys.glob(file.path(project_dir, "*_prevalence_data_LONG_validated.tsv.gz"))
+  study_overview_path <- list.files(
+    path = project_dir,
+    pattern = "*_study_data_validated\\.tsv\\.gz$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
+  
+  site_overview_path <- list.files(
+    path = project_dir,
+    pattern = "*_site_data_validated\\.tsv\\.gz$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
+  
+  prev_table_path <- list.files(
+    path = project_dir,
+    pattern = "*_prevalence_data_LONG_validated\\.tsv\\.gz$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
   
   # Skip if any files are missing
   if (length(study_overview_path) == 0 || length(site_overview_path) == 0 || length(prev_table_path) == 0) {
+    print(paste("Project missing all three input tables:", study_uid))
     next
   }
   
