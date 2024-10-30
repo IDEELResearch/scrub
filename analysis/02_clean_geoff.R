@@ -160,13 +160,15 @@ create_combined_df <- function(df, mapping, default_database = "GEOFF") {
 master_table <- readRDS(here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
 
 # Load mutation key for k13 reference ranges
-mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
-mutation_key <- read.csv(mutation_key_path)
+mutation_key <- read.csv(here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv"))
 
 # Filter the combined geoff data table for untreated data only
 # TODO: when we have more data, check this is actually all of the treated to exclude (GT: sounds good, will do a manual check when we have all of data validated for cleaning)
 # TODO: check if the day3, day24 etc. are actually treated - may need a manual look 
 master_table <- master_table %>% filter(!substudy %in% c("treatedextracted", "treatedcalculated"))
+
+#TODO: Neeva reminded me that for some studies we have extracted and calculated but for the same SNPs at Jeff's request
+# TODO: deduplicate where we have both for the same codons to prevent double counting in prev estimates in {stave}
 
 # Expand gene mutation ranges for reference range syntax
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table$gene_mutation)))
@@ -192,10 +194,12 @@ master_table$collection_day <- sapply(1:nrow(master_table), function(i) {
   }
 })
 
-# Convert numeric back to Date class after transformations
+# Convert numeric back to Date class after transformations 
 master_table$collection_start <- as.Date(master_table$collection_start, origin = "1970-01-01")
 master_table$collection_end <- as.Date(master_table$collection_end, origin = "1970-01-01")
 master_table$collection_day <- as.Date(master_table$collection_day, origin = "1970-01-01")
+
+## dates still working until this point
 
 # Add survey_ID and other fields
 master_table <- master_table %>%
@@ -208,12 +212,14 @@ master_table <- master_table %>%
   )
 
 # Check for gene name typos and print warnings if any are found
+# TODO: update typo list when you have new data
 check_gene_typos(master_table$gene)
 
 # Apply substudy corrections and validation
 master_table$substudy <- check_substudy_entries(master_table$substudy)
 
 # Define a column mapping for the WWARN merge
+# TODO: currently this just creates extra columns with the mapping rather than renaming existing columns
 column_mapping <- list(
   admin_0 = "country",
   admin_1 = NA,
@@ -246,8 +252,6 @@ master_table_combined <- create_combined_df(master_table, column_mapping)
 # TODO: column types don't need to be consistent - I will fix this in WWARN. Please especially fix the dates (GT: OK, can this be handled by you since you will have all dataframes in hand to know which types all need to be converted to at once? Would also be helpful to know which cols will actually be kept for dedup so not spending time converting columns which will be dropped)
 master_table_combined <- master_table_combined %>%
   mutate(
-    study_start_year = as.character(study_start_year), #TODO remove
-    study_end_year = as.character(study_end_year), #TODO remove
     x = as.double(x),
     n = as.double(n),
     prev = if_else(n != 0, x / n, NA_real_)
@@ -267,8 +271,27 @@ for (col in setdiff(all_columns, colnames(master_table_combined))) {
 }
 
 # Reorder columns to match the wwarn_res_df_cols structure
-# TODO: Gina to do - filter this so it's just the columns we can use to help deduplicate. Too many to visually be helpful right
 master_table_combined <- master_table_combined[, all_columns]
+
+# clean specific columns
+# identify items for cleaning
+master_unique <- lapply(master_table_combined, unique)
+
+# TODO: fix site names to have no spaces for deduplication
+# TODO: fix collection location entry: "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital"
+# TODO: fix collection location entry: remove spaces and commas
+# TODO: country should be standard capitalisation format
+# TODO: fix "na" to NA in "study_design_age_min_years"
+# TODO: fix "1year" to "1" in "study_design_age_min_years"
+# TODO: fix published region to have standard format
+# TODO: make column that uses study notes to determine if the estimate is multi-site 
+# TODO: standardise countries covered
+# TODO: fix all "na" to be NA
+# TODO: figure out what NA on publication status means and fix these so we don't include/exclude data unintentionally
+# TODO: clean up the data_processing_pipeline - getting clarification on MIP vs WGS
+
+# TODO: figure out which additional columns would be helpful for inclusion here to enable better deduplication
+master_table_simplified <- master_table_combined[, c(wwarn_res_df_cols, "study_uid", "data_entry_author", "data_processing_pipeline")]
 
 # Save the final merged_df as an RDS file
 saveRDS(master_table_combined, here("analysis", "data-derived", "02_clean_geoffs_output_table.rds"))
