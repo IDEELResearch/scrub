@@ -16,7 +16,7 @@
 #' # Invalid entries found in 'substudy':
 #' # [1] "day 5 extracted"
 #'
-#' @export
+#' 
 check_substudy_entries <- function(substudy_column) {
   # Correct bad strings first and track corrections
   substudy_column <- correct_substudy_entries(substudy_column)

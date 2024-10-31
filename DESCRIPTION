@@ -20,7 +20,8 @@ Imports:
     readr,
     stringr,
     tidyverse,
-    countrycode
+    countrycode,
+    lubridate
 Suggests:
     knitr,
     rmarkdown,
