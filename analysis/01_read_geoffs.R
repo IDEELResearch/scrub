@@ -60,6 +60,7 @@ for (project_dir in study_folders) {
   colnames(study_overview_t) <- make.names(study_overview$FIELDS, unique = TRUE)
   study_overview_t <- study_overview_t[-1, , drop = FALSE]
   
+  # TODO: fix the duplicate columns in the outputs created
   wide_data <- prev_table %>%
     left_join(site_overview, by = "site_uid") %>%
     mutate(study_key = study_uid) %>%
