@@ -22,7 +22,7 @@
 #' renamed_df <- create_renamed_df(master_table, mapping)
 #' print(renamed_df)
 #' 
-#' @export
+#' 
 create_renamed_df <- function(df, mapping, default_database = "GEOFF") {
   result_df <- df  # Start with all columns from the original dataframe
   for (new_col in names(mapping)) {
