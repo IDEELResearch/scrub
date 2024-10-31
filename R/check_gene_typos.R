@@ -14,7 +14,7 @@
 #' # Probable typo found for crt: did you mean crt?
 #' # Probable typo found for mdr1: did you mean mdr1?
 #'
-#' @export
+#' 
 check_gene_typos <- function(gene_column) {
   # Define probable typos for k13, crt, and mdr1
   probable_typos <- list(

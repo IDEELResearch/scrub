@@ -17,7 +17,7 @@
 #' # Corrected 1 instances of untreated_extracted
 #' # Corrected 1 instances of untreadextracted
 #'
-#' @export
+#' 
 correct_substudy_entries <- function(substudy_column) {
   # Correct entries and count the corrections
   corrections <- list(

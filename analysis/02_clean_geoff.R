@@ -1,298 +1,218 @@
-# Load required libraries
-library(dplyr)
-library(lubridate)
-library(here)
 
 ################################################################################
 #
 # Script: 02_clean_geoffs.R
-# Purpose: Perform various data cleaning and reformatting functions to 
-# facilitate rbind() with wwarn and other cleaned data before deduplication
-# and stave append
+# Purpose: Perform various data cleaning to allow deduplication and combining
+# with other data sources within {stave} object
 # 
 ################################################################################
 
-# TODO: functions should always live in a separate script in the R directory (GT: Sorry - I had meant to push a version with all functions removed here since I moved them to the /R directory with last push. Not sure what happened/why theyre still here.)
-# TODO: add function descriptions with comments for what you've done -- some of these don't make sense. (GT: I have descriptions in the roxygen headers in the funtions in the /R dir Are they informative enough?
-# TODO: a lot of these functions are redundant and should just be a few lines max of dplyr cleaning code # (GT: OK that sounds good - I see below which ones you mean. Am I right in thinking this can be low priority until after my deadline next friday?)
-#   (WWARN cleaning gives an idea of what this should look like)
-#   to me and I'm a little confused by what you've done and why. (GT: I can add an outline. A lot of the wwarn cleaning seemed wwarn specific, I think I caught most of the things done in wwarn that apply here)
-# Define functions
-
-# Collapse k13 range into a standard format
-# GCD this looks great
-collapse_k13_range <- function(gene_mutation) {
-  parts <- unlist(strsplit(gene_mutation, "[:-]"))
-  start_pos <- as.numeric(parts[2])
-  end_pos <- as.numeric(parts[3])
-  
-  # Filter the reference amino acids for the specified range
-  ref_amino_acids <- mutation_key %>%
-    filter(PROTEIN == "k13", CODON >= start_pos, CODON <= end_pos) %>%
-    arrange(CODON)
-  
-  # If no matching codons are found, return the original value and log the issue
-  if (nrow(ref_amino_acids) == 0) {
-    cat("Warning: No matching codons found for gene_mutation:", gene_mutation, "\n")
-    return(gene_mutation)
-  }
-  
-  # Concatenate codon positions and amino acids
-  codon_string <- paste(ref_amino_acids$CODON, collapse = "_")
-  amino_acid_string <- paste(ref_amino_acids$REF, collapse = "_")
-  collapsed_mutation <- paste("K13", codon_string, amino_acid_string, sep = ":")
-  
-  return(collapsed_mutation)
-}
-
-# Adjust invalid dates (e.g., 2019-02-31) with year-only, year-month, and full date support
-# TODO: this should be using date formats, not using grepl on characters.  (GT: Sounds good - OK to make low priority till after next Friday or needed sooner?)
-adjust_invalid_date <- function(date_str, is_start = TRUE) {
-  date_fixed <- suppressWarnings(
-    case_when(
-      grepl("^[0-9]{4}$", date_str) ~ {
-        if (is_start) ymd(paste0(date_str, "-01-01")) else ymd(paste0(date_str, "-12-31"))
-      },
-      grepl("^[0-9]{4}-[0-9]{2}$", date_str) ~ {
-        if (is_start) ymd(paste0(date_str, "-01")) else ceiling_date(ymd(paste0(date_str, "-01")), "month") - days(1)
-      },
-      grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", date_str) ~ ymd(date_str),
-      TRUE ~ as.Date(NA)
-    )
-  )
-  return(date_fixed)
-}
-
-# Function to check for gene name typos and print warnings
-# GCD this looks great too
-# TODO: in later iterations, you need to check unique(gene_column) to ensure you aren't missing any mistakes. (GT: Ok, I did this manually during dev - there will be a long text block printed with this since MIP studies report a lot of genes, can discuss ways to detect non-gene names probably using a table of valid genes.)
-check_gene_typos <- function(gene_column) {
-  # Define probable typos for k13, crt, and mdr1
-  probable_typos <- list(
-    "k13" = c("kelch13", "kelch 13", "kelch_13", "kelch", "kletch13", "klech 13"),
-    "crt" = c("ctr"),
-    "mdr1" = c("mrd1", "mdr")
-  )
-  
-  for (correct_gene in names(probable_typos)) {
-    typos_found <- gene_column[gene_column %in% probable_typos[[correct_gene]]]
-    if (length(typos_found) > 0) {
-      message(paste("Probable typo found for", correct_gene, ": did you mean", correct_gene, "?"))
-    }
-  }
-}
-
-# Correcting known bad strings in the substudy column and counting instances
-# TODO: this is a basic cleaning task and could be a few lines of dplyr -- generally want to avoid unnecessary functions (GT: Sounds good, OK to make low priority?)
-correct_substudy_entries <- function(substudy_column) {
-  # Correct entries and count the corrections
-  corrections <- list(
-    day0extracted = sum(grepl("^day 0$", substudy_column)),  # Count "day 0" 
-    untreated_extracted = sum(grepl("^untreated_extracted$", substudy_column)),  # Count "untreated_extracted"
-    untreadextracted = sum(grepl("^untreadextracted$", substudy_column))  # Count "untreadextracted"
-  )
-  
-  # Perform the corrections
-  substudy_column <- gsub("^day 0$", "day0extracted", substudy_column)
-  substudy_column <- gsub("^untreated_extracted$", "untreatedextracted", substudy_column)
-  substudy_column <- gsub("^untreadextracted$", "untreatedextracted", substudy_column)
-  
-  # Print the corrections made and their counts
-  for (correction in names(corrections)) {
-    if (corrections[[correction]] > 0) {
-      message(paste("Corrected", corrections[[correction]], "instances of", correction))
-    }
-  }
-  
-  return(substudy_column)
-}
-
-# Check if all entries are valid for substudy
-# TODO: again, this could be a few lines of just standard cleaning code - doesn't need to be a funtion at all (GT: Sounds good, OK to make low priority?)
-# i.e. unique(substudy) to look at the data. clean in one mutate function in dplyr using if_else
-check_substudy_entries <- function(substudy_column) {
-  # Correct bad strings first and track corrections
-  substudy_column <- correct_substudy_entries(substudy_column)
-  
-  # Define allowed categories
-  allowed_categories <- c(
-    "untreatedextracted", "untreatedcalculated", "day0extracted", "day0calculated",
-    "day3calculated", "day24calculated", "treatedextracted", "treatedcalculated"
-  )
-  
-  # Regular expression for "day X extracted" or "day X calculated"
-  day_extracted_calculated_pattern <- "^day[0-9]+(extracted|calculated)$"
-  
-  # Find any entries not matching the allowed categories or the day X extracted/calculated pattern
-  invalid_entries <- substudy_column[!substudy_column %in% allowed_categories & 
-                                       !grepl(day_extracted_calculated_pattern, substudy_column)]
-  
-  # If there are invalid entries, print them
-  if (length(invalid_entries) > 0) {
-    message("Invalid entries found in 'substudy':")
-    print(invalid_entries)
-  } else {
-    message("All 'substudy' entries are valid after corrections.")
-  }
-  
-  return(substudy_column)
-}
-
-# Function to create combined dataframe with all columns from the original master_table
-create_combined_df <- function(df, mapping, default_database = "GEOFF") {
-  result_df <- df  # Start with all columns from the original dataframe
-  for (new_col in names(mapping)) {
-    if (!is.na(mapping[[new_col]]) && mapping[[new_col]] %in% colnames(df)) {
-      result_df[[new_col]] <- df[[mapping[[new_col]]]]
-    } else if (new_col == "database") {
-      result_df[[new_col]] <- default_database
-    } else {
-      result_df[[new_col]] <- NA
-    }
-  }
-  return(result_df)
-}
-
-# Load data and perform operations
+# read in data
 # Load the combined geoff data table created in the first script
-# TODO: clean data-geoff to remove duplicate folders
-# TODO: general layout of files should be package loads, load data sets, source R scripts and then run the code. Functions should be living elsewhere (GT: sounds good, functions are already in /R but left here somehow or maybe kept during merge?)
-master_table <- readRDS(here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
+master_table <- readRDS(here("analysis", "data-derived", 
+                             "01_read_geoffs_output_table.rds"))
 
 # Load mutation key for k13 reference ranges
-mutation_key <- read.csv(here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv"))
+mutation_key <- read.csv(here("analysis", "data-raw", 
+                              "k13_ref_protein_codon_dictionary.csv"))
 
-# Filter the combined geoff data table for untreated data only
-# TODO: when we have more data, check this is actually all of the treated to exclude (GT: sounds good, will do a manual check when we have all of data validated for cleaning)
-# TODO: check if the day3, day24 etc. are actually treated - may need a manual look 
-master_table <- master_table %>% filter(!substudy %in% c("treatedextracted", "treatedcalculated"))
+## start by looking at the data - explore this in the console
+master_unique <- lapply(master_table, unique)
 
-#TODO: Neeva reminded me that for some studies we have extracted and calculated but for the same SNPs at Jeff's request
-# TODO: deduplicate where we have both for the same codons to prevent double counting in prev estimates in {stave}
+# based on console exploration:
+# TODO: fix site names to have no spaces for deduplication
+# TODO: fix collection location entry: 
+# "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital"
+# refers to these study keys:"s0050_davlantes_v01" "s0052_ljolje_v01"  # have asked team to investigate
+# TODO: fix collection location entry: remove spaces and commas
+# TODO: country should be standard capitalisation format
+# investigate why country = manual -- same as collection location issue
+# TODO: fix "na" to NA in "study_design_age_min_years"
+# TODO: fix "1year" to "1" in "study_design_age_min_years"
+# TODO: fix published field to have standard format
+# TODO: standardise countries covered
+# TODO: fix all "na" to be NA
+# TODO: fix publication statuses: all published but explicitly fix s0037, s0057, 
+# s0059 in case this changes in the future
+# TODO: clean up the data_processing_pipeline - all uppercase and should be a 
+# fixed format
+# TODO: add tests to ensure that code throws errors if things change
 
+master_table_clean <- master_table |>
+  dplyr::mutate(substudy = gsub(" ","", substudy)) |>
+  dplyr::mutate(substudy = gsub("_","", substudy)) |>
+  dplyr::mutate(substudy = if_else(substudy == "untreadextracted",
+                                   "untreatedextracted", substudy)) |>
+  dplyr::mutate(substudy = if_else((substudy == "day0" & study_uid == "s0029_warsame_2019"),
+                                   "day0extracted", substudy)) |>
+  dplyr::mutate(site_name = gsub(" ", "_", tolower(site_name))) |>
+  # filter out the shifted data entries for the moment until this is fixed 
+  # filter was removing additional data so hacky way for now
+  dplyr::mutate(remove = if_else(collection_location == "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital", 
+                                 TRUE, FALSE)) |> # correct number of TRUE values
+  dplyr::mutate(remove = if_else(is.na(remove), FALSE, remove)) |>
+  dplyr::filter(remove != TRUE) |> 
+  dplyr::select(-remove) |>
+  dplyr::mutate(collection_location = gsub(" ", "_", tolower(collection_location))) |>
+  dplyr::mutate(collection_location = gsub(",", "", tolower(collection_location))) |>
+  dplyr::mutate(country = stringr::str_to_title(country)) |>
+  dplyr::mutate(country = if_else(country %in% c("Democratic Republic Of The Congo", "Drc"),
+                                  "Democratic Republic of the Congo",
+                                  country)) |>
+  dplyr::mutate(country = if_else(country == "Rukara", "Rwanda", country)) |>
+  dplyr::mutate(pretreatment_samples = if_else(pretreatment_samples == "",
+                                               NA, pretreatment_samples)) |>
+  dplyr::mutate(study_design_age_min_years = if_else(study_design_age_min_years == "na",
+                                                     NA, study_design_age_min_years)) |>
+  dplyr::mutate(study_design_age_min_years = if_else(study_design_age_min_years == "1year",
+                                                     "1", study_design_age_min_years)) |>
+  dplyr::mutate(study_design_age_max_years = if_else(study_design_age_max_years == "na",
+                                                     NA, study_design_age_max_years)) |>
+  dplyr::mutate(site_study_type = if_else(study_uid == "s0034_uwimana", 
+                                          "TES", site_study_type)) |>
+  dplyr::mutate(site_study_type = toupper(gsub("_","", site_study_type))) |>
+  dplyr::mutate(publication_status = gsub(" ", "_", publication_status)) |>
+  dplyr::mutate(publication_status = if_else(publication_status == "na", NA, publication_status)) |>
+  dplyr::mutate(publication_status = if_else(str_detect(study_uid, "unpub"), "unpublished", publication_status)) |>
+  dplyr::mutate(publication_status = if_else(publication_status == "draft_paper", "unpublished", publication_status)) |>
+  dplyr::mutate(publication_status = if_else(study_uid %in% c("s0031_bergmann_2021", #GCD: manually checked that these were pub'd
+                                                              "s0057_koko", 
+                                                              "s0059_osborne"),
+                                             "peer_reviewed", publication_status)) |>
+  dplyr::mutate(publication_year = if_else(publication_status == "unpublished", NA, publication_year)) |>
+  dplyr::mutate(countries_covered = gsub(",", ", ", countries_covered)) |>
+  dplyr::mutate(countries_covered = stringr::str_to_title(countries_covered)) |>
+  dplyr::mutate(countries_covered = if_else(countries_covered %in% c("Democratic Republic Of The Congo", "Drc"),
+                                            "Democratic Republic of the Congo",
+                                            country)) |>
+  dplyr::mutate(data_processing_pipeline = toupper(data_processing_pipeline)) |>
+  dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname))
+
+# TODO: test that values satisfy specified lists - if these tests fail, you will need to update the cleaning above
+# TODO: test: countries in Africa, iso3c, substudy, pretreatment samples, publication status, publication_year, coords_source, site_study_type
+african_countries <- data.frame(country = countrycode::codelist$country.name.en,
+                                continent = countrycode::codelist$continent,
+                                iso3c = countrycode::codelist$iso3c) |>
+  dplyr::filter(continent == "Africa") |> dplyr::distinct()
+allowed_countries <- c(african_countries$country, "Democratic Republic of the Congo")
+allowed_iso3c <- c(african_countries$iso3c, "DRC", "ERT")
+allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
+                      "treatedextracted", "treatedcalculated",
+                      "day0extracted", "day0calculated")
+allowed_pretreatment <- c("no", "yes", NA)
+allowed_publication <- c("peer_reviewed", "preprint", "unpublished")
+allowed_pub_year <- c(as.character(seq(from = 2000, to = (lubridate::year(Sys.Date())))), NA) # automatically update as years change
+allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS" )
+
+# run tests
+check_values_in_column(master_table_clean, "country", allowed_countries)
+check_values_in_column(master_table_clean, "iso3c", allowed_iso3c)
+check_values_in_column(master_table_clean, "substudy", allowed_substudy)
+check_values_in_column(master_table_clean, "pretreatment_samples", allowed_pretreatment)
+check_values_in_column(master_table_clean, "publication_status", allowed_publication)
+check_values_in_column(master_table_clean, "publication_year", allowed_pub_year)
+check_values_in_column(master_table_clean, "site_study_type", allowed_site_types)
+
+#TODO: check the extracted vs calculated and filter accordingly
+
+
+
+# Clean mutation names
 # Expand gene mutation ranges for reference range syntax
-indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table$gene_mutation)))
-master_table$gene_mutation[indices_to_transform] <- sapply(
-  master_table$gene_mutation[indices_to_transform],
+indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
+master_table_clean$gene_mutation[indices_to_transform] <- sapply(
+  master_table_clean$gene_mutation[indices_to_transform],
   collapse_k13_range
 )
 
 # Adjust and add dates and survey IDs
-master_table$collection_start <- sapply(master_table$date_start, adjust_invalid_date, is_start = TRUE)
-master_table$collection_end <- sapply(master_table$date_end, adjust_invalid_date, is_start = FALSE)
+master_table_clean$collection_start <- sapply(master_table_clean$date_start, adjust_invalid_date, is_start = TRUE)
+master_table_clean$collection_end <- sapply(master_table_clean$date_end, adjust_invalid_date, is_start = FALSE)
 
 # Compute collection day
-master_table$collection_day <- sapply(1:nrow(master_table), function(i) {
-  if (!is.na(master_table$collection_start[i]) & !is.na(master_table$collection_end[i])) {
-    return(as.Date(median(c(as.numeric(master_table$collection_start[i]), as.numeric(master_table$collection_end[i]))), origin = "1970-01-01"))
-  } else if (!is.na(master_table$collection_start[i])) {
-    return(as.Date(master_table$collection_start[i]))
-  } else if (!is.na(master_table$collection_end[i])) {
-    return(as.Date(master_table$collection_end[i]))
+master_table_clean$collection_day <- sapply(1:nrow(master_table_clean), function(i) {
+  if (!is.na(master_table_clean$collection_start[i]) & !is.na(master_table_clean$collection_end[i])) {
+    return(as.Date(median(c(as.numeric(master_table_clean$collection_start[i]), as.numeric(master_table_clean$collection_end[i]))), origin = "1970-01-01"))
+  } else if (!is.na(master_table_clean$collection_start[i])) {
+    return(as.Date(master_table_clean$collection_start[i]))
+  } else if (!is.na(master_table_clean$collection_end[i])) {
+    return(as.Date(master_table_clean$collection_end[i]))
   } else {
     return(as.Date(NA))
   }
 })
 
-# Convert numeric back to Date class after transformations 
-master_table$collection_start <- as.Date(master_table$collection_start, origin = "1970-01-01")
-master_table$collection_end <- as.Date(master_table$collection_end, origin = "1970-01-01")
-master_table$collection_day <- as.Date(master_table$collection_day, origin = "1970-01-01")
+# TODO: fix long and lat which got read in as formula vs values
+fix_lat <- which(is.na(as.numeric(master_table_clean$lat_n)))
+fix_lon <- which(is.na(as.numeric(master_table_clean$lon_e)))
 
-## dates still working until this point
+master_table_clean$lat_n[fix_lat] <- mean(as.numeric(str_extract_all(master_table_clean$lat_n[fix_lat], 
+                                                                     "\\d+\\.\\d+")[[1]]))
+master_table_clean$lon_e[fix_lat] <- mean(as.numeric(str_extract_all(master_table_clean$lon_e[fix_lat], 
+                                                                     "\\d+\\.\\d+")[[1]]))
 
-# Add survey_ID and other fields
-master_table <- master_table %>%
-  mutate(
-    survey_ID = paste0(study_uid, "_", first_author_surname, "_", site_name, "_", publication_year, "_", sample(1:1000000, size = nrow(master_table), replace = FALSE)),
-    survey_ID = gsub("[^a-zA-Z0-9_]", "", survey_ID),
-    survey_ID = iconv(survey_ID, from = "UTF-8", to = "ASCII//TRANSLIT"),
-    gene = sub(":.*", "", gene_mutation),
-    mut = sapply(strsplit(gene_mutation, ":"), function(x) paste(tail(x, 2), collapse = ":"))
-  )
+# TODO: convert the class of variables in the columns
+# date columns, long, lat, numbers of samples/mutants, publication year
+master_table_clean <- master_table_clean |>
+  dplyr::mutate(collection_day = as.Date(collection_day),
+                collection_start = as.Date(collection_start),
+                collection_end = as.Date(collection_end),
+                lat_n = as.numeric(lat_n),
+                lon_e = as.numeric(lon_e),
+                mutant_num = as.numeric(mutant_num),
+                total_num = as.numeric(total_num),
+                publication_year = as.numeric(publication_year)) |>
+  # TODO: split gene_mut into gene and mut
+  dplyr::mutate(gene = str_extract(gene_mutation, "^[^:]+"),
+                mut = str_extract(gene_mutation, "(?<=:).*")) |>
+  dplyr::filter(total_num > 0) # zeroes are because these codons weren't genotyped
 
-# Check for gene name typos and print warnings if any are found
-# TODO: update typo list when you have new data
-check_gene_typos(master_table$gene)
-
-# Apply substudy corrections and validation
-master_table$substudy <- check_substudy_entries(master_table$substudy)
-
-# Define a column mapping for the WWARN merge
-# TODO: currently this just creates extra columns with the mapping rather than renaming existing columns
-column_mapping <- list(
-  admin_0 = "country",
-  admin_1 = NA,
-  site = "site_name",
-  lat = "lat_n",
-  long = "lon_e",
-  year = "collection_day",
-  study_start_year = "collection_start", #TODO: these should be collection start and end because this is what you've fixed (GT: Thank you for catching this!)
-  study_end_year = "collection_end",
-  x = "mutant_num",
-  n = "total_num",
-  prev = NA,
-  gene = "gene",
-  mut = "mut",
-  gene_mut = "gene_mutation",
-  annotation = NA,
-  database = "database",
-  url = "study_url",
-  source = "publication_status",
-  iso3c = "iso3c",
-  pmid = "pmid"
-)
-
-# Create combined dataframe based on column mapping, keeping all original columns
-master_table_combined <- create_combined_df(master_table, column_mapping)
-
-# Ensure consistent column types for merging
-# TODO: this is my fault because WWARN data is still mid cleaning (waiting on OJ) but classes 
-#   should align with what you would expect. prev = number, dates are dates etc. rather than characters as in WWARN atm
-# TODO: column types don't need to be consistent - I will fix this in WWARN. Please especially fix the dates (GT: OK, can this be handled by you since you will have all dataframes in hand to know which types all need to be converted to at once? Would also be helpful to know which cols will actually be kept for dedup so not spending time converting columns which will be dropped)
-master_table_combined <- master_table_combined %>%
-  mutate(
-    x = as.double(x),
-    n = as.double(n),
-    prev = if_else(n != 0, x / n, NA_real_)
-  )
-
-# Add missing columns as NA to each dataframe
-wwarn_res_df_cols <- c("iso3c", "admin_0", "admin_1", "site", "lat", "long", "year", 
-                       "study_start_year", "study_end_year", "x", "n", "prev", 
-                       "gene", "mut", "gene_mut", "annotation", "database", 
-                       "pmid", "url", "source")
-
-all_columns <- union(colnames(master_table_combined), wwarn_res_df_cols)
-
-# Fill any columns still required for wwarn rbind which have no comparable data in geoff with na to allow rbind later on
-for (col in setdiff(all_columns, colnames(master_table_combined))) {
-  master_table_combined[[col]] <- NA
+# TODO: test that mutations make sense i.c. x < n, n != 0
+if(sum(master_table_clean$total_num < master_table_clean$mutant_num) > 0) {
+  errorCondition("Entries with more mutant samples than total samples")
+}
+if(sum(master_table_clean$total_num == 0) > 0) {
+  errorCondition("Entries with zero total samples")
 }
 
-# Reorder columns to match the wwarn_res_df_cols structure
-master_table_combined <- master_table_combined[, all_columns]
+# TODO: rename the columns so that they make sense
+wwarn_names <- c("iso3c", "admin_0", "admin_1", "site", "lat", "long", "year", 
+                 "study_start_year", "study_end_year", "x", "n", "prev", 
+                 "gene", "mut", "gene_mut", "annotation", "database", 
+                 "pmid", "url", "source")
 
-# clean specific columns
-# identify items for cleaning
-master_unique <- lapply(master_table_combined, unique)
+master_table_clean <- master_table_clean |>
+  dplyr::mutate(database = "GEOFF") |>
+  dplyr::rename(admin_0 = "country",
+                # admin_1 = NA,
+                site = "site_name",
+                lat = "lat_n",
+                long = "lon_e",
+                year = "collection_day",
+                study_start_year = "collection_start", 
+                study_end_year = "collection_end", 
+                x = "mutant_num",
+                n = "total_num",
+                # prev = NA,
+                gene = "gene",
+                mut = "mut",
+                gene_mut = "gene_mutation",
+                # annotation = NA,
+                database = "database",
+                url = "study_url",
+                source = "publication_status",
+                iso3c = "iso3c",
+                pmid = "pmid") |>
+  dplyr::mutate(admin_1 = NA,
+                prev = NA, 
+                annotation = NA) |> #reorder to have the same column order as WWARN
+  dplyr::relocate(all_of(wwarn_names))
 
-# TODO: fix site names to have no spaces for deduplication
-# TODO: fix collection location entry: "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital"
-# TODO: fix collection location entry: remove spaces and commas
-# TODO: country should be standard capitalisation format
-# TODO: fix "na" to NA in "study_design_age_min_years"
-# TODO: fix "1year" to "1" in "study_design_age_min_years"
-# TODO: fix published region to have standard format
-# TODO: make column that uses study notes to determine if the estimate is multi-site 
-# TODO: standardise countries covered
-# TODO: fix all "na" to be NA
-# TODO: figure out what NA on publication status means and fix these so we don't include/exclude data unintentionally
-# TODO: clean up the data_processing_pipeline - getting clarification on MIP vs WGS
 
 # TODO: figure out which additional columns would be helpful for inclusion here to enable better deduplication
-master_table_simplified <- master_table_combined[, c(wwarn_res_df_cols, "study_uid", "data_entry_author", "data_processing_pipeline")]
+master_table_simplified <- master_table_clean[, c(wwarn_names, "study_uid", "data_entry_author", "data_processing_pipeline")]
 
 # Save the final merged_df as an RDS file
-saveRDS(master_table_combined, here("analysis", "data-derived", "02_clean_geoffs_output_table.rds"))
+saveRDS(master_table_simplified, here("analysis", "data-derived", "02_clean_geoffs_simple.RDS"))
+saveRDS(master_table_clean, here("analysis", "data-derived", "02_clean_geoffs_complete.RDS"))
 print("Data saved. Ready for further analysis.")
