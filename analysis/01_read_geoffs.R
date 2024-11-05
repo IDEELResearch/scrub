@@ -51,9 +51,9 @@ for (project_dir in study_folders) {
   }
   
   # Read in the TSV files
-  study_overview <- read.table(gzfile(study_overview_path), sep = "\t", header = TRUE, fill = TRUE)
-  site_overview <- read.table(gzfile(site_overview_path), sep = "\t", header = TRUE, fill = TRUE)
-  prev_table <- read.table(gzfile(prev_table_path), sep = "\t", header = TRUE, fill = TRUE)
+  study_overview <- read.table(gzfile(study_overview_path), sep = "\t", quote = "", header = TRUE, fill = TRUE)
+  site_overview <- read.table(gzfile(site_overview_path), sep = "\t", quote = "", header = TRUE, fill = TRUE)
+  prev_table <- read.table(gzfile(prev_table_path), sep = "\t", quote = "", header = TRUE, fill = TRUE)
   
   # Transpose and merge data
   study_overview_t <- as.data.frame(t(study_overview), stringsAsFactors = FALSE)
