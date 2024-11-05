@@ -19,24 +19,10 @@ mutation_key <- read.csv(here("analysis", "data-raw",
 ## start by looking at the data - explore this in the console
 master_unique <- lapply(master_table, unique)
 
-# based on console exploration:
-# TODO: fix site names to have no spaces for deduplication
-# TODO: fix collection location entry: 
+# TODO: fix collection location entry: this is to do with how it's read in 01 
 # "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital"
 # refers to these study keys:"s0050_davlantes_v01" "s0052_ljolje_v01"  # have asked team to investigate
-# TODO: fix collection location entry: remove spaces and commas
-# TODO: country should be standard capitalisation format
-# investigate why country = manual -- same as collection location issue
-# TODO: fix "na" to NA in "study_design_age_min_years"
-# TODO: fix "1year" to "1" in "study_design_age_min_years"
-# TODO: fix published field to have standard format
-# TODO: standardise countries covered
 # TODO: fix all "na" to be NA
-# TODO: fix publication statuses: all published but explicitly fix s0037, s0057, 
-# s0059 in case this changes in the future
-# TODO: clean up the data_processing_pipeline - all uppercase and should be a 
-# fixed format
-# TODO: add tests to ensure that code throws errors if things change
 
 master_table_clean <- master_table |>
   dplyr::mutate(substudy = gsub(" ","", substudy)) |>
@@ -88,8 +74,7 @@ master_table_clean <- master_table |>
   dplyr::mutate(data_processing_pipeline = toupper(data_processing_pipeline)) |>
   dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname))
 
-# TODO: test that values satisfy specified lists - if these tests fail, you will need to update the cleaning above
-# TODO: test: countries in Africa, iso3c, substudy, pretreatment samples, publication status, publication_year, coords_source, site_study_type
+# perform tests
 african_countries <- data.frame(country = countrycode::codelist$country.name.en,
                                 continent = countrycode::codelist$continent,
                                 iso3c = countrycode::codelist$iso3c) |>
@@ -150,9 +135,7 @@ master_table_clean$lat_n[fix_lat] <- mean(as.numeric(str_extract_all(master_tabl
                                                                      "\\d+\\.\\d+")[[1]]))
 master_table_clean$lon_e[fix_lat] <- mean(as.numeric(str_extract_all(master_table_clean$lon_e[fix_lat], 
                                                                      "\\d+\\.\\d+")[[1]]))
-
-# TODO: convert the class of variables in the columns
-# date columns, long, lat, numbers of samples/mutants, publication year
+# change variable classes
 master_table_clean <- master_table_clean |>
   dplyr::mutate(collection_day = as.Date(collection_day),
                 collection_start = as.Date(collection_start),
@@ -162,12 +145,10 @@ master_table_clean <- master_table_clean |>
                 mutant_num = as.numeric(mutant_num),
                 total_num = as.numeric(total_num),
                 publication_year = as.numeric(publication_year)) |>
-  # TODO: split gene_mut into gene and mut
   dplyr::mutate(gene = str_extract(gene_mutation, "^[^:]+"),
                 mut = str_extract(gene_mutation, "(?<=:).*")) |>
   dplyr::filter(total_num > 0) # zeroes are because these codons weren't genotyped
 
-# TODO: test that mutations make sense i.c. x < n, n != 0
 if(sum(master_table_clean$total_num < master_table_clean$mutant_num) > 0) {
   errorCondition("Entries with more mutant samples than total samples")
 }
@@ -175,7 +156,7 @@ if(sum(master_table_clean$total_num == 0) > 0) {
   errorCondition("Entries with zero total samples")
 }
 
-# TODO: rename the columns so that they make sense
+# rename the columns so that they make sense
 wwarn_names <- c("iso3c", "admin_0", "admin_1", "site", "lat", "long", "year", 
                  "study_start_year", "study_end_year", "x", "n", "prev", 
                  "gene", "mut", "gene_mut", "annotation", "database", 
