@@ -1,4 +1,11 @@
-## functions converting the main types of data output into stave objects
+#' Convert data into a stave compatible list of dataframes
+#' 
+#' @param data A wide dataset to be converted into a form compatible with {STAVE}
+#' 
+#' @return A list of three dataframes easily convertible to be compatible with {STAVE} using stave$append_data
+#' 
+#' @export
+#' 
 
 convert_stave <- function(data) {
   #TODO figure out how to extract the publication year from PMID
