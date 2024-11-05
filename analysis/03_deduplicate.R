@@ -1,12 +1,37 @@
+library(tidyverse)
 library(here)
 
-# read in the data
-# TODO: read in the other data sources
-wwarn_data <- readRDS(here("analysis", "data-derived", "wwarn_data.rds"))
+# Read each file if it exists
+safe_read <- function(path) {
+  if (file.exists(path)) {
+    clean <- readRDS(path) %>% 
+      as.data.frame() %>% 
+      dplyr::filter(source != "unpublished")
+  } else {
+    clean <- data.frame()
+  }
+  return(clean)
+}
 
-## placeholder for reading in all the data sources and deduplicating
-# TODO: deduplicate the studies
-all_data <- wwarn_data
+# Read in each cleaned file
+clean_geoff <- safe_read(here("analysis", "data-derived", "geoff_clean.rds"))
+clean_wwarn <- safe_read(here("analysis", "data-derived", "wwarn_clean.rds"))
+clean_pf7k <- safe_read(here("analysis", "data-derived", "pf7k_clean.rds"))
+clean_who <- safe_read(here("analysis", "data-derived", "who_clean.rds"))
 
-# output final data
-saveRDS(all_data, "analysis/data-derived/final_data.rds")
+# consistent set of names we want
+comnms <- names(clean_wwarn)
+
+# make our full bind across
+full_bind <- rbind(
+  # clean_geoff %>% select(all_of(comnms)) %>% mutate(across(everything(), as.character)), 
+  clean_wwarn %>% select(all_of(comnms)) %>% mutate(across(everything(), as.character))
+  # clean_pf7k %>% select(all_of(comnms)) %>% mutate(across(everything(), as.character)),
+  # clean_who %>% select(all_of(comnms)) %>% mutate(across(everything(), as.character))
+)
+
+# deduplication
+full_bind <- deduplicate(full_bind)
+
+# save ready to go to stave
+saveRRDS(full_bind, here("analysis/data-derived/final_data.rds"))
