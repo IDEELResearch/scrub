@@ -18,7 +18,9 @@ Imports:
     magrittr,
     ragg,
     readr,
-    stringr
+    stringr,
+    tidyverse,
+    countrycode
 Suggests:
     knitr,
     rmarkdown,
