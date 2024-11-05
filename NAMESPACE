@@ -2,6 +2,7 @@
 
 export("%>%")
 export(clean_mutations)
+export(convert_stave)
 importFrom(grDevices,dev.off)
 importFrom(grDevices,pdf)
 importFrom(magrittr,"%>%")
