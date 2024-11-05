@@ -91,10 +91,6 @@ check_values_in_column(master_table_clean, "publication_status", allowed_publica
 check_values_in_column(master_table_clean, "publication_year", allowed_pub_year)
 check_values_in_column(master_table_clean, "site_study_type", allowed_site_types)
 
-#TODO: check the extracted vs calculated and filter accordingly
-
-
-
 # Clean mutation names
 # Expand gene mutation ranges for reference range syntax
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
@@ -180,11 +176,12 @@ master_table_clean <- master_table_clean |>
   dplyr::mutate(admin_1 = NA,
                 prev = NA, 
                 annotation = NA) |> #reorder to have the same column order as WWARN
-  dplyr::relocate(all_of(wwarn_names))
+  dplyr::relocate(all_of(wwarn_names)) |>
+  dplyr::filter(grepl("calculated", substudy) == 0)
 
 
 # TODO: figure out which additional columns would be helpful for inclusion here to enable better deduplication
-master_table_simplified <- master_table_clean[, c(wwarn_names, "study_uid", "data_entry_author", "data_processing_pipeline")]
+master_table_simplified <- master_table_clean[, c(wwarn_names, "study_uid", "data_entry_author", "data_processing_pipeline", "substudy")]
 
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "02_clean_geoffs_simple.RDS"))
