@@ -2,7 +2,7 @@ library(tidyverse)
 library(here)
 
 # read data sets
-clean_geoff <- readRDS(here("analysis", "data-derived", "02_clean_geoffs_output_table.rds"))
+clean_geoff <- readRDS(here("analysis", "data-derived", "02_clean_geoffs_simple.RDS"))
 clean_wwarn <- readRDS(here("analysis", "data-derived", "wwarn_res_df.rds"))
 
 ## deduplicate by pmid
