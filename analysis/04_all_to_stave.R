@@ -16,4 +16,4 @@ stave$append_data(studies_dataframe = data_stave$studies_dataframe,
                   surveys_dataframe = data_stave$surveys_dataframe,
                   counts_dataframe = data_stave$counts_dataframe)
 
-saveRDS(stave, "analysis/data-derived/stave_data.RDS")
+saveRDS(stave, "analysis/data-derived/stave_data.rds")
