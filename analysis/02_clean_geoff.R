@@ -124,24 +124,14 @@ master_table_clean$lat_n[fix_lat] <- mean(as.numeric(str_extract_all(master_tabl
                                                                      "\\d+\\.\\d+")[[1]]))
 master_table_clean$lon_e[fix_lat] <- mean(as.numeric(str_extract_all(master_table_clean$lon_e[fix_lat], 
                                                                      "\\d+\\.\\d+")[[1]]))
-# change variable classes
 master_table_clean <- master_table_clean |>
-  dplyr::mutate(collection_day = as.Date(collection_day),
-                collection_start = as.Date(collection_start),
-                collection_end = as.Date(collection_end),
-                lat_n = as.numeric(lat_n),
-                lon_e = as.numeric(lon_e),
-                mutant_num = as.numeric(mutant_num),
-                total_num = as.numeric(total_num),
-                publication_year = as.numeric(publication_year)) |>
-  dplyr::mutate(gene = str_extract(gene_mutation, "^[^:]+"),
-                mut = str_extract(gene_mutation, "(?<=:).*")) |>
-  dplyr::filter(total_num > 0) # zeroes are because these codons weren't genotyped
+  dplyr::filter(as.numeric(total_num) > 0) |> # zeroes are because these codons weren't genotyped
+  
 
-if(sum(master_table_clean$total_num < master_table_clean$mutant_num) > 0) {
+if(sum(as.numeric(master_table_clean$total_num) < as.numeric(master_table_clean$mutant_num)) > 0) {
   errorCondition("Entries with more mutant samples than total samples")
 }
-if(sum(master_table_clean$total_num == 0) > 0) {
+if(sum(as.numeric(master_table_clean$total_num == 0)) > 0) {
   errorCondition("Entries with zero total samples")
 }
 
