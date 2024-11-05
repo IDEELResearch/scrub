@@ -1,5 +1,5 @@
 wwarn_data <- readRDS(here("analysis", "data-derived", 
-                           "wwarn_res_df.rds"))
+                           "wwarn_res.rds"))
 ref_als <- read.csv(here("analysis", "data-raw", 
                                  "k13_ref_protein_codon_dictionary.csv"))
 
@@ -100,4 +100,4 @@ remove <- wwarn_stave$counts_dataframe[c(1791, 1692, 1735, 1718, 1936, 1939, 194
 # wwarn <- rbind(wwarn_mut, wwarn_wt) 
 wwarn <- wwarn_mut %>% dplyr::filter((survey_id %in% remove) == FALSE)
 
-saveRDS(wwarn, "analysis/data-derived/wwarn_data.rds")
+saveRDS(wwarn, "analysis/data-derived/wwarn_clean.rds")
