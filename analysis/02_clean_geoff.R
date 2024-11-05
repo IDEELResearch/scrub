@@ -32,13 +32,6 @@ master_table_clean <- master_table |>
   dplyr::mutate(substudy = if_else((substudy == "day0" & study_uid == "s0029_warsame_2019"),
                                    "day0extracted", substudy)) |>
   dplyr::mutate(site_name = gsub(" ", "_", tolower(site_name))) |>
-  # filter out the shifted data entries for the moment until this is fixed 
-  # filter was removing additional data so hacky way for now
-  dplyr::mutate(remove = if_else(collection_location == "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital", 
-                                 TRUE, FALSE)) |> # correct number of TRUE values
-  dplyr::mutate(remove = if_else(is.na(remove), FALSE, remove)) |>
-  dplyr::filter(remove != TRUE) |> 
-  dplyr::select(-remove) |>
   dplyr::mutate(collection_location = gsub(" ", "_", tolower(collection_location))) |>
   dplyr::mutate(collection_location = gsub(",", "", tolower(collection_location))) |>
   dplyr::mutate(country = stringr::str_to_title(country)) |>
