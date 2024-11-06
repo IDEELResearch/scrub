@@ -1,0 +1,9 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Kigoma	Ujiji Health Centre		Tanzania	TZA	-4.9162	29.68108	=concatenate(D3,", ",D2)	manual	yes	TES							
+Morogoro	Mlimba		Tanzania	TZA	-8.7825	35.8089	=concatenate(E3,", ",E2)	manual	yes	TES							
+Pwani	Yombo		Tanzania	TZA	-6.59	38.8347	=concatenate(F3,", ",F2)	manual	yes	TES							
+Tanga	Mkuzi		Tanzania	TZA	-5.2434	38.8297	=concatenate(G3,", ",G2)	manual	yes	TES							
+Mbeya	Ipinda		Tanzania	TZA	-9.552	33.765	=concatenate(H3,", ",H2)	manual	yes	TES							
+Mtwara	Nagaga		Tanzania	TZA	-10.9007	39.1072	=concatenate(I3,", ",I2)	manual	yes	TES							
+Tabora	Simbo		Tanzania	TZA	-4.6556	33.432	=concatenate(J3,", ",J2)	manual	yes	TES							
+Mwanza	Igombe Health Centre		Tanzania	TZA	-2.3973	32.9665	=concatenate(K3,", ",K2)	manual	yes	TES							

@@ -1,0 +1,5 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Karume	Karume	Karume	Tanzania	TZA	-2.500212523	32.9021871	Karume Primary School	manual	yes	TES	0.5	10	both				CRT and K13 haplotypes available for followup visits but no validated or candidate mutations in K13
+Ipinda	Ipinda	Ipinda	Tanzania	TZA	-9.488177155	33.89328	Ipinda, Kyela	manual	yes	TES	0.5	10	both				
+Simbo	Simbo	Simbo	Tanzania	TZA	-4.655600977	33.43203734	Simbo, Igunge	manual	yes	TES	0.5	10	both				
+Nagaga	Nagaga	Nagaga	Tanzania	TZA	-10.73239837	38.8100917	Nagaga, Masasi	manual	yes	TES	0.5	10	both				

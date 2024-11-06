@@ -46,6 +46,8 @@ The structure within analysis is as follows:
         ├── data_raw/             # data obtained from elsewhere and treated read-only    
         |
         ├── data_derived/         # intermediate data generated during the analysis
+        |
+        ├── data_out/             # final data objects to be used in other analyses
 
 - Analysis scripts are to be run in the numbered order they are
   included. If there are shared numbers, then any order of these scripts
