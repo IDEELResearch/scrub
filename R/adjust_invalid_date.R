@@ -37,3 +37,32 @@ adjust_invalid_date <- function(date_str, is_start = TRUE) {
   )
   return(date_fixed)
 }
+
+
+#' @noRd
+clean_excel_formulas <- function(str) {
+  
+  # growing list of known function conversions
+  excel_funcs <- list(
+    "AVERAGE" = mean,
+         "average" = mean
+    )
+  
+  # are these patterns in our strings
+  fail <- grep(paste0(names(excel_funcs), collapse = "|"), str)
+  if(length(fail) > 0) {
+    
+    # if so apply the function to the numbers inside the string
+    funcs_to_match <- gsub("(=)([A-z]*)(\\(.*)", "\\2", str[fail])
+    numbers_to_use <- str_extract_all(str[fail], "\\d+\\.\\d+")
+    results <- vector("numeric", length(numbers_to_use))
+    for(i in seq_along(fail)){
+      results[i] <- excel_funcs[[funcs_to_match[i]]](as.numeric(numbers_to_use[[i]]))
+    }
+    str[fail] <- as.character(results)
+  }
+  
+  return(str)
+  
+}
+   
