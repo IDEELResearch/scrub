@@ -56,9 +56,10 @@ for (project_dir in study_folders) {
   prev_table <- read.table(gzfile(prev_table_path), sep = "\t", quote = "", header = TRUE, fill = TRUE)
   
   # Transpose and merge data
-  study_overview_t <- as.data.frame(t(study_overview), stringsAsFactors = FALSE)
-  colnames(study_overview_t) <- make.names(study_overview$FIELDS, unique = TRUE)
-  study_overview_t <- study_overview_t[-1, , drop = FALSE]
+  
+  study_overview_t <- as.data.frame(t(study_overview$DATA), stringsAsFactors = FALSE)
+  colnames(study_overview_t) <- (study_overview$FIELDS)
+  study_overview_t <- janitor::clean_names(study_overview_t)
   
   # TODO: fix the duplicate columns in the outputs created
   wide_data <- prev_table %>%
