@@ -1,7 +1,11 @@
+# Load required libraries
+library(tidyverse)
+library(lubridate)
+library(here)
 
 ################################################################################
 #
-# Script: 02_clean_geoffs.R
+# Script: 02_clean_geoff.R
 # Purpose: Perform various data cleaning to allow deduplication and combining
 # with other data sources within {stave} object
 # 
@@ -10,7 +14,7 @@
 # read in data
 # Load the combined geoff data table created in the first script
 master_table <- readRDS(here("analysis", "data-derived", 
-                             "01_read_geoffs_output_table.rds"))
+                             "geoff_res.rds"))
 
 # Load mutation key for k13 reference ranges
 mutation_key <- read.csv(here("analysis", "data-raw", 
@@ -65,15 +69,17 @@ master_table_clean <- master_table |>
                                             "Democratic Republic of the Congo",
                                             country)) |>
   dplyr::mutate(data_processing_pipeline = toupper(data_processing_pipeline)) |>
-  dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname))
-
+  dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname)) %>% 
+  dplyr::mutate(iso3c = replace(iso3c, iso3c == "DRC", "COD")) %>% 
+  dplyr::mutate(iso3c = replace(iso3c, iso3c == "ERT", "ERI"))
+  
 # perform tests
 african_countries <- data.frame(country = countrycode::codelist$country.name.en,
                                 continent = countrycode::codelist$continent,
                                 iso3c = countrycode::codelist$iso3c) |>
   dplyr::filter(continent == "Africa") |> dplyr::distinct()
 allowed_countries <- c(african_countries$country, "Democratic Republic of the Congo")
-allowed_iso3c <- c(african_countries$iso3c, "DRC", "ERT")
+allowed_iso3c <- c(african_countries$iso3c)
 allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
                       "treatedextracted", "treatedcalculated",
                       "day0extracted", "day0calculated")
@@ -100,30 +106,20 @@ master_table_clean$gene_mutation[indices_to_transform] <- sapply(
 )
 
 # Adjust and add dates and survey IDs
-master_table_clean$collection_start <- sapply(master_table_clean$date_start, adjust_invalid_date, is_start = TRUE)
-master_table_clean$collection_end <- sapply(master_table_clean$date_end, adjust_invalid_date, is_start = FALSE)
+convstart <- adjust_invalid_date(unique(master_table_clean$date_start), is_start = TRUE)
+master_table_clean$collection_start <- convstart[match(master_table_clean$date_start, unique(master_table_clean$date_start))]
+convend <- adjust_invalid_date(unique(master_table_clean$date_end), is_start = FALSE)
+master_table_clean$collection_end <- convend[match(master_table_clean$date_end, unique(master_table_clean$date_end))]
 
 # Compute collection day
-master_table_clean$collection_day <- sapply(1:nrow(master_table_clean), function(i) {
-  if (!is.na(master_table_clean$collection_start[i]) & !is.na(master_table_clean$collection_end[i])) {
-    return(as.Date(median(c(as.numeric(master_table_clean$collection_start[i]), as.numeric(master_table_clean$collection_end[i]))), origin = "1970-01-01"))
-  } else if (!is.na(master_table_clean$collection_start[i])) {
-    return(as.Date(master_table_clean$collection_start[i]))
-  } else if (!is.na(master_table_clean$collection_end[i])) {
-    return(as.Date(master_table_clean$collection_end[i]))
-  } else {
-    return(as.Date(NA))
-  }
-})
+master_table_clean <- master_table_clean %>% rowwise() %>% 
+  mutate(collection_day = median(c(collection_start, collection_end))) %>% 
+  ungroup()
 
-# TODO: fix long and lat which got read in as formula vs values
-fix_lat <- which(is.na(as.numeric(master_table_clean$lat_n)))
-fix_lon <- which(is.na(as.numeric(master_table_clean$lon_e)))
+# Fix long and lat which got read in as formula vs values
+master_table_clean$lat_n <- clean_excel_formulas(master_table_clean$lat_n)
+master_table_clean$lon_e <- clean_excel_formulas(master_table_clean$lon_e)
 
-master_table_clean$lat_n[fix_lat] <- mean(as.numeric(str_extract_all(master_table_clean$lat_n[fix_lat], 
-                                                                     "\\d+\\.\\d+")[[1]]))
-master_table_clean$lon_e[fix_lat] <- mean(as.numeric(str_extract_all(master_table_clean$lon_e[fix_lat], 
-                                                                     "\\d+\\.\\d+")[[1]]))
 # change variable classes
 master_table_clean <- master_table_clean |>
   dplyr::mutate(collection_day = as.Date(collection_day),
@@ -180,10 +176,9 @@ master_table_clean <- master_table_clean |>
   dplyr::filter(grepl("calculated", substudy) == 0)
 
 
-# TODO: figure out which additional columns would be helpful for inclusion here to enable better deduplication
+# Grab just the columns we need for pairing with WWARN etc
 master_table_simplified <- master_table_clean[, c(wwarn_names, "study_uid", "data_entry_author", "data_processing_pipeline", "substudy")]
 
 # Save the final merged_df as an RDS file
-saveRDS(master_table_simplified, here("analysis", "data-derived", "02_clean_geoffs_simple.RDS"))
-saveRDS(master_table_clean, here("analysis", "data-derived", "02_clean_geoffs_complete.RDS"))
-print("Data saved. Ready for further analysis.")
+saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
+saveRDS(master_table_clean, here("analysis", "data-derived", "geoff_clean_complete.rds"))

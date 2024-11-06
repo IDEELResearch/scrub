@@ -1,13 +1,20 @@
-## functions converting the main types of data output into stave objects
+#' Convert data into a stave compatible list of dataframes
+#' 
+#' @param data A wide dataset to be converted into a form compatible with {STAVE}
+#' 
+#' @return A list of three dataframes easily convertible to be compatible with {STAVE} using stave$append_data
+#' 
+#' @export
+#' 
 
-wwarn_to_stave <- function(wwarn) {
+convert_stave <- function(data) {
   #TODO figure out how to extract the publication year from PMID
   
-  studies <- wwarn %>% 
+  studies <- data %>% 
     dplyr::select(c("study_ID","study_name","study_type","authors","publication_year","url")) %>%
     dplyr::distinct(study_ID, study_name, study_type, authors, publication_year, .keep_all = TRUE)
   
-  counts <- wwarn %>%
+  counts <- data %>%
     dplyr::rename(survey_key = survey_id,
                   variant_string = gene_mut,
                   variant_num = x,
@@ -20,8 +27,8 @@ wwarn_to_stave <- function(wwarn) {
     dplyr::distinct(survey_key, variant_string, .keep_all = TRUE)
   
   
-  ### surveys id -- in WWARN a lot of data points are multisite 
-  surveys <- wwarn %>%
+  ### surveys id -- in data a lot of data points are multisite 
+  surveys <- data %>%
     dplyr::group_by(across(c(study_ID, site_fixed))) %>%
     dplyr::ungroup() %>%
     dplyr::select(-site) %>%
@@ -38,7 +45,7 @@ wwarn_to_stave <- function(wwarn) {
                   end = as.Date(collection_end),
                   mid = as.Date((as.numeric(start) + as.numeric(end)) / 2)) %>%
     dplyr::mutate(collection_day = as.character(mid),
-                  spatial_notes = "wwarn lat and long",
+                  spatial_notes = "data lat and long",
                   time_notes = "automated midpoint") %>%
     dplyr::select(study_key, survey_ID, country_name, site_name,
                   lat, lon, spatial_notes, collection_start, collection_end, 
