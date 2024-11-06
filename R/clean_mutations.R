@@ -41,3 +41,17 @@ clean_mutations <- function(string) {
   # Return the cleaned mutation name
   return(gene_mut)
 }
+
+#' @noRd
+format_variants_for_stave <- function(str) {
+  
+  spl <- strsplit(str, ":")
+  
+  clean <- lapply(spl, function(x){
+    x[1] <- tolower(x[1])
+    return(x)
+  })
+  
+  res <- lapply(clean, paste0, collapse = ":")
+  unlist(res)
+}
