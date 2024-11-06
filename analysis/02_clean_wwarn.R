@@ -1,5 +1,7 @@
-wwarn_data <- readRDS("analysis/data-derived/wwarn_res_df.rds")
-ref_als <- read.csv("analysis/data-raw/k13_ref_protein_codon_dictionary.csv")
+wwarn_data <- readRDS(here("analysis", "data-derived", 
+                           "wwarn_res.rds"))
+ref_als <- read.csv(here("analysis", "data-raw", 
+                                 "k13_ref_protein_codon_dictionary.csv"))
 
 set.seed(1)
 wwarn <- wwarn_data %>%
@@ -17,20 +19,20 @@ wwarn <- wwarn_data %>%
                 country_name = countrycode::countrycode(iso3c, # fix up top
                                                         origin = 'iso3c', 
                                                         destination = 'country.name')) %>%
-  # manually fix the country names
-  dplyr::mutate(country_name = if_else(country_name %in% c("Congo - Kinshasa",
-                                                           "Congo - Brazzaville"),
-                                       "Democratic Republic of the Congo", country_name)) %>%
-  dplyr::mutate(country_name = if_else(country_name == "Côte d’Ivoire",
-                                       "Côte d'Ivoire", country_name)) %>%
-  dplyr::mutate(country_name = if_else(country_name == "Myanmar (Burma)",
-                                       "Myanmar", country_name)) %>%
-  dplyr::mutate(country_name = if_else(country_name == "São Tomé & Príncipe",
-                                       "São Tomé and Príncipe", country_name)) %>%
-  dplyr::mutate(country_name = if_else(country_name == "Cape Verde",
-                                       "Cabo Verde", country_name)) %>%
+  # # manually fix the country names
+  # dplyr::mutate(country_name = if_else(country_name %in% c("Congo - Kinshasa",
+  #                                                          "Congo - Brazzaville"),
+  #                                      "Democratic Republic of the Congo", country_name)) %>%
+  # dplyr::mutate(country_name = if_else(country_name == "Côte d’Ivoire",
+  #                                      "Côte d'Ivoire", country_name)) %>%
+  # dplyr::mutate(country_name = if_else(country_name == "Myanmar (Burma)",
+  #                                      "Myanmar", country_name)) %>%
+  # dplyr::mutate(country_name = if_else(country_name == "São Tomé & Príncipe",
+  #                                      "São Tomé and Príncipe", country_name)) %>%
+  # dplyr::mutate(country_name = if_else(country_name == "Cape Verde",
+  #                                      "Cabo Verde", country_name)) %>%
   dplyr::ungroup() %>%
-  dplyr::filter(country_name != "Eswatini") %>% 
+  # dplyr::filter(country_name != "Eswatini") %>% 
   dplyr::mutate(study_end_year = if_else(is.na(study_end_year),
                                          as.numeric(year), study_end_year)) %>%
   dplyr::mutate(study_start_year = if_else(is.na(study_start_year),
@@ -95,9 +97,7 @@ wwarn_wt <- wwarn %>% dplyr::filter((gene_mut == "k13:WT")) %>%
 remove <- wwarn_stave$counts_dataframe[c(1791, 1692, 1735, 1718, 1936, 1939, 1949, 1972, 1974, 1978, 1984, 1989, 1998, 2007, 2011, 2023, 2035, 2037, 1861, 1566, 1873, 1585, 1578),] %>%
   pull(survey_key)
   
-  
-  
 # wwarn <- rbind(wwarn_mut, wwarn_wt) 
 wwarn <- wwarn_mut %>% dplyr::filter((survey_id %in% remove) == FALSE)
 
-saveRDS(wwarn, "analysis/data-derived/wwarn_stave.RDS")
+saveRDS(wwarn, "analysis/data-derived/wwarn_clean.rds")

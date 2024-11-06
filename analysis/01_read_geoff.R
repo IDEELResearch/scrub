@@ -77,5 +77,4 @@ for (project_dir in study_folders) {
 }
 
 # Save the combined master table as an RDS file in the data-derived directory
-saveRDS(master_table, here("analysis", "data-derived", "01_read_geoffs_output_table.rds"))
-print("Master table saved. Ready for cleaning with 02_clean_geoffs.R.")
+saveRDS(master_table, here("analysis", "data-derived", "geoff_res.rds"))
