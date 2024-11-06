@@ -66,3 +66,36 @@ clean_excel_formulas <- function(str) {
   
 }
    
+#' @noRd
+get_column_names_for_clean <- function(){
+  
+  c(
+    "study_ID",
+    "study_name",
+    "study_type",
+    "authors",
+    "publication_year",
+    "url",
+    "survey_ID",
+    "country_name",
+    "site_name",
+    "lat",
+    "lon",
+    "spatial_notes",
+    "collection_start",
+    "collection_end",
+    "collection_day",
+    "time_notes",
+    "variant_string",
+    "variant_num",
+    "total_num",
+    "iso3c",
+    "continent",
+    "pmid",
+    "prev",
+    "gene",
+    "database"
+  )
+  
+  
+}
