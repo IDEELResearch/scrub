@@ -105,6 +105,9 @@ master_table_clean$gene_mutation[indices_to_transform] <- sapply(
   collapse_k13_range
 )
 
+# TODO: Check with Isabela about the s0054 extraction for 1034
+master_table_clean$gene_mutation[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- "MDR1:1034:C"
+
 # Adjust and add dates and survey IDs
 convstart <- adjust_invalid_date(unique(master_table_clean$date_start), is_start = TRUE)
 master_table_clean$collection_start <- convstart[match(master_table_clean$date_start, unique(master_table_clean$date_start))]
@@ -119,6 +122,10 @@ master_table_clean <- master_table_clean %>% rowwise() %>%
 # Fix long and lat which got read in as formula vs values
 master_table_clean$lat_n <- clean_excel_formulas(master_table_clean$lat_n)
 master_table_clean$lon_e <- clean_excel_formulas(master_table_clean$lon_e)
+
+# Correct gene mutation format
+convmutation <- format_variants_for_stave(unique(master_table_clean$gene_mutation))
+master_table_clean$gene_mutation <- convmutation[match(master_table_clean$gene_mutation, unique(master_table_clean$gene_mutation))]
 
 # change variable classes
 master_table_clean <- master_table_clean |>
@@ -142,43 +149,53 @@ if(sum(master_table_clean$total_num == 0) > 0) {
 }
 
 # rename the columns so that they make sense
-wwarn_names <- c("iso3c", "admin_0", "admin_1", "site", "lat", "long", "year", 
-                 "study_start_year", "study_end_year", "x", "n", "prev", 
-                 "gene", "mut", "gene_mut", "annotation", "database", 
-                 "pmid", "url", "source")
+column_names <- get_column_names_for_clean()
 
-master_table_clean <- master_table_clean |>
-  dplyr::mutate(database = "GEOFF") |>
-  dplyr::rename(admin_0 = "country",
-                # admin_1 = NA,
-                site = "site_name",
-                lat = "lat_n",
-                long = "lon_e",
-                year = "collection_day",
-                study_start_year = "collection_start", 
-                study_end_year = "collection_end", 
-                x = "mutant_num",
-                n = "total_num",
-                # prev = NA,
-                gene = "gene",
-                mut = "mut",
-                gene_mut = "gene_mutation",
-                # annotation = NA,
-                database = "database",
+# first add in extra information needed within column_names
+master_table_formatted <- master_table_clean |>
+  dplyr::mutate(database = "GEOFF",
+                survey_ID = paste0(study_uid, "_", janitor::make_clean_names(site_name, "big_camel"), "_", lubridate::year(collection_start)),
+                study_nm = study_uid,
+                continent = countrycode::countrycode(sourcevar = iso3c, "iso3c", "continent"),
+                prev = mutant_num/total_num,
+                spatial_notes = "Literature review sourced lat/lon",
+                time_notes = "Automated midpoint"
+                ) |>
+  # second check we have all the correctly named columns 
+  dplyr::rename(study_ID = "study_uid",
+                study_name = "study_nm",
+                study_type = "publication_status",
+                authors = "first_author_surname", 
+                publication_year = "publication_year",
                 url = "study_url",
-                source = "publication_status",
-                iso3c = "iso3c",
-                pmid = "pmid") |>
-  dplyr::mutate(admin_1 = NA,
-                prev = NA, 
-                annotation = NA) |> #reorder to have the same column order as WWARN
-  dplyr::relocate(all_of(wwarn_names)) |>
+                survey_ID = "survey_ID",
+                country_name = "country", 
+                site_name = "site_name",
+                lat = "lat_n",
+                lon = "lon_e",
+                spatial_notes = "spatial_notes",
+                collection_start = "collection_start", 
+                collection_end = "collection_end", 
+                collection_day = "collection_day", 
+                time_notes = "time_notes",
+                variant_string = "gene_mutation",
+                variant_num = "mutant_num",
+                total_num = "total_num",
+                iso3c = "iso3c", 
+                continent = "continent",
+                pmid = "pmid",
+                prev = "prev",
+                gene = "gene",
+                database = "database"
+  ) %>% 
+  # filter out any entries that are calculated - these reflect extra data entries for total genotype counts
+  # which are already captured within haplotype counts
   dplyr::filter(grepl("calculated", substudy) == 0)
 
-
 # Grab just the columns we need for pairing with WWARN etc
-master_table_simplified <- master_table_clean[, c(wwarn_names, "study_uid", "data_entry_author", "data_processing_pipeline", "substudy")]
+master_table_simplified <- master_table_formatted %>% 
+  select(all_of(column_names))
 
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
-saveRDS(master_table_clean, here("analysis", "data-derived", "geoff_clean_complete.rds"))
+saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
