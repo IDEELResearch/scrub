@@ -1,0 +1,13 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Abole	Abole	Abole	ETHIOPIA	ETH	8.1879	34.3989	Abole	manual	no	health_facility	1		both	Abole	1	99	This is sentinel site genomic surveillance of Pf DR in Ethiopia
+Andassa	Andassa	Andassa	ETHIOPIA	ETH	11.50241	37.48655	Andassa	manual	no	health_facility	1		both	Andassa	1	99	
+Asendabo	Asendabo	Asendabo	ETHIOPIA	ETH	7.75904	37.22329	Asendabo	manual	no	health_facility	1		both	Asendabo			
+Batu	Batu	Batu	ETHIOPIA	ETH	7.93833	38.71916	Batu	manual	no	health_facility	1		both	Batu			
+Dilla	Dilla	Dilla	ETHIOPIA	ETH	6.4007	38.3111	Dilla	manual	no	health_facility	1		both	Dilla			
+Erer	Erer	Erer	ETHIOPIA	ETH	9.5614	41.3833	Erer	manual	no	health_facility	1		both	Erer			
+Jiga	Jiga	Jiga	ETHIOPIA	ETH	10.67261	37.70038	Jiga	manual	no	health_facility	1		both	Jiga			
+Lante	Lante	Lante	ETHIOPIA	ETH	6.13325	37.63912	Lante	manual	no	health_facility	1		both	Lante			
+Metehara	Metehara	Metehara	ETHIOPIA	ETH	8.83826	39.92292	Metehara	manual	no	health_facility	1		both	Metehara			
+Secha	Secha	Secha	ETHIOPIA	ETH	6.03333	37.555	Secha	manual	no	health_facility	1		both	Secha			
+Shile	Shile	Shile	ETHIOPIA	ETH	6.3	37.11667	Shile	manual	no	health_facility	1		both	Shile			
+Woreta	Woreta	Woreta	ETHIOPIA	ETH	11.92777	37.75625	Woreta	manual	no	health_facility	1		both	Woreta			

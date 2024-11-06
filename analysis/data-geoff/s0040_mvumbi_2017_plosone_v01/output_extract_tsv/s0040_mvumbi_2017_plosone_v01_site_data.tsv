@@ -1,0 +1,7 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Bolenge	Bolenge	Bolenge	Democratic Republic of the Congo	COD	0.0022	18.2229	Bolenge drc lat lon	manual	yes	Community	0	73	both	Equatuer			
+Luzizila	Luzizila	Luzizila	Democratic Republic of the Congo	COD	-4.322447	15.307045	Luzizila drc lat lon	manual	yes	Community	0	73	both	KInshasa			
+Mweka	Mweka	Mweka	Democratic Republic of the Congo	COD	-4.8531	21.5588	Mweka drc lat lon	manual	yes	Community	0	73	both	Kasai			
+Punia	Punia	Punia	Democratic Republic of the Congo	COD	-1.7777	26.6082	Punia drc lat lon	manual	yes	Community	0	73	both	Maniema			
+Kapolowe	Kapolowe	Kapolowe	Democratic Republic of the Congo	COD	-10.9424	26.9522	Kapolowe drc lat lon	manual	yes	Community	0	73	both	Haut-Katanga			
+Butembo	Butembo	Butembo	Democratic Republic of the Congo	COD	0.114	29.3018	Butembo drc lat lon	manual	yes	Community	0	73	both	Nord-Kivu			

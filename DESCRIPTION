@@ -18,7 +18,10 @@ Imports:
     magrittr,
     ragg,
     readr,
-    stringr
+    stringr,
+    tidyverse,
+    countrycode,
+    lubridate
 Suggests:
     knitr,
     rmarkdown,
