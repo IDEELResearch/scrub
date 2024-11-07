@@ -8,6 +8,7 @@ mdf <- data.table::fread("https://www.malariagen.net/wp-content/uploads/2023/11/
   rename(sample = V1)
 # writing in case they remove it later
 write.csv(mdf, "analysis/data-raw/pf7k_raw.csv")
+mdf <- data.table::fread("analysis/data-raw/pf7k_raw.csv") %>% as.data.frame()
 
 # get the vcf grabbed GTs
 mdrex <- read.csv(here::here("analysis/data-raw/mdr.csv")) %>%
@@ -38,6 +39,7 @@ mdf <- left_join(mdf, mdrex_df, by = "sample")
 meta <- read.csv("https://www.malariagen.net/wp-content/uploads/2023/11/Pf7_samples.txt", sep = "\t")
 # writing in case they remove it later
 write.csv(meta, "analysis/data-raw/pf7k_samples.csv")
+meta <- read.csv("analysis/data-raw/pf7k_samples.csv")
 
 # and join
 mdf <- left_join(mdf, meta %>% rename(sample = Sample), by = "sample")
@@ -45,39 +47,28 @@ mdf <- left_join(mdf, meta %>% rename(sample = Sample), by = "sample")
 # sort this into a consistent format that is the same as the WHO/WWWARN information
 
 # 1. Rename annoying markers
-mdf <- mdf %>%
-  rename(crt_K76T = `crt_76[K]`,
-         mdr1_N86Y = `mdr1_86[Y]`,
-         mdr1_Y184F = `mdr1_184[F]`,
-         k13_markers = `kelch13_349-726_ns_changes`
-  )
+mdf <- mdf %>% janitor::clean_names()
 
 # select all that are needed
 mdf <- mdf %>% select(
-  sample,
-  crt_K76T, mdr1_N86Y, mdr1_Y184F, mdr1_dup_call, k13_markers, pm2_dup_call,
-  study = Study,
-  admin_0 = Country,
-  admin_1 = Admin.level.1,
-  lat = Admin.level.1.latitude,
-  long = Admin.level.1.longitude,
-  year = Year
-)
+  sample:mdr1_184_f,
+  study = study,
+  admin_0 = country,
+  admin_1 = admin_level_1,
+  lat = admin_level_1_latitude,
+  long = admin_level_1_longitude,
+  year = year
+) %>% 
+  rename(k13_markers = kelch13_349_726_ns_changes)
 
 # now start collapsing into helpful formats
 
 # A. ART
-# as of 2 Jan 2024 ART-R markers (valid and candidate)
-validated_df <- read.csv("analysis/data-raw/mutation_dictionary.csv")
-validated_prereg <- validated_df %>% 
-  filter(annotation %in% c("validated", "candidate") & gene == "k13") %>% 
-  pull(mut)
-validated <- paste0(validated_prereg, collapse = "|")
 
 # First clean the misings
 mdf <- mdf %>%
   # 1. All blanks in k13 are WT
-  mutate(k13_markers = replace(k13_markers, k13_markers == "", "WT")) %>%
+  mutate(k = replace(k13_markers, k13_markers == "", "WT")) %>%
   # 2. All "-" in k13 are missing (N = 843)
   mutate(k13_markers = replace(k13_markers, k13_markers == "-", NA)) %>%
   # 3. All "!" in k13 are frame-shift in the haplotype, consider missing (N = 4)
@@ -95,11 +86,27 @@ mdf <- mdf %>%
 # / dictates additional NS changes in the same clone
 # * in the context of mutations, these indicate that the sample could not be phased
 
-# From this, anything that is homozygous alt and the alt is a validated marker is resistant (=1)
-# anything that is heterozygous alt and both NS are validated is full resistant (=1)
-# anything that is heterozygous alt but not both NS are validated, then weighted resistant is full resistant (=0.5)
-# This function works with the data as is here, which has only ether two haplotypes reported (i.e. 1 comma (","))
-k13_conv <- function(marker) {
+convert_k13 <- function(marker) {
+  
+  # Case 1: NA - Missing
+  if (is.na(marker)) {
+    return(NA)
+  }
+  
+  # Case 2: "" - Wild Type
+  if (marker == "") {
+    return("WT")
+  }
+  
+  # Case 3:  No / or , therefore simple
+  if (!grepl("\\/|\\,", marker)) {
+    return(clean_mutations(paste0("k13-", marker)))
+  }
+  
+  # Final Case
+  spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
+  vapply(paste0("k13-", spl), clean_mutations, character(1))
+  
   
   spls <- strsplit(marker, ",", fixed = TRUE)
   
@@ -129,60 +136,39 @@ mdf %>% select(crt_K76T, mdr1_N86Y, mdr1_Y184F, mdr1_dup_call, k13_markers,pm2_d
   unique() %>% 
   write.csv("analysis/data-derived/pf7k_phase_examples.csv")
 
-# 6. convert our k13 markers into numeric for k13 valid markers
-mdf <- mdf %>%
-  mutate(k13_valid = k13_conv(k13_markers))
+## NB FOR STAVE: "|" reflects phased 
+## NB FOR STAVE: "/" reflects unphased 
 
-# pull the k13
-all_muts <- toupper(unlist(str_extract_all(mdf$k13_markers %>% unique, "\\w*")) %>% unique)
-all_muts <- all_muts[(!all_muts %in% c("WT","",NA))]
-pull_k13_muts <- function(marker) {
+mdf %>% 
+  mutate(crt_K76T = case_when(
+    crt_K76T == "T,K" ~ "crt:76:T|K",
+    crt_K76T == "T" ~ "crt:76:T",
+    crt_K76T == "K" ~ "crt:76:K",
+    crt_K76T == "K,T" ~ "crt:76:K|T",
+    crt_K76T == "K,T" ~ NA,
+    # Just marking as phased here. But if we come back to do extended haplotypes then change this
+    crt_K76T == "T,Q*" ~ "crt:76:T|Q", 
+    crt_K76T == "K,P" ~ "crt:76:K|P"
+  )) %>% 
+  mutate(mdr1_N86Y = case_when(
+    mdr1_86_y == "N" ~ "mdr1:86:N",
+    mdr1_86_y == "Y" ~ "mdr1:86:Y",
+    # The mdr1 SNPs I had to grab from read counts off vcfs, but can't tell if they are phased.
+    # Have left as unphased while we just consider the single haplotype at the moment 
+    mdr1_86_y == "N,Y" ~ "mdr1:86:N|Y"
+  )) %>% 
+  mutate(mdr1_Y184F = case_when(
+    mdr1_184_f == "F" ~ "mdr1:184:F",
+    mdr1_184_f == "Y" ~ "mdr1:184:Y",
+    # The mdr1 SNPs I had to grab from read counts off vcfs, but can't tell if they are phased.
+    # Have left as unphased while we just consider the single haplotype at the moment 
+    mdr1_184_f == "Y,F" ~ "mdr1:184:Y|F"
+  )) %>% 
+  mutate(k13_markers = convert_k13(k13_markers))
   
-  muts <- str_extract_all(marker, paste0(validated, "|", tolower(validated)))[[1]]
-  muts <- unique(toupper(muts))
-  dfmut <- data.frame("mut" = all_muts, "present" = 0)
-  if(length(muts) > 0) {
-    dfmut$present[grep(paste0(muts, collapse = "|"), dfmut$mut)] <- 1
-  }
-  res <- dfmut %>% pivot_wider(names_from = mut, values_from = present)
-  res$k13_marker_in <- marker
-  return(res)
-  
-}
 
-# now grab the specific mutations
-k13_pulled <- purrr::map((mdf$k13_markers), pull_k13_muts, .progress = TRUE)
-k13_pulled <- do.call(rbind, k13_pulled)
 
-# and set to NA if NA
-k13_pulled[which(is.na(mdf$k13_valid)),] <- NA
-mdf <- cbind(mdf, k13_pulled)
 
-# B. crt_K76T mdr1 SNPs
-
-# Function to convert biallelix res markers
-bires_conv <- function(marker, res_AA, sens_AA) {
-  
-  spls <- strsplit(marker, ",", fixed = TRUE)
-  
-  lapply(spls, function(x){
-    #message(x)
-    if (length(x) == 2) {
-      return(sum(grepl(res_AA, x, ignore.case = TRUE)))
-    } else {
-      if (is.na(x)){
-        return(NA)
-      } else if (x == sens_AA) {
-        return(0)
-      } else if (x == res_AA) {
-        return(1)
-      } else {
-        return("ERROR")
-      }
-    }
-  }) %>% unlist
-  
-}
 
 # First clean the misings
 mdf <- mdf %>%
