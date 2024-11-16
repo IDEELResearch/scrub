@@ -34,7 +34,7 @@ deduplicate <- function(df) {
   
   df %>% 
     # fully remove complete duplicates at all columns
-    dplyr::distinct() %>% dim()
+    dplyr::distinct() %>% 
     # fully remove complete duplicates at all columns minus database
     dplyr::distinct(dplyr::across(-database))
   
