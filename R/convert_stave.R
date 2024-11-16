@@ -8,48 +8,33 @@
 #' 
 
 convert_stave <- function(data) {
-  #TODO figure out how to extract the publication year from PMID
   
+  #TODO figure out how to extract the publication year from PMID (is this still needed)
+  
+  # grab our distinct studies data frame 
   studies <- data %>% 
     dplyr::select(c("study_ID","study_name","study_type","authors","publication_year","url")) %>%
+    dplyr::mutate(publication_year = as.integer(publication_year)) %>% 
     dplyr::distinct(study_ID, study_name, study_type, authors, publication_year, .keep_all = TRUE)
   
+  # grab our distinct counts data frame
   counts <- data %>%
-    dplyr::rename(survey_key = survey_id,
-                  variant_string = gene_mut,
-                  variant_num = x,
-                  total_num = n) %>%
-    dplyr::filter(variant_num >= 0) %>%
-    # TODO: figure out why some of these are not integers and how to fix them
-    dplyr::mutate(variant_num = floor(variant_num)) %>%
+    dplyr::rename(survey_key = survey_ID) %>% 
     dplyr::filter(variant_string != "mdr1:CNV") %>%
+    dplyr::filter(variant_string != "pfpm23:CNV") %>%
     dplyr::select(survey_key, variant_string, variant_num, total_num) %>%
+    dplyr::mutate(variant_num = as.integer(variant_num)) %>% 
+    dplyr::mutate(total_num = as.integer(total_num)) %>% 
     dplyr::distinct(survey_key, variant_string, .keep_all = TRUE)
   
-  
-  ### surveys id -- in data a lot of data points are multisite 
+  # grab our distinct surveys data frame
   surveys <- data %>%
-    dplyr::group_by(across(c(study_ID, site_fixed))) %>%
-    dplyr::ungroup() %>%
-    dplyr::select(-site) %>%
-    dplyr::rename(site_name = admin_1, 
-                  date_start = study_start_year,
-                  date_end = study_end_year,
-                  lon = long, 
-                  survey_ID = survey_id) %>%
-    dplyr::filter(survey_ID %in% counts$survey_key) %>%
-    dplyr::mutate(collection_start = paste0(date_start,"-01-01"),
-                  collection_end = paste0(date_end,"-12-31"),
-                  study_key = study_ID) %>%
-    dplyr::mutate(start = as.Date(collection_start),
-                  end = as.Date(collection_end),
-                  mid = as.Date((as.numeric(start) + as.numeric(end)) / 2)) %>%
-    dplyr::mutate(collection_day = as.character(mid),
-                  spatial_notes = "data lat and long",
-                  time_notes = "automated midpoint") %>%
+    dplyr::rename(study_key = study_ID) %>%
     dplyr::select(study_key, survey_ID, country_name, site_name,
                   lat, lon, spatial_notes, collection_start, collection_end, 
                   collection_day, time_notes) %>%
+    dplyr::mutate(lat = as.integer(lat)) %>% 
+    dplyr::mutate(lon = as.integer(lon)) %>% 
     dplyr::distinct(study_key, survey_ID, .keep_all = TRUE)
   
   studies <- studies %>%
@@ -59,5 +44,3 @@ convert_stave <- function(data) {
               surveys_dataframe = surveys, 
               counts_dataframe = counts))
 }
-
-# repeat the same functions for pf7k and who when those datasets are ready
