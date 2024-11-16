@@ -1,9 +1,3 @@
-## reading in the tsv's routinely fixing the formatting
-# read in all three tsv's from the filepaths passed and then reformat into a list of dataframes for stave
-# currently only works for long tsv's - I think we shouldn't have any wide format
-
-# TODO: add all the zero prevalence genotypes from k13:codon-codon:* or k13:WT
-
 library(tidyverse)
 
 read_geoff <- function(study_path, site_path, prev_path) {
@@ -35,7 +29,7 @@ read_geoff <- function(study_path, site_path, prev_path) {
   surveys <- site_prev %>%
     dplyr::mutate(study_id = study_id) %>%
     dplyr::select(c(study_id, survey_id, iso3c, country, site_name, collection_location,
-                      lat_n, lon_e, date_start, date_end)) %>%
+                    lat_n, lon_e, date_start, date_end)) %>%
     dplyr::distinct() %>%
     dplyr::rename(site = site_name,
                   location = collection_location,
@@ -46,12 +40,8 @@ read_geoff <- function(study_path, site_path, prev_path) {
     dplyr::mutate(study_uid = study_id) %>%
     dplyr::select(study_uid, survey_id, gene_mutation, mutant_num, total_num)
   
-  return(list(studies_dataframe = studies, 
-              surveys_dataframe = surveys, 
-              counts_dataframe = counts))
+  df <- full_join(study, surveys) %>%
+    dplyr::full_join(counts)
+  
+  
 }
-
-# test this object
-stave_obj <- read_geoff(study_path = "analysis/data-example/ideel_study_data_validated.tsv",
-                        site_path =  "analysis/data-example/ideel_site_data_validated.tsv",
-                        prev_path = "analysis/data-example/ideel_prevalence_data_long_validated.tsv")

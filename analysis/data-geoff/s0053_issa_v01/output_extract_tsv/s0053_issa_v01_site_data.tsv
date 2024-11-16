@@ -1,0 +1,4 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Doba	Doba	Gaki	Chad	TCD	8.682115518	16.85931663	Doba	manual	yes	health_facility	0.5	4.9					
+Kelo	Kelo	Hindina	Chad	TCD	9.309760666	15.80398151	Hindina_Centre_de_Santé	manual	yes	health_facility	0.5	4.9					
+Koyom	Koyom	Boubou	Chad	TCD	9.816570018	15.85670426	Medical_Center_De_Koyom	manual	yes	health_facility	0.5	4.9					

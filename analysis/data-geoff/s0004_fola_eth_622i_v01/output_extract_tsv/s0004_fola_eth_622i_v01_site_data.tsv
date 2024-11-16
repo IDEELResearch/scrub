@@ -1,0 +1,13 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Ahferom	Ahferom	Ahferom	ETHIOPIA	ETH	14.28061	39.147419	Ahferom	manual	no	Community			both	Ahferom	1	99	These study used previously assessed for pfhrp2/3 deletions samples (here is link to original paper -https://pubmed.ncbi.nlm.nih.gov/34580442/)
+At_Tsimbila	At_Tsimbila	At_Tsimbila	ETHIOPIA	ETH	13.95504	38.016378	At_Tsimbila	manual	no	Community			both	At_Tsimbila	1	99	
+Gulomekeda	Gulomekeda	Gulomekeda	ETHIOPIA	ETH	14.343	39.325	Gulomekeda	manual	no	Community			both	Gulomekeda			
+Itang	Itang	Itang	ETHIOPIA	ETH	8.195926357	34.26860365	Itang	manual	no	Community			both	Itang			
+K_Humera	K_Humera	K_Humera	ETHIOPIA	ETH	14.28168379	36.61267932	K_Humera	manual	no	Community			both	K_Humera			
+Kule	Kule	Kule	ETHIOPIA	ETH	11.69513686	39.68712271	Kule	manual	no	Community			both	Kule			
+L_Adiabo	L_Adiabo	L_Adiabo	ETHIOPIA	ETH	14.44690316	38.2900075	L_Adiabo	manual	no	Community			both	L_Adiabo			
+Metema	Metema	Metema	ETHIOPIA	ETH	12.95339209	36.16043686	Metema	manual	no	Community			both	Metema			
+Quara	Quara	Quara	ETHIOPIA	ETH	12.499685	35.748713	Quara	manual	no	Community			both	Quara			
+T_Adiabo	T_Adiabo	T_Adiabo	ETHIOPIA	ETH	14.33333333	37.83333333	T_Adiabo	manual	no	Community			both	T_Adiabo			
+Tegede	Tegede	Tegede	ETHIOPIA	ETH	13.306837	36.998048	Tegede	manual	no	Community			both	Tegede			
+West_Armachiho	West_Armachiho	West_Armachiho	ETHIOPIA	ETH	13.46475445	36.48377436	West_Armachiho	manual	no	Community			both	West_Armachiho			
