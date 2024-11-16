@@ -103,8 +103,25 @@ convert_k13 <- function(marker) {
     return(clean_mutations(paste0("k13-", marker)))
   }
   
-  # Final Case
+  # Case 4:  Only ,
+  if (grepl("\\,", marker) && !grepl("\\/", marker)) {
+    return(clean_mutations(paste0("k13-", marker)))
+  }
+  
+  # 1. First work out all the loci and snps for this sample
   spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
+  all_loci <- unique(gsub("(^\\w)(\\d*)(\\w$)", "\\2", spl))
+  all_snps <- unique(gsub("(^\\w)(\\d*)(\\w$)", "\\3", spl))
+  all_wts <- unique(gsub("(^\\w)(\\d*)(\\w$)", "\\1", spl))
+  
+  # now split them based on their 
+  cspl <- toupper(strsplit(marker, "\\,")[[1]]) %>% 
+    lapply(function(x) {strsplit(x, "\\,|\\/")[[1]]})
+  loci <- lapply(cspl, function(x) {gsub("(^\\w)(\\d*)(\\w$)", "\\2", x)})
+  snps <- lapply(cspl, function(x) {gsub("(^\\w)(\\d*)(\\w$)", "\\3", x)})
+  wts <- lapply(cspl, function(x) {gsub("(^\\w)(\\d*)(\\w$)", "\\1", x)})
+  
+  
   vapply(paste0("k13-", spl), clean_mutations, character(1))
   
   
@@ -132,23 +149,62 @@ convert_k13 <- function(marker) {
 }
 
 # send example to Bob to comment on
-mdf %>% select(crt_K76T, mdr1_N86Y, mdr1_Y184F, mdr1_dup_call, k13_markers,pm2_dup_call) %>% 
+mdf %>% select(crt_76_k, mdr1_86_y, mdr1_184f, k13_markers) %>% 
   unique() %>% 
   write.csv("analysis/data-derived/pf7k_phase_examples.csv")
+
+# let's look at the types of data to help write a function to pass these
+biat <- mdf %>% 
+  select(crt_76_k, dhfr_51_n:dhps_613_a, mdr1_86_y, mdr1_184_f) %>% 
+  as.matrix() %>% 
+  unlist %>% 
+  as.character %>% 
+  unique()
+
+pf7k_format_bia_for_stave <- function(mut, gls = deparse(substitute(mut))) {
+  
+  # what is the gene loci snp
+  gl <- gsub("(^[[:alnum:]]*_\\d*)(_[[:alnum:]]$)", "\\1", gls)
+  gl <- gsub("_", ":", gl)
+  
+  # convert to stave phased format
+  res <- gsub("\\,", "\\|", mut)
+  
+  # if any unphased (*) handle this
+  unphased <- grep("\\*", res)
+  if (length(unphased) > 0) {
+    res[unphased] <- gsub("\\|", "\\/", res[unphased])
+    res[unphased] <- gsub("\\*", "", res[unphased])
+  }
+  
+  # remove any missing (-)
+  missing <- grep("\\-", res)
+  if (length(missing) > 0) {
+    res[missing] <- NA
+  }  
+  
+  # and paste together with gene 
+  res[!is.na(res)] <- paste0(gl, ":", res[!is.na(res)])
+  
+  return(res)
+}
+
 
 ## NB FOR STAVE: "|" reflects phased 
 ## NB FOR STAVE: "/" reflects unphased 
 
 mdf %>% 
+  mutate(across(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$"), pf7k_format_bia_for_stave)) 
+  mutate(across(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$"), pf7k_format_bia_for_stave)) %>% 
+  
   mutate(crt_K76T = case_when(
-    crt_K76T == "T,K" ~ "crt:76:T|K",
-    crt_K76T == "T" ~ "crt:76:T",
-    crt_K76T == "K" ~ "crt:76:K",
-    crt_K76T == "K,T" ~ "crt:76:K|T",
-    crt_K76T == "K,T" ~ NA,
-    # Just marking as phased here. But if we come back to do extended haplotypes then change this
-    crt_K76T == "T,Q*" ~ "crt:76:T|Q", 
-    crt_K76T == "K,P" ~ "crt:76:K|P"
+    crt_76_k == "T,K" ~ "crt:76:T|K",
+    crt_76_k == "T" ~ "crt:76:T",
+    crt_76_k == "K" ~ "crt:76:K",
+    crt_76_k == "K,T" ~ "crt:76:K|T",
+    crt_76_k == "K,T" ~ NA,
+    crt_76_k == "T,Q*" ~ "crt:76:T/Q", 
+    crt_76_k == "K,P" ~ "crt:76:K|P"
   )) %>% 
   mutate(mdr1_N86Y = case_when(
     mdr1_86_y == "N" ~ "mdr1:86:N",
@@ -173,9 +229,9 @@ mdf %>%
 # First clean the misings
 mdf <- mdf %>%
   # 1. All "-" in crt are missing (N = 26)
-  mutate(crt_K76T = replace(crt_K76T, crt_K76T == "-", NA)) %>%
+  mutate(crt_76_k = replace(crt_76_k, crt_76_k == "-", NA)) %>%
   # 2. convert our crt markers into numeric for crt76T
-  mutate(crt_76T = bires_conv(crt_K76T, "T", "K")) %>%
+  mutate(crt_76T = bires_conv(crt_76_k, "T", "K")) %>%
   # 3. convert our mdr markers into numeric for mdr1_86Y
   mutate(mdr1_86Y = bires_conv(mdr1_N86Y, "Y", "N")) %>%
   # 3. convert our mdr markers into numeric for mdr1_184F
@@ -191,7 +247,7 @@ mdf <- mdf %>%
 # FINALLY:
 # and work out totals etc
 pf7k_res_df <- mdf %>%
-  select(-k13_marker_in, -k13_markers, -k13_valid, -crt_K76T, -mdr1_N86Y, -mdr1_Y184F, -mdr1_dup_call, -pm2_dup_call) %>% 
+  select(-k13_marker_in, -k13_markers, -k13_valid, -crt_76_k, -mdr1_N86Y, -mdr1_Y184F, -mdr1_dup_call, -pm2_dup_call) %>% 
   pivot_longer(starts_with(c("k13","crt","mdr1","pfpm23"))) %>%
   mutate(gene = gsub("(.*)_(.*)", "\\1", name)) %>%
   rename(mut = name) %>%
