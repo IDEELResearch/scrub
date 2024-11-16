@@ -1,0 +1,7 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes	Pikine, Thiès, Kédougou, Diourbel, Kolda, and Kaolack
+pikine	Pikine	Pikine	Senegal	SEN	14.7589	-17.3938	google_lat_long_site	manual	yes	health_facility	0.25			Tanga			CRT and K13 haplotypes available for followup visits but no validated or candidate mutations in K13	
+thies	Thies	Thies	Senegal	SEN	14.791	-16.9359	google_lat_long_site	manual	yes	health_facility	0.25							
+kedougou	Kedougou	Kedougou	Senegal	SEN	12.5605	-12.1747	google_lat_long_site	manual	yes	health_facility	0.25							
+diourbel	Diourbel	Diourbel	Senegal	SEN	14.6561	-16.2346	google_lat_long_site	manual	yes	health_facility	0.25							
+kolda	Kolda	Kolda	Senegal	SEN	12.9002	-14.9425	google_lat_long_site	manual	yes	health_facility	0.25							
+kaolack	Kaolack	Kaolack	Senegal	SEN	14.1652	-16.0758	google_lat_long_site	manual	yes	health_facility	0.25							
