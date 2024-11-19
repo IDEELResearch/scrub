@@ -1,4 +1,5 @@
 library(tidyverse)
+devtools::load_all()
 
 # ---------------------------------------------------- o
 # 1. Malariagen wrangle
@@ -83,163 +84,28 @@ mdf <- mdf %>%
 #   unique() %>% 
 #   write.csv("analysis/data-derived/pf7k_phase_examples.csv")
 
-
-# FOR UNDERSTANDING
-# Upper case = homozygous mutations
-# lower case = heterozygous
-# lower case without second mutation noted is heterozygous at SNP level but same AA
-# , dictates separate and distinct haplotypes (different clones)
-# / dictates additional NS changes in the same clone
-# * in the context of mutations, these indicate that the sample could not be phased
-
-# function to convert various pf7k k13 SNP formats for stave
-pf7k_format_k13_for_stave <- function(marker) {
-  
-  # Case 1: NA - Missing
-  if (is.na(marker)) {
-    return(NA)
-  }
-  
-  # Case 2: "" - Wild Type
-  if (marker == "") {
-    return("WT")
-  }
-  
-  # Case 3:  No / or , therefore simple
-  if (!grepl("\\/|\\,", marker)) {
-    return(clean_mutations(paste0("k13-", gsub("*", "", toupper(marker), fixed = TRUE))))
-  }
-  
-  # Case 4:  Only ,
-  if (grepl("\\,", marker) && !grepl("\\/", marker)) {
-    
-    # split these out and clean
-    marker <- gsub("*", "", marker, fixed = TRUE)
-    spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
-    res <- vapply(paste0("k13-", spl), clean_mutations, character(1))
-    
-    # these will become two rows of data as these are different clones
-    # so collapse like this to be split apart later
-    res <- paste0(as.character(res), collapse = "&&")
-    return(res)
-  }
-  
-  # Case 5:  Only /
-  if (grepl("\\/", marker) && !grepl("\\,", marker)) {
-    
-    # First work out all the loci and snps for this sample
-    marker <- gsub("*", "", marker, fixed = TRUE)
-    spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
-    all_loci <- unique(gsub("(^\\w)(\\d*)(\\w)", "\\2", spl))
-    all_snps <- unique(gsub("(^\\w)(\\d*)(\\w)", "\\3", spl))
-    all_wts <- unique(gsub("(^\\w)(\\d*)(\\w)", "\\1", spl))
-    
-    # And concatenate and order it
-    res <- paste0("k13:",
-                           paste0(sort(as.numeric(all_loci)), collapse = "_"),
-                           paste0(":", paste0(all_snps[order(as.numeric(all_loci))], collapse = "_"))
-                    )
-    
-    # these will become two rows of data as these are different clones
-    # so collapse like this to be split apart later
-    res <- paste0(as.character(unlist(res)), collapse = "&&")
-    return(res)
-  }
-  
-  # Case 6 , and /
-  if (grepl("\\,", marker) && grepl("\\/", marker)) {
-  
-  # First work out all the loci and snps for this sample
-  marker <- gsub("*", "", marker, fixed = TRUE)
-  spl <- toupper(strsplit(marker, "\\,")[[1]])
-  spl2 <- strsplit(spl, "\\/")
-  all_loci <- lapply(spl2, function(x) {unique(gsub("(^\\w)(\\d*)(\\w)", "\\2", x))})
-  all_snps <- lapply(spl2, function(x) {unique(gsub("(^\\w)(\\d*)(\\w)", "\\3", x))})
-  all_wts <- lapply(spl2, function(x) {unique(gsub("(^\\w)(\\d*)(\\w)", "\\1", x))})
-  
-  # And concatenate and order it
-  res <- lapply(seq_along(all_loci), 
-                function(x) {
-                  paste0("k13:",
-                paste0(sort(as.numeric(all_loci[[x]])), collapse = "_"),
-                paste0(":", paste0(all_snps[[x]][order(as.numeric(all_loci[[x]]))], collapse = "_"))
-                  )
-                })
-  
-  # these will become two rows of data as these are different clones
-  # so collapse like this to be split apart later
-  res <- paste0(as.character(unlist(res)), collapse = "&&")
-  return(res)
-  
-  }
-  
-
-}
-
-# function to convert biallelic SNP formats for stave
-pf7k_format_bia_for_stave <- function(mut, gls = deparse(substitute(mut))) {
-  
-  # what is the gene loci snp
-  gl <- gsub("(^[[:alnum:]]*_\\d*)(_[[:alnum:]]$)", "\\1", gls)
-  gl <- gsub("_", ":", gl)
-  
-  # convert to stave phased format
-  res <- gsub("\\,", "\\|", mut)
-  
-  # if any unphased (*) handle this
-  unphased <- grep("\\*", res)
-  if (length(unphased) > 0) {
-    res[unphased] <- gsub("\\|", "\\/", res[unphased])
-    res[unphased] <- gsub("\\*", "", res[unphased])
-  }
-  
-  # remove any missing (-)
-  missing <- grep("\\-", res)
-  if (length(missing) > 0) {
-    res[missing] <- NA
-  }  
-  
-  # remove if same SNP (G|G)
-  rept <- strsplit(res, "|")
-  if (any(lengths(rept) == 3)) {
-    pos <- which(lengths(rept) == 3)
-    fix <- unlist(lapply(rept[pos], function(x){x[1] == x[3]}))
-    if (any(fix)){
-    correction <- unlist(lapply(rept[pos[which(fix)]], function(x){x[1]}))  
-    res[pos[which(fix)]] <- correction
-    }
-  }  
-  
-  # and paste together with gene 
-  res[!is.na(res)] <- paste0(gl, ":", res[!is.na(res)])
-  
-  return(res)
-}
-
 # function to split duplicated entries
 split_rows_by_and <- function(data, column) {
   # Use tidyr's separate_rows to split the specified column
   data %>%
     separate_rows(!!sym(column), sep = "\\s*&&\\s*")
 }
-# function to duplicate samples for 
 
-## NB FOR STAVE: "|" reflects phased 
-## NB FOR STAVE: "/" reflects unphased 
-
-# make this k13 marker and biallelic data
+# clean the biallelic and k13 markers
 mdf2 <- mdf %>% 
   mutate(across(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$"), pf7k_format_bia_for_stave)) %>% 
   rowwise() %>% 
   mutate(k13_markers = pf7k_format_k13_for_stave(k13_markers))
   
-# now do the clean on the double ands
+# now clean the variant_string entries with && in and bind with the rest
 res <- rbind(
 mdf2 %>% pivot_longer(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$|k13_markers")) %>% 
-  select(sample, study, admin_0, admin_1, lat, long, year, name, value) %>% filter(grepl("&&", value)) %>% 
+  select(sample, study, admin_0, admin_1, lat, long, year, name, value) %>% 
+  filter(grepl("&&", value)) %>% 
   split_rows_by_and("value"),
 mdf2 %>% pivot_longer(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$|k13_markers")) %>% 
-  select(sample, study, admin_0, admin_1, lat, long, year, name, value) %>% filter(!grepl("&&", value))
+  select(sample, study, admin_0, admin_1, lat, long, year, name, value) %>% 
+  filter(!grepl("&&", value))
 )
 
 # FINALLY:
