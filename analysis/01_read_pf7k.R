@@ -68,7 +68,7 @@ mdf <- mdf %>% select(
 # First clean the misings
 mdf <- mdf %>%
   # 1. All blanks in k13 are WT
-  mutate(k = replace(k13_markers, k13_markers == "", "WT")) %>%
+  mutate(k13_markers = replace(k13_markers, k13_markers == "", "WT")) %>%
   # 2. All "-" in k13 are missing (N = 843)
   mutate(k13_markers = replace(k13_markers, k13_markers == "-", NA)) %>%
   # 3. All "!" in k13 are frame-shift in the haplotype, consider missing (N = 4)
@@ -78,6 +78,12 @@ mdf <- mdf %>%
   # 5. All "*" in k13 are unphased het followed by het. consider missing (N = 8)
   mutate(k13_markers = replace(k13_markers, k13_markers == "*", NA))
 
+# send example to Bob to comment on
+# mdf %>% select(crt_76_k, mdr1_86_y, mdr1_184f, k13_markers) %>% 
+#   unique() %>% 
+#   write.csv("analysis/data-derived/pf7k_phase_examples.csv")
+
+
 # FOR UNDERSTANDING
 # Upper case = homozygous mutations
 # lower case = heterozygous
@@ -86,7 +92,8 @@ mdf <- mdf %>%
 # / dictates additional NS changes in the same clone
 # * in the context of mutations, these indicate that the sample could not be phased
 
-convert_k13 <- function(marker) {
+# function to convert various pf7k k13 SNP formats for stave
+pf7k_format_k13_for_stave <- function(marker) {
   
   # Case 1: NA - Missing
   if (is.na(marker)) {
@@ -100,67 +107,76 @@ convert_k13 <- function(marker) {
   
   # Case 3:  No / or , therefore simple
   if (!grepl("\\/|\\,", marker)) {
-    return(clean_mutations(paste0("k13-", marker)))
+    return(clean_mutations(paste0("k13-", gsub("*", "", toupper(marker), fixed = TRUE))))
   }
   
   # Case 4:  Only ,
   if (grepl("\\,", marker) && !grepl("\\/", marker)) {
-    return(clean_mutations(paste0("k13-", marker)))
+    
+    # split these out and clean
+    marker <- gsub("*", "", marker, fixed = TRUE)
+    spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
+    res <- vapply(paste0("k13-", spl), clean_mutations, character(1))
+    
+    # these will become two rows of data as these are different clones
+    # so collapse like this to be split apart later
+    res <- paste0(as.character(res), collapse = "&&")
+    return(res)
   }
   
-  # 1. First work out all the loci and snps for this sample
-  spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
-  all_loci <- unique(gsub("(^\\w)(\\d*)(\\w$)", "\\2", spl))
-  all_snps <- unique(gsub("(^\\w)(\\d*)(\\w$)", "\\3", spl))
-  all_wts <- unique(gsub("(^\\w)(\\d*)(\\w$)", "\\1", spl))
+  # Case 5:  Only /
+  if (grepl("\\/", marker) && !grepl("\\,", marker)) {
+    
+    # First work out all the loci and snps for this sample
+    marker <- gsub("*", "", marker, fixed = TRUE)
+    spl <- toupper(strsplit(marker, "\\,|\\/")[[1]])
+    all_loci <- unique(gsub("(^\\w)(\\d*)(\\w)", "\\2", spl))
+    all_snps <- unique(gsub("(^\\w)(\\d*)(\\w)", "\\3", spl))
+    all_wts <- unique(gsub("(^\\w)(\\d*)(\\w)", "\\1", spl))
+    
+    # And concatenate and order it
+    res <- paste0("k13:",
+                           paste0(sort(as.numeric(all_loci)), collapse = "_"),
+                           paste0(":", paste0(all_snps[order(as.numeric(all_loci))], collapse = "_"))
+                    )
+    
+    # these will become two rows of data as these are different clones
+    # so collapse like this to be split apart later
+    res <- paste0(as.character(unlist(res)), collapse = "&&")
+    return(res)
+  }
   
-  # now split them based on their 
-  cspl <- toupper(strsplit(marker, "\\,")[[1]]) %>% 
-    lapply(function(x) {strsplit(x, "\\,|\\/")[[1]]})
-  loci <- lapply(cspl, function(x) {gsub("(^\\w)(\\d*)(\\w$)", "\\2", x)})
-  snps <- lapply(cspl, function(x) {gsub("(^\\w)(\\d*)(\\w$)", "\\3", x)})
-  wts <- lapply(cspl, function(x) {gsub("(^\\w)(\\d*)(\\w$)", "\\1", x)})
+  # Case 6 , and /
+  if (grepl("\\,", marker) && grepl("\\/", marker)) {
   
+  # First work out all the loci and snps for this sample
+  marker <- gsub("*", "", marker, fixed = TRUE)
+  spl <- toupper(strsplit(marker, "\\,")[[1]])
+  spl2 <- strsplit(spl, "\\/")
+  all_loci <- lapply(spl2, function(x) {unique(gsub("(^\\w)(\\d*)(\\w)", "\\2", x))})
+  all_snps <- lapply(spl2, function(x) {unique(gsub("(^\\w)(\\d*)(\\w)", "\\3", x))})
+  all_wts <- lapply(spl2, function(x) {unique(gsub("(^\\w)(\\d*)(\\w)", "\\1", x))})
   
-  vapply(paste0("k13-", spl), clean_mutations, character(1))
+  # And concatenate and order it
+  res <- lapply(seq_along(all_loci), 
+                function(x) {
+                  paste0("k13:",
+                paste0(sort(as.numeric(all_loci[[x]])), collapse = "_"),
+                paste0(":", paste0(all_snps[[x]][order(as.numeric(all_loci[[x]]))], collapse = "_"))
+                  )
+                })
   
+  # these will become two rows of data as these are different clones
+  # so collapse like this to be split apart later
+  res <- paste0(as.character(unlist(res)), collapse = "&&")
+  return(res)
   
-  spls <- strsplit(marker, ",", fixed = TRUE)
+  }
   
-  lapply(spls, function(x){
-    #message(x)
-    if (length(x) == 2) {
-      return(sum(grepl(validated, x, ignore.case = TRUE))/2)
-    } else {
-      if (is.na(x)){
-        return(NA)
-      } else if (x == "WT") {
-        return(0)
-      } else {
-        ret <- as.integer(grepl(validated, x, ignore.case = TRUE))
-        if(grepl("[[:lower:]]", x)) {
-          ret <- ret/2
-        }
-        return(ret)
-      }
-    }
-  }) %>% unlist
-  
+
 }
 
-# send example to Bob to comment on
-mdf %>% select(crt_76_k, mdr1_86_y, mdr1_184f, k13_markers) %>% 
-  unique() %>% 
-  write.csv("analysis/data-derived/pf7k_phase_examples.csv")
-
-# let's look at the types of data to help write a function to pass these
-biat <- mdf %>% 
-  select(crt_76_k, dhfr_51_n:dhps_613_a, mdr1_86_y, mdr1_184_f) %>% 
-  as.matrix() %>% 
-  unlist %>% 
-  as.character %>% 
-  unique()
-
+# function to convert biallelic SNP formats for stave
 pf7k_format_bia_for_stave <- function(mut, gls = deparse(substitute(mut))) {
   
   # what is the gene loci snp
@@ -183,94 +199,79 @@ pf7k_format_bia_for_stave <- function(mut, gls = deparse(substitute(mut))) {
     res[missing] <- NA
   }  
   
+  # remove if same SNP (G|G)
+  rept <- strsplit(res, "|")
+  if (any(lengths(rept) == 3)) {
+    pos <- which(lengths(rept) == 3)
+    fix <- unlist(lapply(rept[pos], function(x){x[1] == x[3]}))
+    if (any(fix)){
+    correction <- unlist(lapply(rept[pos[which(fix)]], function(x){x[1]}))  
+    res[pos[which(fix)]] <- correction
+    }
+  }  
+  
   # and paste together with gene 
   res[!is.na(res)] <- paste0(gl, ":", res[!is.na(res)])
   
   return(res)
 }
 
+# function to split duplicated entries
+split_rows_by_and <- function(data, column) {
+  # Use tidyr's separate_rows to split the specified column
+  data %>%
+    separate_rows(!!sym(column), sep = "\\s*&&\\s*")
+}
+# function to duplicate samples for 
 
 ## NB FOR STAVE: "|" reflects phased 
 ## NB FOR STAVE: "/" reflects unphased 
 
-mdf %>% 
-  mutate(across(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$"), pf7k_format_bia_for_stave)) 
+# make this k13 marker and biallelic data
+mdf2 <- mdf %>% 
   mutate(across(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$"), pf7k_format_bia_for_stave)) %>% 
+  rowwise() %>% 
+  mutate(k13_markers = pf7k_format_k13_for_stave(k13_markers))
   
-  mutate(crt_K76T = case_when(
-    crt_76_k == "T,K" ~ "crt:76:T|K",
-    crt_76_k == "T" ~ "crt:76:T",
-    crt_76_k == "K" ~ "crt:76:K",
-    crt_76_k == "K,T" ~ "crt:76:K|T",
-    crt_76_k == "K,T" ~ NA,
-    crt_76_k == "T,Q*" ~ "crt:76:T/Q", 
-    crt_76_k == "K,P" ~ "crt:76:K|P"
-  )) %>% 
-  mutate(mdr1_N86Y = case_when(
-    mdr1_86_y == "N" ~ "mdr1:86:N",
-    mdr1_86_y == "Y" ~ "mdr1:86:Y",
-    # The mdr1 SNPs I had to grab from read counts off vcfs, but can't tell if they are phased.
-    # Have left as unphased while we just consider the single haplotype at the moment 
-    mdr1_86_y == "N,Y" ~ "mdr1:86:N|Y"
-  )) %>% 
-  mutate(mdr1_Y184F = case_when(
-    mdr1_184_f == "F" ~ "mdr1:184:F",
-    mdr1_184_f == "Y" ~ "mdr1:184:Y",
-    # The mdr1 SNPs I had to grab from read counts off vcfs, but can't tell if they are phased.
-    # Have left as unphased while we just consider the single haplotype at the moment 
-    mdr1_184_f == "Y,F" ~ "mdr1:184:Y|F"
-  )) %>% 
-  mutate(k13_markers = convert_k13(k13_markers))
-  
-
-
-
-
-# First clean the misings
-mdf <- mdf %>%
-  # 1. All "-" in crt are missing (N = 26)
-  mutate(crt_76_k = replace(crt_76_k, crt_76_k == "-", NA)) %>%
-  # 2. convert our crt markers into numeric for crt76T
-  mutate(crt_76T = bires_conv(crt_76_k, "T", "K")) %>%
-  # 3. convert our mdr markers into numeric for mdr1_86Y
-  mutate(mdr1_86Y = bires_conv(mdr1_N86Y, "Y", "N")) %>%
-  # 3. convert our mdr markers into numeric for mdr1_184F
-  mutate(mdr1_184F = bires_conv(mdr1_Y184F, "F", "Y"))
-
-# C. Duplications - convert the dup calls to resi status and NAs
-mdf <- mdf %>%
-  mutate(mdr1_CNV = mdr1_dup_call) %>%
-  mutate(pfpm23_CNV = pm2_dup_call) %>%
-  mutate(mdr1_CNV = replace(mdr1_CNV, mdr1_CNV == -1, NA)) %>%
-  mutate(pfpm23_CNV = replace(pfpm23_CNV, pfpm23_CNV == -1, NA))
+# now do the clean on the double ands
+res <- rbind(
+mdf2 %>% pivot_longer(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$|k13_markers")) %>% 
+  select(sample, study, admin_0, admin_1, lat, long, year, name, value) %>% filter(grepl("&&", value)) %>% 
+  split_rows_by_and("value"),
+mdf2 %>% pivot_longer(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$|k13_markers")) %>% 
+  select(sample, study, admin_0, admin_1, lat, long, year, name, value) %>% filter(!grepl("&&", value))
+)
 
 # FINALLY:
 # and work out totals etc
-pf7k_res_df <- mdf %>%
-  select(-k13_marker_in, -k13_markers, -k13_valid, -crt_76_k, -mdr1_N86Y, -mdr1_Y184F, -mdr1_dup_call, -pm2_dup_call) %>% 
-  pivot_longer(starts_with(c("k13","crt","mdr1","pfpm23"))) %>%
-  mutate(gene = gsub("(.*)_(.*)", "\\1", name)) %>%
-  rename(mut = name) %>%
+pf7k_res_df <- res %>% 
+  na.omit() %>% 
+  group_by(across(study:name)) %>%
+  mutate(total_num = sum(!is.na(value))) %>%
+  ungroup() %>%
+  group_by(across(study:total_num)) %>%
+  summarise(variant_string = unique(value), 
+            variant_num = sum(!is.na(value))) %>%
+  rename(study_ID = study) %>%
   mutate(url = "https://pubmed.ncbi.nlm.nih.gov/36864926/",
          pmid = "36864926",
+         study_name = study_ID,
+         study_type = "peer_reviewed",
          database = "Pf7k",
-         site = paste("Pf7k Study:", study),
-         source = NA) %>%
-  group_by(
-    site, source, admin_0, admin_1, lat, long, year,
-    gene, mut, pmid, url, database
-  ) %>%
-  summarise(n = sum(!is.na(value)),
-            x = sum(value, na.rm = TRUE)) %>%
-  ungroup() %>%
-  mutate(iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c")) %>%
-  mutate(study_start_year = NA, study_end_year = NA) %>%
-  mutate(prev = x/n) %>%
-  select(iso3c, admin_0, admin_1, site, lat, long,
-         year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source) %>% 
-  mutate(source = "MalariaGEN") %>% 
-  mutate(gene_mut = vapply(mut, clean_mutations, character(1)))
+         site = paste("Pf7k Study:", study_ID),
+         source = NA,
+         authors = "MalariaGen",
+         publication_year = 2023,
+         survey_ID = paste0(study_ID, "_", authors, "_", admin_1, "_", year),
+  ) %>% 
+  ungroup()
 
-saveRDS(pf7k_res_df, here::here("analysis/data-derived/pf7k_res_df.rds"))
+# and lastly sort out the WT calls
+mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
+mutation_key <- read.csv(mutation_key_path)
+indices_to_transform <- which(pf7k_res_df$variant_string == "k13:WT")
+# range <- "349-726" - this is the range noted in the original pf7k file
+pf7k_res_df$variant_string[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726"))
+
+saveRDS(pf7k_res_df, here::here("analysis/data-derived/pf7k_res.rds"))
 
