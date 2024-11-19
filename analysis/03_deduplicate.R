@@ -27,9 +27,9 @@ column_names <- get_column_names_for_clean()
 
 # make our full bind across
 full_bind <- rbind(
-  clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)) 
-  #clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
-  # clean_pf7k %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
+  # clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_pf7k %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
   # clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
