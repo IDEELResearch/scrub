@@ -25,7 +25,7 @@ clean_mutations <- function(string) {
   mut <- stringr::str_split(string, "-")[[1]][2]
   
   # Extract only letters and specific symbols from the mutation part (e.g., mixed infections)
-  amino <- gsub("[^a-zA-Z/|]", "", mut)
+  amino <- gsub(".*\\d+([A-Za-z]+)", "\\1", mut)
   
   # Process based on the type of mutation
   if (amino == "WT") {
