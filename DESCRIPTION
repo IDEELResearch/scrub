@@ -19,13 +19,14 @@ Imports:
     ragg,
     readr,
     stringr,
-    tidyverse,
-    countrycode,
+    dplyr,
     lubridate
 Suggests:
     knitr,
     rmarkdown,
-    testthat
+    testthat,
+    tidyr,
+    countrycode
 Remotes:
     mrc-ide/STAVE
 URL: https://IDEELResearch.github.io/scrub/
