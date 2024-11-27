@@ -7,8 +7,9 @@
 #' @param substudy_column A character vector containing substudy entries that may need validation and corrections.
 #' @return A character vector with corrected and validated substudy entries. Prints invalid entries if found.
 #' @examples
-#' substudy_data <- c("day 0", "untreated_extracted", "untreadextracted", "day3calculated", "day 5 extracted")
-#' validated_substudy <- check_substudy_entries(substudy_data)
+#' substudy_data <- c("day 0", "untreated_extracted", 
+#' "untreadextracted", "day3calculated", "day 5 extracted")
+#' validated_substudy <- scrub:::check_substudy_entries(substudy_data)
 #' # Output:
 #' # Corrected 1 instances of day0extracted
 #' # Corrected 1 instances of untreated_extracted
