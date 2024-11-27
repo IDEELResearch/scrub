@@ -18,6 +18,7 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 [![Licence](https://img.shields.io/github/license/mashape/apistatus.svg)](http://choosealicense.com/licenses/mit/) 
 [![R build status](https://github.com/IDEELResearch/scrub/workflows/R-CMD-check/badge.svg)](https://github.com/IDEELResearch/scrub/actions)
+[![R-CMD-check](https://github.com/IDEELResearch/scrub/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/IDEELResearch/scrub/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 ## {scrub} - Spatial Cleaned Resistance and Unified Base

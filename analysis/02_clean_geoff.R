@@ -102,7 +102,8 @@ check_values_in_column(master_table_clean, "site_study_type", allowed_site_types
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
 master_table_clean$gene_mutation[indices_to_transform] <- sapply(
   master_table_clean$gene_mutation[indices_to_transform],
-  collapse_k13_range
+  collapse_k13_range, 
+  mutation_key = mutation_key
 )
 
 # TODO: Check with Isabela about the s0054 extraction for 1034

@@ -125,7 +125,7 @@ mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_diction
 mutation_key <- read.csv(mutation_key_path)
 indices_to_transform <- which(res$mut == "k13:WT")
 # range <- "349-726" - this is the range noted in the original pf7k file
-res$mut[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726"))
+res$mut[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726", mutation_key))
 
 # bring it all back together
 who_res_df <- rbind(whospl$crt, res)

@@ -5,10 +5,10 @@ devtools::load_all()
 # 1. Malariagen wrangle
 # ---------------------------------------------------- o
 
-mdf <- data.table::fread("https://www.malariagen.net/wp-content/uploads/2023/11/Pf7_drug_resistance_marker_genotypes.txt") %>%
-  rename(sample = V1)
+# mdf <- data.table::fread("https://www.malariagen.net/wp-content/uploads/2023/11/Pf7_drug_resistance_marker_genotypes.txt") %>%
+#   rename(sample = V1)
 # writing in case they remove it later
-write.csv(mdf, "analysis/data-raw/pf7k_raw.csv")
+# write.csv(mdf, "analysis/data-raw/pf7k_raw.csv")
 mdf <- data.table::fread("analysis/data-raw/pf7k_raw.csv") %>% as.data.frame()
 
 # get the vcf grabbed GTs
@@ -37,9 +37,10 @@ mdrex_df <- mdrex %>%
 mdf <- left_join(mdf, mdrex_df, by = "sample")
 
 # grab the meta information for getting lat long and sample year
-meta <- read.csv("https://www.malariagen.net/wp-content/uploads/2023/11/Pf7_samples.txt", sep = "\t")
+# meta <- read.csv("https://www.malariagen.net/wp-content/uploads/2023/11/Pf7_samples.txt", sep = "\t")
+
 # writing in case they remove it later
-write.csv(meta, "analysis/data-raw/pf7k_samples.csv")
+# write.csv(meta, "analysis/data-raw/pf7k_samples.csv")
 meta <- read.csv("analysis/data-raw/pf7k_samples.csv")
 
 # and join
@@ -137,7 +138,7 @@ mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_diction
 mutation_key <- read.csv(mutation_key_path)
 indices_to_transform <- which(pf7k_res_df$variant_string == "k13:WT")
 # range <- "349-726" - this is the range noted in the original pf7k file
-pf7k_res_df$variant_string[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726"))
+pf7k_res_df$variant_string[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726", mutation_key))
 
 saveRDS(pf7k_res_df, here::here("analysis/data-derived/pf7k_res.rds"))
 
