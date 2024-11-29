@@ -134,7 +134,7 @@ pf7k_res_df <- res %>%
   ungroup()
 
 # and lastly sort out the WT calls
-mutation_key_path <- here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
+mutation_key_path <- here::here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
 mutation_key <- read.csv(mutation_key_path)
 indices_to_transform <- which(pf7k_res_df$variant_string == "k13:WT")
 # range <- "349-726" - this is the range noted in the original pf7k file
