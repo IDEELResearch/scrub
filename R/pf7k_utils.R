@@ -145,9 +145,9 @@ pf7k_format_bia_for_stave <- function(mut, gls = deparse(substitute(mut))) {
   
   # Remove redundant SNPs (e.g., `G|G`)
   rept <- strsplit(res, "\\|")
-  if (any(lengths(rept) == 3)) {
-    pos <- which(lengths(rept) == 3)
-    fix <- unlist(lapply(rept[pos], function(x) x[1] == x[3]))
+  if (any(lengths(rept) == 2)) {
+    pos <- which(lengths(rept) == 2)
+    fix <- unlist(lapply(rept[pos], function(x) x[1] == x[2]))
     if (any(fix)) {
       correction <- unlist(lapply(rept[pos[which(fix)]], function(x) x[1]))
       res[pos[which(fix)]] <- correction
