@@ -4,10 +4,12 @@
 \alias{collapse_k13_range}
 \title{Collapse K13 Mutation Range}
 \usage{
-collapse_k13_range(gene_mutation)
+collapse_k13_range(gene_mutation, mutation_key)
 }
 \arguments{
 \item{gene_mutation}{A string representing the mutation in the format "k13:start-end:*".}
+
+\item{mutation_key}{Dataframe for mutation codon lookup}
 }
 \value{
 A string in the format "K13:start_pos_end_pos:amino_acids", or the original
@@ -21,7 +23,7 @@ reference amino acids based on the specified start and end positions.
 }
 \examples{
 mutation_key <- data.frame(PROTEIN = "k13", CODON = 440:450, REF = letters[1:11])
-collapse_k13_range("k13:440-445:*")
+collapse_k13_range("k13:440-445:*", mutation_key)
 # Returns: "K13:440_441_442_443_444_445:a_b_c_d_e_f"
 
 }

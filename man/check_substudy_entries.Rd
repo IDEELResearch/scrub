@@ -18,8 +18,9 @@ and then ensuring all entries match the allowed categories or follow the "day X 
 It prints any invalid entries found, or a message confirming that all entries are valid after corrections.
 }
 \examples{
-substudy_data <- c("day 0", "untreated_extracted", "untreadextracted", "day3calculated", "day 5 extracted")
-validated_substudy <- check_substudy_entries(substudy_data)
+substudy_data <- c("day 0", "untreated_extracted", 
+"untreadextracted", "day3calculated", "day 5 extracted")
+validated_substudy <- scrub:::check_substudy_entries(substudy_data)
 # Output:
 # Corrected 1 instances of day0extracted
 # Corrected 1 instances of untreated_extracted

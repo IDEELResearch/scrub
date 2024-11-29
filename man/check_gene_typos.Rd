@@ -19,7 +19,7 @@ when it finds any. It searches for probable misspellings of "k13", "crt", and "m
 }
 \examples{
 genes <- c("kletch13", "ctr", "mdr1", "mdr", "kelch 13")
-check_gene_typos(genes)
+scrub:::check_gene_typos(genes)
 # Output:
 # Probable typo found for k13: did you mean k13?
 # Probable typo found for crt: did you mean crt?

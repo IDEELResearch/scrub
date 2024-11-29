@@ -1,9 +1,15 @@
 #' Convert pf7k k13 SNP formats for Stave
 #'
-#' This function processes k13 SNP data into a format compatible with the `stave` tool. 
+#' @details
+#' 
+#' This function processes k13 SNP data into a format compatible with the `STAVE` tool. 
 #' It handles different scenarios of input data, such as wild types, phased/unphased mutations, 
 #' and distinct haplotypes. The function accommodates variations in notation, including the use 
 #' of `,`, `/`, and `*` in the input string.
+#'
+#' NB FOR STAVE: "|" reflects phased 
+#' 
+#' NB FOR STAVE "/" reflects unphased 
 #'
 #' ## Input format conventions:
 #' - **Uppercase letters**: Homozygous mutations.
@@ -17,13 +23,11 @@
 #' - `WT`: Wild type.
 #' - Mutations are prefixed with "k13-" and standardised.
 #' - Multiple haplotypes or NS changes are separated with `&&` for downstream splitting.
-#' 
-#' ## NB FOR STAVE: "|" reflects phased 
-#' ## NB FOR STAVE: "/" reflects unphased 
 #'
 #' @param marker Character. A string representing k13 SNP data in various formats.
-#' @return Character. Processed k13 SNP data in a standardised format for `stave`.
+#' @return Character. Processed k13 SNP data in a standardised format for `STAVE`.
 #' Returns `NA` if the input is missing.
+#' @export
 #' @examples
 #' pf7k_format_k13_for_stave("")  # Blank
 #' pf7k_format_k13_for_stave("C580Y")  # Single SNP homozygous
@@ -108,6 +112,7 @@ pf7k_format_k13_for_stave <- function(marker) {
 #' @param mut Character vector. A vector of SNP mutations in a biallelic format.
 #' @param gls Character. The gene locus and SNP identifier, inferred from the input variable name by default.
 #' @return Character vector. Processed SNP data in a standardised format for `stave`. Missing values are returned as `NA`.
+#' @export
 #' @examples
 #' 
 #' # Example input with phased and unphased SNPs
@@ -140,9 +145,9 @@ pf7k_format_bia_for_stave <- function(mut, gls = deparse(substitute(mut))) {
   
   # Remove redundant SNPs (e.g., `G|G`)
   rept <- strsplit(res, "\\|")
-  if (any(lengths(rept) == 3)) {
-    pos <- which(lengths(rept) == 3)
-    fix <- unlist(lapply(rept[pos], function(x) x[1] == x[3]))
+  if (any(lengths(rept) == 2)) {
+    pos <- which(lengths(rept) == 2)
+    fix <- unlist(lapply(rept[pos], function(x) x[1] == x[2]))
     if (any(fix)) {
       correction <- unlist(lapply(rept[pos[which(fix)]], function(x) x[1]))
       res[pos[which(fix)]] <- correction
