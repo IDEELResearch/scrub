@@ -7,10 +7,10 @@
 convert_stave(data)
 }
 \arguments{
-\item{data}{A wide dataset to be converted into a form compatible with {STAVE}}
+\item{data}{A wide dataset to be converted into a form compatible with \code{STAVE}}
 }
 \value{
-A list of three dataframes easily convertible to be compatible with {STAVE} using stave$append_data
+A list of three dataframes easily convertible to be compatible with \code{STAVE} using stave$append_data
 }
 \description{
 Convert data into a stave compatible list of dataframes

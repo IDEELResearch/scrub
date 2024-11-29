@@ -10,16 +10,21 @@ pf7k_format_k13_for_stave(marker)
 \item{marker}{Character. A string representing k13 SNP data in various formats.}
 }
 \value{
-Character. Processed k13 SNP data in a standardised format for \code{stave}.
+Character. Processed k13 SNP data in a standardised format for \code{STAVE}.
 Returns \code{NA} if the input is missing.
 }
 \description{
-This function processes k13 SNP data into a format compatible with the \code{stave} tool.
+Convert pf7k k13 SNP formats for Stave
+}
+\details{
+This function processes k13 SNP data into a format compatible with the \code{STAVE} tool.
 It handles different scenarios of input data, such as wild types, phased/unphased mutations,
 and distinct haplotypes. The function accommodates variations in notation, including the use
 of \verb{,}, \code{/}, and \code{*} in the input string.
-}
-\details{
+
+NB FOR STAVE: "|" reflects phased
+
+NB FOR STAVE "/" reflects unphased
 \subsection{Input format conventions:}{
 \itemize{
 \item \strong{Uppercase letters}: Homozygous mutations.
@@ -37,12 +42,6 @@ of \verb{,}, \code{/}, and \code{*} in the input string.
 \item Mutations are prefixed with "k13-" and standardised.
 \item Multiple haplotypes or NS changes are separated with \code{&&} for downstream splitting.
 }
-}
-
-\subsection{NB FOR STAVE: "|" reflects phased}{
-}
-
-\subsection{NB FOR STAVE: "/" reflects unphased}{
 }
 }
 \examples{
