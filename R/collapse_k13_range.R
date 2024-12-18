@@ -6,23 +6,24 @@
 #' reference amino acids based on the specified start and end positions.
 #'
 #' @param gene_mutation A string representing the mutation in the format "k13:start-end:*".
+#' @param mutation_key Dataframe for mutation codon lookup
 #' @return A string in the format "K13:start_pos_end_pos:amino_acids", or the original 
 #'         `gene_mutation` if no matching codons are found in the reference table.
 #' @examples
 #' mutation_key <- data.frame(PROTEIN = "k13", CODON = 440:450, REF = letters[1:11])
-#' collapse_k13_range("k13:440-445:*")
+#' collapse_k13_range("k13:440-445:*", mutation_key)
 #' # Returns: "K13:440_441_442_443_444_445:a_b_c_d_e_f"
 #' 
 #' @export
-collapse_k13_range <- function(gene_mutation) {
+collapse_k13_range <- function(gene_mutation, mutation_key) {
   parts <- unlist(strsplit(gene_mutation, "[:-]"))
   start_pos <- as.numeric(parts[2])
   end_pos <- as.numeric(parts[3])
   
   # Filter the reference amino acids for the specified range
   ref_amino_acids <- mutation_key %>%
-    filter(PROTEIN == "k13", CODON >= start_pos, CODON <= end_pos) %>%
-    arrange(CODON)
+    dplyr::filter(.data$PROTEIN == "k13", .data$CODON >= start_pos, .data$CODON <= end_pos) %>%
+    dplyr::arrange(.data$CODON)
   
   # If no matching codons are found, return the original value and log the issue
   if (nrow(ref_amino_acids) == 0) {

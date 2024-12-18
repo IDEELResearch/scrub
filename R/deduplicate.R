@@ -36,7 +36,7 @@ deduplicate <- function(df) {
     # fully remove complete duplicates at all columns
     dplyr::distinct() %>% 
     # fully remove complete duplicates at all columns minus database
-    dplyr::distinct(dplyr::across(-database))
+    dplyr::distinct(dplyr::across(-.data$database))
   
   return(df)
   
@@ -70,37 +70,37 @@ deduplicate <- function(df) {
 rows_removed_by_distinct <- function(df, ...) {
 
   # Capture columns specified in ...
-  grouping_cols <- ensyms(...)
+  grouping_cols <- dplyr::ensyms(...)
   
 # Identify and keep rows to show removed and retained rows
 df_with_flags <- df %>%
-  group_by(...) %>%
-  mutate(keep_row = row_number() == 1) %>%
-  ungroup()
+  dplyr::group_by(...) %>%
+  dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
+  dplyr::ungroup()
 
 # Rows being kept (distinct rows)
 kept_rows <- df_with_flags %>%
-  filter(keep_row) %>%
-  select(-keep_row)
+  dplyr::filter(.data$keep_row) %>%
+  dplyr::select(-.data$keep_row)
 
 # Rows being removed (duplicates)
 removed_rows <- df_with_flags %>%
-  filter(!keep_row) %>%
-  select(-keep_row)
+  dplyr::filter(!.data$keep_row) %>%
+  dplyr::select(-.data$keep_row)
 
 # Filter `kept_rows` to match unique combinations in `removed_rows`
 matching_kept_rows <- kept_rows %>%
-  semi_join(removed_rows, by = as.character(grouping_cols))  # Only keeps matching rows
+  dplyr::semi_join(removed_rows, by = as.character(grouping_cols))  # Only keeps matching rows
 
 # Bind the matching kept rows with removed rows
-paired_rows <- bind_rows(removed_rows, matching_kept_rows, .id = "type") %>%
-  mutate(type = ifelse(type == "1", "removed", "kept"))
+paired_rows <- dplyr::bind_rows(removed_rows, matching_kept_rows, .id = "type") %>%
+  dplyr::mutate(type = ifelse(.data$type == "1", "removed", "kept"))
 
 
 # Split into a list by the grouping columns to show each set of duplicates separately
 paired_list <- paired_rows %>%
-  group_by(...) %>%
-  group_split()
+  dplyr::group_by(...) %>%
+  dplyr::group_split()
 
 return(paired_list)
 

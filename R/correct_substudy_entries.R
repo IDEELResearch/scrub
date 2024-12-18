@@ -11,7 +11,7 @@
 #'         corrections made for each issue.
 #' @examples
 #' substudy_data <- c("day 0", "untreated_extracted", "untreadextracted", "day0extracted")
-#' corrected_substudy <- correct_substudy_entries(substudy_data)
+#' corrected_substudy <- scrub:::correct_substudy_entries(substudy_data)
 #' # Output:
 #' # Corrected 1 instances of day0extracted
 #' # Corrected 1 instances of untreated_extracted
