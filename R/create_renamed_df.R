@@ -19,7 +19,7 @@
 #'   "study" = "study_uid",
 #'   "database" = NA
 #' )
-#' renamed_df <- create_renamed_df(master_table, mapping)
+#' renamed_df <- scrub:::create_renamed_df(master_table, mapping)
 #' print(renamed_df)
 #' 
 #' 

@@ -8,7 +8,7 @@
 #'         correct gene name. No value is returned.
 #' @examples
 #' genes <- c("kletch13", "ctr", "mdr1", "mdr", "kelch 13")
-#' check_gene_typos(genes)
+#' scrub:::check_gene_typos(genes)
 #' # Output:
 #' # Probable typo found for k13: did you mean k13?
 #' # Probable typo found for crt: did you mean crt?
