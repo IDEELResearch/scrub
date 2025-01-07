@@ -2,6 +2,7 @@
 library(tidyverse)
 library(lubridate)
 library(here)
+devtools::load_all()
 
 ################################################################################
 #
@@ -73,6 +74,20 @@ master_table_clean <- master_table |>
   dplyr::mutate(iso3c = replace(iso3c, iso3c == "DRC", "COD")) %>% 
   dplyr::mutate(iso3c = replace(iso3c, iso3c == "ERT", "ERI"))
   
+# additional cleaning to correct for malformed iso3cs
+master_table_clean <- master_table_clean %>% 
+  mutate(country = if_else(country %in% c("Ago", "Ben", "Cmr", "Caf", "Cog", "Cod", "Eth", "Gha", "Stp", "Sen", "Sdn", "Uga"),
+                           suppressWarnings(countrycode::countrycode(toupper(country), "iso3c", "country.name.en")),
+                           country))
+
+# additional cleaning to correct for malformed pretreatment_samples
+master_table_clean <- master_table_clean %>% 
+  mutate(pretreatment_samples = replace(pretreatment_samples, pretreatment_samples %in% c("pre_treatment", "Y"), "yes"))
+
+# additional cleaning to correct for malformed pretreatment_samples
+master_table_clean <- master_table_clean %>% 
+  mutate(publication_year = replace(publication_year, publication_year %in% c("none"), NA))
+
 # perform tests
 african_countries <- data.frame(country = countrycode::codelist$country.name.en,
                                 continent = countrycode::codelist$continent,
@@ -84,9 +99,9 @@ allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
                       "treatedextracted", "treatedcalculated",
                       "day0extracted", "day0calculated")
 allowed_pretreatment <- c("no", "yes", NA)
-allowed_publication <- c("peer_reviewed", "preprint", "unpublished")
+allowed_publication <- c("peer_reviewed", "preprint", "unpublished", "data_incomplete")
 allowed_pub_year <- c(as.character(seq(from = 2000, to = (lubridate::year(Sys.Date())))), NA) # automatically update as years change
-allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS" )
+allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS")
 
 # run tests
 check_values_in_column(master_table_clean, "country", allowed_countries)
@@ -153,15 +168,22 @@ if(sum(master_table_clean$total_num == 0) > 0) {
 column_names <- get_column_names_for_clean()
 
 # first add in extra information needed within column_names
-master_table_formatted <- master_table_clean |>
+master_table_formatted <- master_table_clean %>% 
+  group_by(study_uid) %>% 
+  dplyr::mutate(study_uid = janitor::make_clean_names(study_uid[1], "big_camel")) %>% 
+  ungroup() %>% 
+  dplyr::group_by(study_uid, site_name, collection_start) %>% 
+  dplyr::mutate(survey_ID = paste0("geoff_", study_uid[1], "_", 
+                                   janitor::make_clean_names(site_name[1], "big_camel"), "_", 
+                                   lubridate::year(collection_start[1])),
+                continent = countrycode::countrycode(sourcevar = iso3c[1], "iso3c", "continent")) %>% 
+  ungroup() %>% 
   dplyr::mutate(database = "GEOFF",
-                survey_ID = paste0(study_uid, "_", janitor::make_clean_names(site_name, "big_camel"), "_", lubridate::year(collection_start)),
                 study_nm = study_uid,
-                continent = countrycode::countrycode(sourcevar = iso3c, "iso3c", "continent"),
                 prev = mutant_num/total_num,
                 spatial_notes = "Literature review sourced lat/lon",
                 time_notes = "Automated midpoint"
-                ) |>
+                )  %>% 
   # second check we have all the correctly named columns 
   dplyr::rename(study_ID = "study_uid",
                 study_name = "study_nm",

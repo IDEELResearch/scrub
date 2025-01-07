@@ -8,7 +8,9 @@ safe_read <- function(path) {
       as.data.frame() 
     if ("study_type" %in% names(clean)) {
       clean <- clean %>% 
-        dplyr::filter(study_type != "unpublished")
+        dplyr::filter(study_type != "unpublished") %>% 
+        dplyr::filter(study_type != "data_incomplete")
+        
     }
   } else {
     clean <- data.frame()
