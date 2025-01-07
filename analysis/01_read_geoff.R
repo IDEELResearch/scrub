@@ -16,6 +16,10 @@ master_table <- data.frame()
 
 # Iterate over each project directory within root_dir
 study_folders <- list.dirs(root_dir, recursive = FALSE)
+
+# filter to just those that end v01
+study_folders <- study_folders[grep("v01$", study_folders)]
+
 for (project_dir in study_folders) {
   
   # Extract the project identifier
