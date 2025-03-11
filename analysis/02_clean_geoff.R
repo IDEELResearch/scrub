@@ -34,8 +34,17 @@ master_table_clean <- master_table |>
   dplyr::mutate(substudy = gsub("_","", substudy)) |>
   dplyr::mutate(substudy = if_else(substudy == "untreadextracted",
                                    "untreatedextracted", substudy)) |>
+  dplyr::mutate(substudy = if_else(substudy == "extracted",
+                                   "untreatedextracted", substudy)) |>
   dplyr::mutate(substudy = if_else((substudy == "day0" & study_uid == "s0029_warsame_2019"),
                                    "day0extracted", substudy)) |>
+  dplyr::mutate(
+    lat_n = if_else(study_uid == "s0020_some_2024", "11.79479482", lat_n),
+    lon_e = if_else(study_uid == "s0020_some_2024", "-2.919282118", lon_e)
+  ) |>
+  mutate(lat_n = as.numeric(if_else(grepl("^‚àí", lat_n), 
+                                    gsub("^‚àí", "-", lat_n), 
+                                    lat_n))) |> # does not appear to work - Ronald will need to fix manually in S0147Jeang2024 entry
   dplyr::mutate(site_name = gsub(" ", "_", tolower(site_name))) |>
   dplyr::mutate(collection_location = gsub(" ", "_", tolower(collection_location))) |>
   dplyr::mutate(collection_location = gsub(",", "", tolower(collection_location))) |>
@@ -70,13 +79,15 @@ master_table_clean <- master_table |>
                                             "Democratic Republic of the Congo",
                                             country)) |>
   dplyr::mutate(data_processing_pipeline = toupper(data_processing_pipeline)) |>
-  dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname)) %>% 
-  dplyr::mutate(iso3c = replace(iso3c, iso3c == "DRC", "COD")) %>% 
-  dplyr::mutate(iso3c = replace(iso3c, iso3c == "ERT", "ERI"))
-  
+  dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname)) |>
+  dplyr::mutate(iso3c = replace(iso3c, iso3c == "DRC", "COD")) |> 
+  dplyr::mutate(iso3c = replace(iso3c, iso3c == "ERT", "ERI")) |>
+  dplyr::mutate(country = replace(country, country == "Gqn", "Gnq")) |>
+  dplyr::mutate(iso3c = replace(iso3c, iso3c == "GQN", "GNQ"))
+
 # additional cleaning to correct for malformed iso3cs
 master_table_clean <- master_table_clean %>% 
-  mutate(country = if_else(country %in% c("Ago", "Ben", "Cmr", "Caf", "Cog", "Cod", "Eth", "Gha", "Stp", "Sen", "Sdn", "Uga"),
+  mutate(country = if_else(country %in% c("Ago", "Ben", "Cmr", "Caf", "Cog", "Cod", "Eth", "Gha", "Stp", "Sen", "Sdn", "Uga", "Gnq", "Gab", "Mli", "Nga", "Sle", "Som", "Zmb", "Zaf"),
                            suppressWarnings(countrycode::countrycode(toupper(country), "iso3c", "country.name.en")),
                            country))
 
@@ -92,16 +103,18 @@ master_table_clean <- master_table_clean %>%
 african_countries <- data.frame(country = countrycode::codelist$country.name.en,
                                 continent = countrycode::codelist$continent,
                                 iso3c = countrycode::codelist$iso3c) |>
-  dplyr::filter(continent == "Africa") |> dplyr::distinct()
+                      dplyr::filter(continent == "Africa") |> dplyr::distinct()
 allowed_countries <- c(african_countries$country, "Democratic Republic of the Congo")
 allowed_iso3c <- c(african_countries$iso3c)
 allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
                       "treatedextracted", "treatedcalculated",
-                      "day0extracted", "day0calculated")
+                      "day0extracted", "day0calculated", 
+                      "tesday0treatmentfailure","day0reinfectionextracted",
+                      "day0recrudescenceextracted") # 
 allowed_pretreatment <- c("no", "yes", NA)
 allowed_publication <- c("peer_reviewed", "published" ,"preprint", "unpublished", "data_incomplete")
 allowed_pub_year <- c(as.character(seq(from = 2000, to = (lubridate::year(Sys.Date())))), NA) # automatically update as years change
-allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS")
+allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS", "REFUGEERECEPTIONCENTER", "UNKNOWN", "SURVEILLANCE")
 
 # run tests
 check_values_in_column(master_table_clean, "country", allowed_countries)
@@ -214,6 +227,21 @@ master_table_formatted <- master_table_clean %>%
   # filter out any entries that are calculated - these reflect extra data entries for total genotype counts
   # which are already captured within haplotype counts
   dplyr::filter(grepl("calculated", substudy) == 0)
+
+# remove site="none" records from study_ID==S0006WrairKenreadKen which were generated automatically from MIP pipeline reading metadata for samples without site info. To be fixed manually in entry eventually.
+master_table_formatted <- master_table_formatted[!(master_table_formatted$study_ID == "S0006WrairKenreadKen" & 
+                                                     is.na(master_table_formatted$lat) & 
+                                                     is.na(master_table_formatted$lon)), ]
+
+# flag any study which has NA for lat or long after format conversion
+lat_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$lat)])
+lon_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$lon)])
+# flag any study which has NA for substudy which is selectively used for inclusion of data in next scripts (ex we must use this field to exclude categories like tesday0treatmentfailure or treatedextracted for population prevalence calcs)
+substudy_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$substudy)])
+cat("Studies with missing or improper latitudes:\n", paste(lat_missing_or_improper, collapse = ", "), "\n\n")
+cat("Studies with missing or improper longitudes:\n", paste(lon_missing_or_improper, collapse = ", "), "\n\n")
+cat("Studies with missing or improper substudy values (critical for inclusion/exclusion in downstream analysis):\n", 
+    paste(substudy_missing_or_improper, collapse = ", "), "\n\n")
 
 # Grab just the columns we need for pairing with WWARN etc
 master_table_simplified <- master_table_formatted %>% 
