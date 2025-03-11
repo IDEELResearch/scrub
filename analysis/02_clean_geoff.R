@@ -99,7 +99,7 @@ allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
                       "treatedextracted", "treatedcalculated",
                       "day0extracted", "day0calculated")
 allowed_pretreatment <- c("no", "yes", NA)
-allowed_publication <- c("peer_reviewed", "preprint", "unpublished", "data_incomplete")
+allowed_publication <- c("peer_reviewed", "published" ,"preprint", "unpublished", "data_incomplete")
 allowed_pub_year <- c(as.character(seq(from = 2000, to = (lubridate::year(Sys.Date())))), NA) # automatically update as years change
 allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS")
 
