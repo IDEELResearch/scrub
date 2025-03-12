@@ -2,6 +2,7 @@
 library(tidyverse)
 library(lubridate)
 library(here)
+library(purrr)
 devtools::load_all()
 
 ################################################################################
@@ -126,8 +127,10 @@ check_values_in_column(master_table_clean, "publication_year", allowed_pub_year)
 check_values_in_column(master_table_clean, "site_study_type", allowed_site_types)
 
 # Clean mutation names
-# Expand gene mutation ranges for reference range syntax
+
+# Expand all gene mutation ranges for reference range syntax
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
+
 master_table_clean$gene_mutation[indices_to_transform] <- sapply(
   master_table_clean$gene_mutation[indices_to_transform],
   collapse_k13_range, 
@@ -180,7 +183,7 @@ if(sum(master_table_clean$total_num == 0) > 0) {
 # rename the columns so that they make sense
 column_names <- get_column_names_for_clean()
 
-# first add in extra information needed within column_names
+# first add in extra information needed within column_names - !IMPORTANT NOTE! we are losing 12 studies here... may not be appropriate to dplyr::filter(grepl("calculated", substudy) == 0)
 master_table_formatted <- master_table_clean %>% 
   group_by(study_uid) %>% 
   dplyr::mutate(study_uid = janitor::make_clean_names(study_uid[1], "big_camel")) %>% 
@@ -228,7 +231,52 @@ master_table_formatted <- master_table_clean %>%
   # which are already captured within haplotype counts
   dplyr::filter(grepl("calculated", substudy) == 0)
 
-# remove site="none" records from study_ID==S0006WrairKenreadKen which were generated automatically from MIP pipeline reading metadata for samples without site info. To be fixed manually in entry eventually.
+################################################################################
+# Impute k13 reference survey records not explicitly entered in data entry
+################################################################################
+
+# Extract K13 mutations from the mutation dictionary
+k13_mutations <- read_csv(here("analysis", "data-raw", "mutation_dictionary.csv")) %>%
+  filter(gene == "k13") %>%
+  mutate(mut = sub("^[A-Z]", "", mut)) %>%  # Remove the ref(first) codon letter (e.g., P553L → 553L)
+  select(mut)
+
+# Define K13 reference range
+k13_range <- 1:726
+
+# for each unique study_uid, impute k13 validated and candidate reference call counts using mean k13 sample coverage per study and k13 sequenced range before adding to add to master_table_formatted
+
+# Get unique survey IDs
+unique_surveys <- unique(master_table_formatted$survey_ID)
+
+# Initialize progress bar
+pb <- txtProgressBar(min = 0, max = length(unique_surveys), style = 3)  # Style 3 = moving bar
+
+# Run the processing sequentially using lapply and show progress
+imputed_records <- lapply(unique_surveys, process_survey)
+
+# Close progress bar
+close(pb)
+
+imputed_data <- bind_rows(imputed_records)
+
+
+# Ensure no duplicate variant_string entries for the same survey_ID
+duplicates <- inner_join(imputed_data, master_table_formatted, 
+                         by = c("survey_ID", "variant_string"))
+
+if (nrow(duplicates) > 0) {
+  message("Warning: ", nrow(duplicates), " duplicate variant_string entries found and removed.")
+  imputed_data <- anti_join(imputed_data, master_table_formatted, 
+                            by = c("survey_ID", "variant_string"))
+}
+
+# Append imputed records to master_table_formatted
+master_table_formatted <- bind_rows(master_table_formatted, imputed_data)
+
+# TODO: add check to confirm all k13_alleles (24 validated and candidate) are present for each survey (year/location)
+
+# remove site="none" records from study_ID==S0006WrairKenreadKen which were generated automatically from MIP pipeline reading metadata for samples without site info which have no lat/lon. To be fixed manually in entry eventually.
 master_table_formatted <- master_table_formatted[!(master_table_formatted$study_ID == "S0006WrairKenreadKen" & 
                                                      is.na(master_table_formatted$lat) & 
                                                      is.na(master_table_formatted$lon)), ]
@@ -246,6 +294,13 @@ cat("Studies with missing or improper substudy values (critical for inclusion/ex
 # Grab just the columns we need for pairing with WWARN etc
 master_table_simplified <- master_table_formatted %>% 
   select(all_of(column_names))
+
+# flag all study uids which report less than 40% prevalence of validated k13 reference allele indicating entry error (using 469C arbitratily to detect erroneous user behavior) 
+low_prev_studies <- master_table_formatted %>%
+  filter(variant_string == "k13:469:C", prev < 0.40) %>%
+  distinct(study_ID, data_entry_author)  # Get unique pairs
+
+print(low_prev_studies)
 
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
