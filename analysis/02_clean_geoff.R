@@ -260,7 +260,6 @@ close(pb)
 
 imputed_data <- bind_rows(imputed_records)
 
-
 # Ensure no duplicate variant_string entries for the same survey_ID
 duplicates <- inner_join(imputed_data, master_table_formatted, 
                          by = c("survey_ID", "variant_string"))
