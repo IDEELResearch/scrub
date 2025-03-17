@@ -1,8 +1,0 @@
-site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
-Tigray	Tigray	Tigray	Ethiopia	ETH	14.0323	38.3166	google_lat_long_site	manual	no	health_facility	12	25.75	both	Tigray			
-Afar	Afar	Afar	Ethiopia	ETH	12.1056	40.6347	google_lat_long_site	manual	no	health_facility	12	25.75	both	Afar			
-Amhara	Amhara	Amhara	Ethiopia	ETH	11.3494	37.9785	google_lat_long_site	manual	no	health_facility	12	25.75	both	Amhara			
-Gambella	Gambella	Gambella	Ethiopia	ETH	8.2506	34.5878	google_lat_long_site	manual	no	health_facility	12	25.75	both	Gambella			
-Oromia	Oromia	Oromia	Ethiopia	ETH	7.546	40.6347	google_lat_long_site	manual	no	health_facility	12	25.75	both	Oromia			
-Somali	Somali	Somali	Ethiopia	ETH	6.6612	43.7908	google_lat_long_site	manual	no	health_facility	12	25.75	both	Oromia			
-SNNPR	SNNPR	SNNPR	Ethiopia	ETH	6.5157	36.9541	google_lat_long_site	manual	no	health_facility	12	25.75	both	Oromia			
