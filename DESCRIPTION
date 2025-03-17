@@ -20,7 +20,8 @@ Imports:
     readr,
     stringr,
     dplyr,
-    lubridate
+    lubridate,
+    purrr
 Suggests:
     knitr,
     rmarkdown,
