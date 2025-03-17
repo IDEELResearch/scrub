@@ -35,6 +35,14 @@ deduplicate <- function(df) {
   df %>% 
     # fully remove complete duplicates at all columns
     dplyr::distinct() %>% 
+    
+    # TODO: Cecile: This would be where we would want to decide on what
+    # columns we think are sufficient for deduplication
+    # Further it would be good to here, instead of just removing, to instead
+    # tag the rows that are being removed and then we can filter on these
+    # before it heads to stave so we can have a look at how much and what is
+    # being removed
+    
     # fully remove complete duplicates at all columns minus database
     dplyr::distinct(dplyr::across(-.data$database))
   
