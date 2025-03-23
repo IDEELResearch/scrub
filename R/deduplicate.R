@@ -29,7 +29,6 @@
 #'   (see \url{https://github.com/mrc-ide/STAVE}).
 #'
 #' @export
-#'
 deduplicate <- function(df) {
   ### Scenario 1: Identify potential duplicates reported across different study_IDs
   # Group by administrative region, mutation, and collection timeframe
@@ -106,7 +105,6 @@ deduplicate <- function(df) {
 #' be kept or removed. 
 #'
 #' @export
-#'
 add_tags_diff_studyID <- function(df) {
   # Case 1: All records are from WHO or Pf7k
   if (all(df$database %in% c("WHO", "Pf7k"))) {
@@ -170,7 +168,6 @@ add_tags_diff_studyID <- function(df) {
 #' be kept or removed. 
 #'
 #' @export
-#'
 handle_same_studyID_duplicates <- function(df) { 
   # Check if all rows in the group come from the GEOFF database
   if (all(df$database == "GEOFF")) {
