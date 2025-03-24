@@ -34,15 +34,15 @@ deduplicate <- function(df) {
   # Group by administrative region, mutation, and collection timeframe
   # Keep groups where more than one unique study_ID reports the same data
   same_data_diff_study <- df %>%
-    group_by(name_2, variant_string, collection_start, collection_end) %>%
-    filter(n_distinct(study_ID) > 1) %>%
-    ungroup()
+    dplyr::group_by(name_2, variant_string, collection_start, collection_end) %>%
+    dplyr::filter(n_distinct(study_ID) > 1) %>%
+    dplyr::ungroup()
   
   # Split the dataframe into a list where each list element represents a potential duplicate group
   duplicate_diff_study_list <- same_data_diff_study %>%
-    group_by(name_2, variant_string, collection_start, collection_end) %>%
-    filter(n() > 1) %>%
-    group_split()
+    dplyr::group_by(name_2, variant_string, collection_start, collection_end) %>%
+    dplyr::filter(n() > 1) %>%
+    dplyr::group_split()
   
   # Apply tagging function to flag which studies to keep or remove
   tagged_duplicate_diff_study_list <- purrr::map(duplicate_diff_study_list, add_tags_diff_studyID)
@@ -51,16 +51,16 @@ deduplicate <- function(df) {
   # Group by administrative region, site, mutation, collection timeframe, and study_ID
   # Keep groups with more than one entry (i.e., internal duplication within the study)
   same_data_same_study <- df %>%
-    group_by(name_2, site_name, variant_string, collection_start, collection_end, study_ID) %>%
-    filter(n() > 1) %>%
-    mutate(keep_row = dplyr::row_number() == 1) %>%
-    ungroup()
+    dplyr::group_by(name_2, site_name, variant_string, collection_start, collection_end, study_ID) %>%
+    dplyr::filter(n() > 1) %>%
+    dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
+    dplyr::ungroup()
   
   # Split into a list where each list element is a group of internal duplicates
   duplicate_same_study_list <- same_data_same_study %>%
-    group_by(name_2, site_name, variant_string, collection_start, collection_end, study_ID) %>%
-    filter(n() > 1) %>%
-    group_split()
+    dplyr::group_by(name_2, site_name, variant_string, collection_start, collection_end, study_ID) %>%
+    dplyr::filter(n() > 1) %>%
+    dplyr::group_split()
   
   # Apply logic to determine which row to keep for internal duplicates
   tagged_duplicate_same_study_list <- lapply(duplicate_same_study_list, handle_same_studyID_duplicates)
@@ -77,8 +77,8 @@ deduplicate <- function(df) {
   
   # Get all rows from df that are not in the duplicates_df
   non_duplicate_rows <- df %>%
-    anti_join(duplicates_df, by = colnames(df)) %>%  # assumes all columns in `df` are relevant for identifying uniqueness
-    mutate(keep_row = "keep")
+    dplyr::anti_join(duplicates_df, by = colnames(df)) %>%  # assumes all columns in `df` are relevant for identifying uniqueness
+    dplyr::mutate(keep_row = "keep")
   
   # Combine duplicates with non-duplicates into a single dataframe
   deduplicate_df_with_tags <- bind_rows(duplicates_df, non_duplicate_rows)
@@ -110,20 +110,19 @@ add_tags_diff_studyID <- function(df) {
   if (all(df$database %in% c("WHO", "Pf7k"))) {
     # Identify first study_ID
     first_study_id <- df %>%
-      arrange(study_ID) %>%
-      slice(1) %>%
-      pull(study_ID)
+      dplyr::arrange(study_ID) %>%
+      dplyr::slice(1) %>%
+      dplyr::pull(study_ID)
     # Keep the first study_ID (alphabetically) and remove the others
     df <- df %>%
-      mutate(keep_row = case_when(
+      dplyr::mutate(keep_row = case_when(
         study_ID == first_study_id ~ "keep",
-        TRUE ~ "remove"
-      ))
+        TRUE ~ "remove"))
   } 
   # Case 2: All records are from GEOFF
   else if (all(df$database == "GEOFF")) {
     df <- df %>%
-      mutate(keep_row = case_when(
+      dplyr::mutate(keep_row = case_when(
         # If duplicates are between study_IDs begin with S00 and S01, pick S01
         any(grepl("^S00", study_ID)) & any(grepl("^S01", study_ID)) ~ ifelse(grepl("^S01", study_ID), "keep", "remove"),
         # If all study_IDs begin with S00 or S01, pick most recent publication
@@ -148,7 +147,7 @@ add_tags_diff_studyID <- function(df) {
   # Case 4: Pf7k and WHO only (again), use Pf7k as priority
   else if (any(df$database %in% c("Pf7k", "WHO"))) {
     df <- df %>%
-      mutate(keep_row = case_when(
+      dplyr::mutate(keep_row = case_when(
         database == "Pf7k" ~ "keep",
         database == "WHO" ~ "remove",
         TRUE ~ NA_character_  # For any other unexpected entries
@@ -178,7 +177,7 @@ handle_same_studyID_duplicates <- function(df) {
     # For all other databases, keep only the first row in the group
     # This helps retain a representative entry and remove internal duplicates
     df %>%
-      mutate(keep_row = ifelse(dplyr::row_number() == 1, "keep", "remove"))
+      dplyr::mutate(keep_row = ifelse(dplyr::row_number() == 1, "keep", "remove"))
   }
 }
 
