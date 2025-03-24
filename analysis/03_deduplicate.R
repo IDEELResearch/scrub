@@ -69,22 +69,59 @@ full_bind <- rbind(
 
 ### TO-DO CECILE: MAKE THE SPATIAL JOIN A FUNCTION
 df <- full_bind
-admin2_df <- geodata_adm2_africa %>% rename("iso" = "GID_0")
+admin2_df <- geodata_adm2_africa %>%
+  rename(admin2_iso3c = GID_0,
+         name_2 = NAME_2) %>%
+  select(name_2, admin2_iso3c, geometry)
 
 df_sf <- df %>%
   filter(!is.na(lon) & !is.na(lat)) %>% # Delete rows where lat/long is NA - NOTE: study S0147Jeang2024 is missing lat
   mutate(lon_keep = lon, lat_keep = lat) %>%
   sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% # Ensure lat lon coordinates use CRS 4326
-  sf::st_transform(df_sf, crs = sf::st_crs(admin2_df)) # Ensure both dataframes use the same CRS (WGS 84)
+  sf::st_transform(crs = sf::st_crs(admin2_df)) # Ensure both dataframes use the same CRS (WGS 84)
 
 # Perform spatial join: Match points (df_sf) to Admin 2 polygons (admin2_df)
 sf::sf_use_s2(FALSE)
-df_sf_joined <- df_sf %>%
-  sf::st_join(admin2_df %>% 
-                rename(admin2_iso3c = iso,
-                       name_2 = NAME_2) %>% 
-                select(name_2, admin2_iso3c, geometry), 
-              left = TRUE)
+# 1. Perform initial spatial join
+df_sf_joined <- sf::st_join(df_sf, admin2_df, left = TRUE)
+
+# 2. Identify unmatched points
+unmatched <- df_sf_joined %>% filter(is.na(name_2))
+
+# 3. Get nearest polygon for unmatched points
+if (nrow(unmatched) > 0) {
+  nearest_idx <- sf::st_nearest_feature(unmatched, admin2_df)
+  nearest_matches <- admin2_df[nearest_idx, ]
+  
+  # Compare iso codes and keep name_2 only if they match
+  name_2_corrected <- ifelse(
+    unmatched$iso == nearest_matches$admin2_iso3c,
+    nearest_matches$name_2,
+    NA_character_
+  )
+  
+  # Update admin2_iso3c accordingly (optional, NA if iso doesn't match)
+  admin2_iso3c_corrected <- ifelse(
+    unmatched$iso == nearest_matches$admin2_iso3c,
+    nearest_matches$admin2_iso3c,
+    NA_character_
+  )
+  
+  # Bind corrected columns and retain original geometry
+  unmatched_filled <- unmatched %>%
+    select(-name_2, -admin2_iso3c) %>%
+    mutate(
+      name_2 = name_2_corrected,
+      admin2_iso3c = admin2_iso3c_corrected
+    )
+  
+  # 4. Combine matched and filled unmatched results
+  matched <- df_sf_joined %>% filter(!is.na(name_2))
+  df_sf_joined_final <- bind_rows(matched, unmatched_filled)
+  
+} else {
+  df_sf_joined_final <- df_sf_joined
+}
 
 # Convert back to a regular dataframe
 df_final <- df_sf_joined %>% 
