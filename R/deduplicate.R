@@ -34,13 +34,13 @@ deduplicate <- function(df) {
   # Group by administrative region, mutation, and collection timeframe
   # Keep groups where more than one unique study_ID reports the same data
   same_data_diff_study <- df %>%
-    dplyr::group_by(name_2, variant_string, collection_start, collection_end) %>%
+    dplyr::group_by(name_2, variant_string, prev, n) %>%
     dplyr::filter(n_distinct(study_ID) > 1) %>%
     dplyr::ungroup()
   
   # Split the dataframe into a list where each list element represents a potential duplicate group
   duplicate_diff_study_list <- same_data_diff_study %>%
-    dplyr::group_by(name_2, variant_string, collection_start, collection_end) %>%
+    dplyr::group_by(name_2, variant_string, prev, n) %>%
     dplyr::filter(n() > 1) %>%
     dplyr::group_split()
   
@@ -84,6 +84,79 @@ deduplicate <- function(df) {
   deduplicate_df_with_tags <- bind_rows(duplicates_df, non_duplicate_rows)
   
   return(deduplicate_df_with_tags)
+}
+
+#' Spatial join for admin2 regions
+#'
+#' This function spatially joins the each survey_IDs (row) reported longitude 
+#' and latitude with the admin2 region reported by geodata.
+#'
+#' @param df A data.frame to be . It must contain the following columns:
+#'   - `"iso3c"`: ISO3 country code
+#'   - `"lat"`: Latitude of the site
+#'   - `"long"`: Longitude of the site
+#'
+#' @return A spatially joined data.frame with the corresponding admin2 region
+#' per row.
+#'
+#' @export
+sf_join_admn2 <- function(df, admin2_sf) {
+  df_sf <- df %>%
+    filter(!is.na(lon) & !is.na(lat)) %>% # Delete rows where lat/long is NA - NOTE: study S0147Jeang2024 is missing lat
+    mutate(lon_keep = lon, lat_keep = lat) %>%
+    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% # Ensure lat lon coordinates use CRS 4326
+    sf::st_transform(crs = sf::st_crs(admin2_sf)) # Ensure both dataframes use the same CRS (WGS 84)
+  
+  # Perform spatial join: Match points (df_sf) to Admin 2 polygons (admin2_sf)
+  sf::sf_use_s2(FALSE)
+  # 1. Perform initial spatial join
+  df_sf_joined <- sf::st_join(df_sf, admin2_sf, left = TRUE)
+  
+  # 2. Identify unmatched points
+  unmatched <- df_sf_joined %>% filter(is.na(name_2))
+  
+  # 3. Get nearest polygon for unmatched points
+  if (nrow(unmatched) > 0) {
+    nearest_idx <- sf::st_nearest_feature(unmatched, admin2_sf)
+    nearest_matches <- admin2_sf[nearest_idx, ]
+    
+    # Compare iso codes and keep name_2 only if they match
+    name_2_corrected <- ifelse(
+      unmatched$iso == nearest_matches$admin2_iso3c,
+      nearest_matches$name_2,
+      NA_character_
+    )
+    
+    # Update admin2_iso3c accordingly (optional, NA if iso doesn't match)
+    admin2_iso3c_corrected <- ifelse(
+      unmatched$iso == nearest_matches$admin2_iso3c,
+      nearest_matches$admin2_iso3c,
+      NA_character_
+    )
+    
+    # Bind corrected columns and retain original geometry
+    unmatched_filled <- unmatched %>%
+      select(-name_2, -admin2_iso3c) %>%
+      mutate(
+        name_2 = name_2_corrected,
+        admin2_iso3c = admin2_iso3c_corrected
+      )
+    
+    # 4. Combine matched and filled unmatched results
+    matched <- df_sf_joined %>% filter(!is.na(name_2))
+    df_sf_joined_final <- bind_rows(matched, unmatched_filled)
+    
+  } else {
+    df_sf_joined_final <- df_sf_joined
+  }
+  
+  # Convert back to a regular dataframe
+  df_final <- df_sf_joined %>% 
+    sf::st_drop_geometry() %>% 
+    mutate(lon = lon_keep, lat = lat_keep) %>%  # Restore lat/lon
+    select(-lon_keep, -lat_keep)  # Remove temporary columns
+  
+  return(df_final)
 }
 
 #' Add tag to rows in data.frame for duplicates between different studies
