@@ -13,12 +13,12 @@
 #'   - `"year"`: Year of the data entry
 #'   - `"study_start_year"`: Starting year of the study
 #'   - `"study_end_year"`: Ending year of the study
-#'   - `"x"`: Numeric variable
-#'   - `"n"`: Sample size
+#'   - `"variant_num"`: Numeric variable
+#'   - `"total_num"`: Sample size
 #'   - `"prev"`: Prevalence value
 #'   - `"gene"`: Gene identifier
 #'   - `"mut"`: Mutation identifier
-#'   - `"gene_mut"`: Gene-mutation combination identifier
+#'   - `"variant_string"`: Gene-mutation combination identifier
 #'   - `"annotation"`: Annotation details
 #'   - `"database"`: Source database
 #'   - `"pmid"`: PubMed identifier for source
@@ -34,13 +34,13 @@ deduplicate <- function(df) {
   # Group by administrative region, mutation, and collection timeframe
   # Keep groups where more than one unique study_ID reports the same data
   same_data_diff_study <- df %>%
-    dplyr::group_by(name_2, variant_string, prev, n) %>%
+    dplyr::group_by(name_2, variant_string, prev, total_num, collection_year) %>%
     dplyr::filter(n_distinct(study_ID) > 1) %>%
     dplyr::ungroup()
   
   # Split the dataframe into a list where each list element represents a potential duplicate group
   duplicate_diff_study_list <- same_data_diff_study %>%
-    dplyr::group_by(name_2, variant_string, prev, n) %>%
+    dplyr::group_by(name_2, variant_string, prev,  total_num, collection_year) %>%
     dplyr::filter(n() > 1) %>%
     dplyr::group_split()
   
