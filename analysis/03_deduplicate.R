@@ -2,8 +2,7 @@ library(tidyverse)
 library(here)
 
 # source functions
-source("R/adjust_invalid_date.R")
-source("R/deduplicate.R")
+devtools::load_all()
 
 # Read each file if it exists
 safe_read <- function(path) {
@@ -71,141 +70,19 @@ full_bind <- rbind(
   clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
-#-------------------- Deconstruct spatial join
-df <- full_bind
-admin2_sf <- geodata_adm2_africa
-df_sf <- df %>%
-  filter(!is.na(lon) & !is.na(lat)) %>% # Delete rows where lat/long is NA - NOTE: study S0147Jeang2024 is missing lat
-  mutate(lon_keep = lon, lat_keep = lat) %>%
-  sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% # Ensure lat lon coordinates use CRS 4326
-  sf::st_transform(crs = sf::st_crs(admin2_sf)) # Ensure both dataframes use the same CRS (WGS 84)
-
-# Perform spatial join: Match points (df_sf) to Admin 2 polygons (admin2_sf)
-sf::sf_use_s2(FALSE)
-# 1. Perform initial spatial join
-df_sf_joined <- sf::st_join(df_sf, admin2_sf, left = TRUE)
-
-# 2. Identify unmatched points
-unmatched <- df_sf_joined %>% filter(is.na(name_2))
-
-# 3. Get nearest polygon for unmatched points
-if (nrow(unmatched) > 0) {
-  nearest_idx <- sf::st_nearest_feature(unmatched, admin2_sf)
-  nearest_matches <- admin2_sf[nearest_idx, ]
-  
-  # Compare iso codes and keep name_2 only if they match
-  name_2_corrected <- ifelse(
-    unmatched$iso == nearest_matches$admin2_iso3c,
-    nearest_matches$name_2,
-    NA_character_
-  )
-  
-  # Update admin2_iso3c accordingly (optional, NA if iso doesn't match)
-  admin2_iso3c_corrected <- ifelse(
-    unmatched$iso == nearest_matches$admin2_iso3c,
-    nearest_matches$admin2_iso3c,
-    NA_character_
-  )
-  
-  # Bind corrected columns and retain original geometry
-  unmatched_filled <- unmatched %>%
-    select(-name_2, -admin2_iso3c) %>%
-    mutate(
-      name_2 = name_2_corrected,
-      admin2_iso3c = admin2_iso3c_corrected
-    )
-  
-  # 4. Combine matched and filled unmatched results
-  matched <- df_sf_joined %>% filter(!is.na(name_2))
-  df_sf_joined_final <- bind_rows(matched, unmatched_filled)
-  
-} else {
-  df_sf_joined_final <- df_sf_joined
-}
-
-# Convert back to a regular dataframe
-df_final <- df_sf_joined %>% 
-  sf::st_drop_geometry() %>% 
-  mutate(lon = lon_keep, lat = lat_keep) %>%  # Restore lat/lon
-  select(-lon_keep, -lat_keep)  # Remove temporary columns
-#-------------------- END Deconstruct spatial join
-
-# Spatially join the dataframe of all databases (GEOFF, WHO, Pf7k, WWARN) with the admin 2 region
-full_bind_sf <- sf_join_admn2(full_bind, geodata_admin2_sf)
-
 # TO-DO CECILE: improve this function
 # Obtain collection year for deduplication
-full_bind_sf$collection_year <- NA
-for (i in 1:dim(full_bind_sf)[1]){
-  y <- full_bind_sf$collection_start[i]
-  full_bind_sf$collection_year[i] <- str_split(y, "-")[[1]][1]
-}
-
-#------------------------ WORKING ON DEDUPLICATE FUNCTION
-df <- full_bind_sf
-### Scenario 1: Identify potential duplicates reported across different study_IDs
-# Group by administrative region, mutation, and collection timeframe
-# Keep groups where more than one unique study_ID reports the same data
-same_data_diff_study <- df %>%
-  dplyr::group_by(name_2, variant_string, prev, total_num, collection_year) %>%
-  dplyr::filter(n_distinct(study_ID) > 1) %>%
-  dplyr::ungroup()
-
-# Split the dataframe into a list where each list element represents a potential duplicate group
-duplicate_diff_study_list <- same_data_diff_study %>%
-  dplyr::group_by(name_2, variant_string, prev,  total_num, collection_year) %>%
-  dplyr::filter(n() > 1) %>%
-  dplyr::group_split()
-
-# Apply tagging function to flag which studies to keep or remove
-tagged_duplicate_diff_study_list <- purrr::map(duplicate_diff_study_list, add_tags_diff_studyID)
-
-### Scenario 2: Identify potential duplicate entries within the same study_ID
-# Group by administrative region, site, mutation, collection timeframe, and study_ID
-# Keep groups with more than one entry (i.e., internal duplication within the study)
-same_data_same_study_prev <- df %>%
-  dplyr::group_by(name_2, site_name, variant_string, prev, total_num, collection_year, study_ID) %>%
-  dplyr::filter(n() > 1) %>%
-  dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
-  dplyr::ungroup()
-
-same_data_same_study_date <- df %>%
-  dplyr::group_by(name_2, site_name, variant_string, collection_start, collection_end, study_ID) %>%
-  dplyr::filter(n() > 1) %>%
-  dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
-  dplyr::ungroup()
-
-# Split into a list where each list element is a group of internal duplicates
-duplicate_same_study_list <- same_data_same_study_prev %>%
-  dplyr::group_by(name_2, site_name, variant_string, prev, total_num, collection_year, study_ID) %>%
-  dplyr::filter(n() > 1) %>%
-  dplyr::group_split()
-
-# Apply logic to determine which row to keep for internal duplicates
-tagged_duplicate_same_study_list <- lapply(duplicate_same_study_list, handle_same_studyID_duplicates)
-
-### TO-DO CECILE: REMOVE EMPTY LIST ITEMS ONCE GEOFF IS FIXED
-# Remove null elements from the list (these represent cases where no valid tag was applied)
-tagged_duplicate_same_study_list <- tagged_duplicate_same_study_list[!sapply(tagged_duplicate_same_study_list, is.null)]
-
-# Combine duplicates identified across studies and within studies
-duplicate_list <- c(tagged_duplicate_diff_study_list, tagged_duplicate_same_study_list)
-
-# Convert list of duplicates into one dataframe
-duplicates_df <- dplyr::bind_rows(duplicate_list)
-
-# Get all rows from df that are not in the duplicates_df
-non_duplicate_rows <- df %>%
-  dplyr::anti_join(duplicates_df, by = colnames(df)) %>%  # assumes all columns in `df` are relevant for identifying uniqueness
-  dplyr::mutate(keep_row = "keep")
-
-# Combine duplicates with non-duplicates into a single dataframe
-deduplicate_df_with_tags <- bind_rows(duplicates_df, non_duplicate_rows)
-
-#------------------------ END: WORKING ON DEDUPLICATE FUNCTION
+full_bind$collection_year_start <- lubridate::year(full_bind$collection_start)
+full_bind$collection_year_end <- lubridate::year(full_bind$collection_end)
 
 # identify studies that may be duplicates
-dedup_output = deduplicate(df_final)
+dedup_output = deduplicate(full_bind)
+dedup_df = dedup_output$df
+summary_same_study = dedup_output$summary_same
+summary_diff_study = dedup_output$summary_diff
+
+dim(full_bind)
+dim(dedup_df)
 
 # save ready to go to stave
 saveRDS(dedup_output, here("analysis/data-derived/final_data.rds"))
