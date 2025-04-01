@@ -40,27 +40,6 @@ africa_iso3 <- c(
 clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
 clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
 
-### TO-DO CECILE: CHECK WITH OJ HOW WE SHOULD HANDLE LOADING OF ADMIN 1/ADMIN2 data ########
-# Use `malariaAtlas` R package to get shape files for Admin 1 and Admin 2
-# sf_adm1_africa <- malariaAtlas::getShp(ISO = africa_iso3, admin_level = "admin1", version = "202206")
-# saveRDS(sf_adm1_africa, "analysis/data-derived/sf_admin1_africa.rds")
-# sf_adm2_africa <- malariaAtlas::getShp(ISO = africa_iso3, admin_level = "admin2", version = "202206")
-# saveRDS(sf_adm2_africa, "analysis/data-derived/sf_admin2_africa.rds")
-# sf_adm0_africa <- malariaAtlas::getShp(ISO = africa_iso3, admin_level = "admin0")
-# saveRDS(sf_adm0_africa, "analysis/data-derived/sf_admin0_africa.rds")
-
-# Read in malariaAtlas shape files for admin 1 and admin 2
-# sf_adm0_africa <- readRDS("analysis/data-derived/sf_admin0_africa.rds")
-# sf_adm1_africa <- readRDS("analysis/data-derived/sf_admin1_africa.rds")
-# sf_adm2_africa <- readRDS("analysis/data-derived/sf_admin2_africa.rds")
-
-# Read in admin2 data loaded from geodata
-geodata_adm2_africa <- readRDS("analysis/data-derived/geodata_admin2_africa.rds")
-geodata_admin2_sf <- geodata_adm2_africa %>%
-  rename(admin2_iso3c = GID_0,
-         name_2 = NAME_2) %>%
-  select(name_2, admin2_iso3c, geometry)
-
 # make our full bind across
 column_names <- get_column_names_for_clean()
 full_bind <- rbind(
@@ -85,7 +64,7 @@ dim(full_bind)
 dim(dedup_df)
 
 # save ready to go to stave
-saveRDS(dedup_output, here("analysis/data-derived/final_data.rds"))
+saveRDS(dedup_df, here("analysis/data-derived/final_data.rds"))
 
 #------------------ CHECKS ------------------
 # Below are some checks I do to the input of the deduplication to identify any errors in data entry
@@ -131,6 +110,3 @@ print(unique_iso3c)
 # Remove studies that need to be fixed and have been added to https://docs.google.com/spreadsheets/d/1YkCO_tV6XtCUHHvTB0snqomhg0FlBUkknqn_nXhoxP8/edit?usp=sharing (2025/03/18)
 df_sf_joined <- df_sf_joined %>%
   filter(!(survey_ID %in% na_admin$survey_ID | survey_ID %in% mismatch_rows$survey_ID))
-
-### TO-DO CECILE: CHECK DIFFERENCE BETWEEN GEORGE AND MALARIAGEN ADMIN2 --> did this in analysis/create_admin2_data.R
-

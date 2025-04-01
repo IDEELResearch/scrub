@@ -57,14 +57,14 @@ deduplicate <- function(df) {
   ### Scenario 2: Identify potential duplicate entries within the same study_ID
   # Group by administrative region, site, mutation, collection timeframe, and study_ID
   # Keep groups with more than one entry (i.e., internal duplication within the study)
-  same_data_same_study_prev <- df %>%
+  same_data_same_study <- df %>%
     dplyr::group_by(variant_string, prev,  total_num, collection_year_start, study_ID) %>%
     dplyr::filter(n() > 1) %>%
     dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
     dplyr::ungroup()
   
   # Split into a list where each list element is a group of internal duplicates
-  duplicate_same_study_list <- same_data_same_study_prev %>%
+  duplicate_same_study_list <- same_data_same_study %>%
     dplyr::group_by(variant_string, prev,  total_num, collection_year_start, study_ID) %>%
     dplyr::filter(n() > 1) %>%
     dplyr::group_split()
@@ -74,10 +74,10 @@ deduplicate <- function(df) {
   duplicate_same_study_50km_list <- duplicate_same_study_50km_list[!sapply(duplicate_same_study_50km_list, is.null)] # Remove NULL elements dataframes that didn't meet the condition)
   
   # Apply logic to determine which row to keep for internal duplicates
-  tagged_duplicate_same_study_list <- lapply(duplicate_same_study_50km_list, handle_same_studyID_duplicates)
+  tagged_duplicate_same_study_list <- lapply(duplicate_same_study_50km_list, add_tags_same_studyID)
   ### TO-DO CECILE: REMOVE EMPTY LIST ITEMS ONCE GEOFF IS FIXED
   tagged_duplicate_same_study_list <- tagged_duplicate_same_study_list[!sapply(tagged_duplicate_same_study_list, is.null)] # Remove null elements from the list (these represent cases where no valid tag was applied)
-  
+  length(tagged_duplicate_same_study_list)
   # Get summary of duplicates
   summary_same_study <- summarize_duplicates(tagged_duplicate_same_study_list)
   
@@ -180,35 +180,45 @@ add_tags_diff_studyID <- function(df) {
   return(df)
 }
 
-#' Tag rows in a data.frame for duplicates within the same study
+#' Add tag to rows in data.frame for duplicates within the same studyID
 #' 
-#' This function tags rows in a data.frame with a "keep_row" column, marking the first row
-#' in each group as "keep" and all subsequent duplicate rows within the same study as "remove".
-#' Additionally, the function handles a special case where records from the "GEOFF" database are excluded
-#' from processing temporarily. This behavior can be adjusted as needed once duplicates in the "GEOFF" data
-#' are resolved.
+#' This function tags rows for removal based on duplicate geographic coordinates 
+#' within the same study ID. If the geographic coordinates (longitude and latitude) 
+#' are the same when rounded to the first decimal place for GEOFF studies, it keeps the 
+#' first row and removes the others. If the coordinates are not the same, it returns `NULL`. 
+#' For all other studies, the first row is kept, and the others are removed.
+#'
+#' @param df A data.frame where rows should be tagged as "keep" or "remove".
 #' 
-#' @param df A `data.frame` containing the data to be processed. It should include the following columns:
-#'   - `study_ID`: Unique identifiers for each study.
-#'   - `database`: The source database for each study (e.g., "WHO", "Pf7k", "GEOFF").
-#' 
-#' @return A `data.frame` with an added `keep_row` column that contains the values "keep" or "remove".
-#'   The column indicates whether the corresponding row should be kept or removed based on whether it is a duplicate
-#'   within the same study group. 
+#' @return A data.frame with the `keep_row` column indicating if the study should be kept or removed. 
+#'   Returns `NULL` if the rounded coordinates for GEOFF studies are not the same.
 #'
 #' @export
-handle_same_studyID_duplicates <- function(df) { 
-  # Check if all rows in the group come from the GEOFF database
+add_tags_same_studyID <- function(df) { 
+  # Round longitude and latitude to 1 decimal place
+  df$lon_rounded <- round(df$lon, 2)
+  df$lat_rounded <- round(df$lat, 2)
+  
+  # Check for GEOFF studies
   if (all(df$database == "GEOFF")) {
-    # If all rows are GEOFF, we currently exclude these from processing
-    # This is a temporary rule until GEOFF duplicates are resolved
-    return(NULL)
+    # Check if the rounded coordinates are the same across all rows
+    if (length(unique(paste(df$lon_rounded, df$lat_rounded))) != 1 || length(unique(df$collection_day)) != 1) {
+      return(NULL)  # If coordinates are not the same (after rounding), return NULL
+    } else {
+      # For GEOFF studies with the same coordinates, keep only the first row
+      df <- df %>%
+        dplyr::mutate(keep_row = ifelse(dplyr::row_number() == 1, "keep", "remove"))
+    }
   } else {
-    # For all other databases, keep only the first row in the group
-    # This helps retain a representative entry and remove internal duplicates
-    df %>%
+    # For all other cases, keep only the first row
+    df <- df %>%
       dplyr::mutate(keep_row = ifelse(dplyr::row_number() == 1, "keep", "remove"))
   }
+  
+  # Remove the rounded columns before returning
+  df <- df %>% dplyr::select(-lon_rounded, -lat_rounded)
+  
+  return(df)
 }
 
 #' Filter Dataframe for Duplicates Within a Specified Radius
