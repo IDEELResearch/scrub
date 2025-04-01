@@ -2,28 +2,45 @@
 % Please edit documentation in R/deduplicate.R
 \name{add_tags_diff_studyID}
 \alias{add_tags_diff_studyID}
-\title{Add tag to rows in data.frame for duplicates between different studies}
+\title{Tag rows in a data.frame for duplicates across different study_IDs}
 \usage{
 add_tags_diff_studyID(df)
 }
 \arguments{
-\item{df}{A data.frame where rows should be tagged as "keep" or "remove".}
+\item{df}{A \code{data.frame} containing the data to be processed. It should include the following columns:
+\itemize{
+\item \code{study_ID}: Unique identifiers for each study.
+\item \code{database}: The source database for each study (e.g., "WHO", "Pf7k", "GEOFF").
+\item \code{publication_year}: The publication year of each study (used in Case 2).
+}}
 }
 \value{
-A data.frame with the keep_row column indicating if the study should
-be kept or removed.
+A \code{data.frame} with an added \code{keep_row} column, which contains the values "keep" or "remove".
+The column indicates whether the corresponding row should be kept or removed based on the criteria for each case.
 }
 \description{
-This function handles cases where duplicates exist across different study_IDs
-by adding a column keep_row that determines which rows should be keep and
-removed. There are 4 cases:
+This function tags rows in a data.frame with a "keep_row" column to indicate which
+records should be kept or removed based on duplicate study IDs across different databases.
+The function handles four distinct cases:
+}
+\details{
 \itemize{
-\item Case 1: All records are from WHO or Pf7k: keep the first study_ID
-(alphabetically) and remove the others
-\item Case 2: All records are from GEOFF: If duplicates are between study_IDs begin
-with S00 and S01, pick S01 and if all study_IDs begin with S00 or S01,
-pick most recent publication
-\item Case 3: Mixture of GEOFF and WHO or Pf7k: Keep GEOFF data over WHO/Pf7k
-\item Case 4: Mixture of Pf7k and WHO: keep Pf7k and remove WHO
+\item \strong{Case 1:} All records are from the "WHO" or "Pf7k" databases:
+\itemize{
+\item Keep the first study_ID alphabetically and remove the rest.
+}
+\item \strong{Case 2:} All records are from the "GEOFF" database:
+\itemize{
+\item If duplicates exist between study_IDs starting with "S00" and "S01", keep the study_ID starting with "S01".
+\item If all study_IDs start with "S00" or "S01", keep the most recent publication based on the \code{publication_year}.
+}
+\item \strong{Case 3:} Mixed records from "GEOFF" and either "WHO" or "Pf7k":
+\itemize{
+\item Keep records from "GEOFF" and remove records from "WHO" or "Pf7k".
+}
+\item \strong{Case 4:} Mixed records from "Pf7k" and "WHO" only:
+\itemize{
+\item Keep records from "Pf7k" and remove records from "WHO".
+}
 }
 }
