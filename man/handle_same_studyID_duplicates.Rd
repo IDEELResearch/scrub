@@ -2,18 +2,26 @@
 % Please edit documentation in R/deduplicate.R
 \name{handle_same_studyID_duplicates}
 \alias{handle_same_studyID_duplicates}
-\title{Add tag to rows in data.frame for duplicates within the same study}
+\title{Tag rows in a data.frame for duplicates within the same study}
 \usage{
 handle_same_studyID_duplicates(df)
 }
 \arguments{
-\item{df}{A data.frame where rows should be tagged as "keep" or "remove".}
+\item{df}{A \code{data.frame} containing the data to be processed. It should include the following columns:
+\itemize{
+\item \code{study_ID}: Unique identifiers for each study.
+\item \code{database}: The source database for each study (e.g., "WHO", "Pf7k", "GEOFF").
+}}
 }
 \value{
-A data.frame with the keep_row column indicating if the study should
-be kept or removed.
+A \code{data.frame} with an added \code{keep_row} column that contains the values "keep" or "remove".
+The column indicates whether the corresponding row should be kept or removed based on whether it is a duplicate
+within the same study group.
 }
 \description{
-This function adds column keep_row and marks the first the first row in the group
-to keep and remove the other rows which are duplicates.
+This function tags rows in a data.frame with a "keep_row" column, marking the first row
+in each group as "keep" and all subsequent duplicate rows within the same study as "remove".
+Additionally, the function handles a special case where records from the "GEOFF" database are excluded
+from processing temporarily. This behavior can be adjusted as needed once duplicates in the "GEOFF" data
+are resolved.
 }
