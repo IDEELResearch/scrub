@@ -6,3 +6,5 @@
 /analysis/data-derived/scenario_maps.rds
 .RDataTmp
 .RDataTmp
+.DS_Store
+.DS_Store
