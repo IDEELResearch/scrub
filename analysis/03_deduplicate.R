@@ -63,6 +63,9 @@ summary_diff_study = dedup_output$summary_diff
 dim(full_bind)
 dim(dedup_df)
 
+dim(summary_same_study)
+dim(summary_diff_study)
+
 # save ready to go to stave
 saveRDS(dedup_df, here("analysis/data-derived/final_data.rds"))
 

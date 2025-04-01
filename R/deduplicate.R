@@ -75,9 +75,9 @@ deduplicate <- function(df) {
   
   # Apply logic to determine which row to keep for internal duplicates
   tagged_duplicate_same_study_list <- lapply(duplicate_same_study_50km_list, add_tags_same_studyID)
-  ### TO-DO CECILE: REMOVE EMPTY LIST ITEMS ONCE GEOFF IS FIXED
   tagged_duplicate_same_study_list <- tagged_duplicate_same_study_list[!sapply(tagged_duplicate_same_study_list, is.null)] # Remove null elements from the list (these represent cases where no valid tag was applied)
   length(tagged_duplicate_same_study_list)
+  
   # Get summary of duplicates
   summary_same_study <- summarize_duplicates(tagged_duplicate_same_study_list)
   
