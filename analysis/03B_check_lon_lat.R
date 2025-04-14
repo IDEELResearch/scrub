@@ -27,6 +27,11 @@ clean_wwarn <- safe_read(here("analysis", "data-derived", "wwarn_clean.rds"))
 clean_pf7k <- safe_read(here("analysis", "data-derived", "pf7k_clean.rds"))
 clean_who <- safe_read(here("analysis", "data-derived", "who_clean.rds"))
 
+# Read in shape file data
+gpkg_africa_shp <- sf::st_read("analysis/data-raw/gpkg_africa_shape_file.gpkg") %>%
+  rename(geometry = geom)
+
+# Obtain Africa iso3 country names
 africa_iso3 <- c(
   "DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CPV", "CMR", "CAF", "TCD",
   "COM", "COD", "COG", "DJI", "EGY", "GNQ", "ERI", "SWZ", "ETH", "GAB",
@@ -40,7 +45,7 @@ africa_iso3 <- c(
 clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
 clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
 
-# make our full bind across
+# Make our full bind across
 column_names <- get_column_names_for_clean()
 full_bind <- rbind(
   clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
@@ -49,44 +54,75 @@ full_bind <- rbind(
   clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
-#------------------ CHECK ISO3 AND ADMIN2 ------------------
-### TO-DO CECILE: REMOVE AT SOME POINT ONCE WHO AND GOEFF ARE UPDATED
-# These studies have been added to https://docs.google.com/spreadsheets/d/1YkCO_tV6XtCUHHvTB0snqomhg0FlBUkknqn_nXhoxP8/edit?usp=sharing (2025/03/18)
+# Rename lat lon to keep after sf::join()
+full_bind <- full_bind %>% mutate(lon_keep = lon, lat_keep = lat)
+# Convert the coordinate class of the geometry in the combined cleaned df and the shape file to the same class
+full_bind_sf <- sf::st_as_sf(full_bind, coords = c("lon", "lat"), crs = sf::st_crs(gpkg_africa_shp)) %>%
+  rename(lat = lat_keep, lon = lon_keep)
 
-# mismatch_rows <- df_sf_joined %>%
-#   filter(iso3c != admin2_iso3c) %>%  # Compare entry_iso3c with admin0_iso3c
-#   select(lon, lat, site_name, site_name, name_2, iso3c, admin2_iso3c, study_ID, survey_ID)
-# 
-# ### TO-DO CECILE: REMOVE AT SOME POINT ONCE WHO AND GOEFF ARE UPDATED
-# ### TO-DO CECILE: CHECK THAT THESE studies have been added to https://docs.google.com/spreadsheets/d/1YkCO_tV6XtCUHHvTB0snqomhg0FlBUkknqn_nXhoxP8/edit?usp=sharing (2025/03/18)
-# na_admin <- df_sf_joined %>%
-#   filter(is.na(admin2_iso3c)) %>%
-#   rename(name2_geodata = name_2) %>%
-#   select(lon, lat, site_name, name2_geodata, iso3c, admin2_iso3c, study_ID, survey_ID)
-# 
-# # Convert na_admin into an sf object for spatial operations
-# na_admin_sf <- na_admin %>%
-#   filter(!is.na(lon) & !is.na(lat)) %>%  # Ensure valid coordinates
-#   sf::st_as_sf(coords = c("lon", "lat"), crs = 4326)  # WGS 84 CRS
-# 
-# # Perform spatial join to find the closest available admin2 region
-# matched_admin <- sf::st_join(na_admin_sf, geodata_admin2_sf %>% 
-#                                rename(name2_malariaAtlas = name_2) %>%
-#                                select(name2_malariaAtlas), 
-#                              left = FALSE)
-# 
-# # Drop geometry and add matched values back into na_admin
-# na_admin_matched <- na_admin %>%
-#   left_join(matched_admin %>% 
-#               sf::st_drop_geometry() %>% 
-#               select(study_ID, survey_ID, name2_malariaAtlas), 
-#             by = c("study_ID", "survey_ID")) %>%
-#   mutate(name_2 = ifelse(!is.na(name2_malariaAtlas), name2_malariaAtlas, name2_geodata)) %>%
-#   select("study_ID", "survey_ID", "name2_geodata", "name2_malariaAtlas", "name_2", "site_name", "iso3c", "admin2_iso3c", "lon", "lat")
-# 
-# unique_iso3c <- unique(na_admin_matched$iso3c[!is.na(na_admin_matched$name_2)])
-# print(unique_iso3c)
-# 
-# # Remove studies that need to be fixed and have been added to https://docs.google.com/spreadsheets/d/1YkCO_tV6XtCUHHvTB0snqomhg0FlBUkknqn_nXhoxP8/edit?usp=sharing (2025/03/18)
-# df_sf_joined <- df_sf_joined %>%
-#   filter(!(survey_ID %in% na_admin$survey_ID | survey_ID %in% mismatch_rows$survey_ID))
+# Merge combined cleaned df and the shape filebased on the geometry
+merged_full_bind_sf <- sf::st_join(full_bind_sf, gpkg_africa_shp, left = TRUE)
+
+# iso3c does not match iso3 from geometry
+mismatch_iso3c <- merged_full_bind_sf %>% filter(iso3c != GID_0)
+
+# Check which survey_IDs are NA
+na_admin2 <- merged_full_bind_sf %>% filter(is.na(NAME_2))
+
+# Manually checked NA admin 2 and mismatch of iso3
+full_bind_cleaned_lon_lat <- full_bind_sf %>%
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat)) %>%
+  mutate(
+    lon = case_when(
+      survey_ID == "who_1171_NA_2011" ~ -17.321190,
+      survey_ID == "who_1491_NA_2017" ~ -23.505476720688392,
+      survey_ID == "who_182_NA_2013" ~ 45.22758346654867,
+      survey_ID == "who_184_Ngazidja_2013" ~ 43.375,
+      survey_ID == "who_246_NA_2013" ~ -16.58865735038155,
+      survey_ID == "who_879_NA_2014" ~ 9.29690,
+      survey_ID == "who_888_Benishangul_GumuzandAmhara_2014" ~ 38.7652126480875,
+      survey_ID == "who_1223_ThiesRegion_2019" ~ -16.98590086453347,
+      TRUE ~ lon
+    ),
+    lat = case_when(
+      survey_ID == "who_1171_NA_2011" ~ 14.783380,
+      survey_ID == "who_1491_NA_2017" ~ 14.920444770903352,
+      survey_ID == "who_182_NA_2013" ~ -12.77878320419641,
+      survey_ID == "who_184_Ngazidja_2013" ~ -11.5,
+      survey_ID == "who_246_NA_2013" ~ 13.459448211037648,
+      survey_ID == "who_879_NA_2014" ~ -1.685000,
+      survey_ID == "who_888_Benishangul_GumuzandAmhara_2014" ~ 9.043439082761527,
+      survey_ID == "who_1223_ThiesRegion_2019" ~ 14.418164041698063,
+      TRUE ~ lat
+    )
+  ) %>%
+  filter(survey_ID != "who_1223_ThiesRegion_2019")
+ 
+# Update geometry in full_bind_cleaned_lon_lat
+sf::st_geometry(full_bind_cleaned_lon_lat) <- sf::st_as_sf(
+  full_bind_cleaned_lon_lat %>%
+    sf::st_drop_geometry(), # remove current geometry
+  coords = c("lon", "lat"),
+  crs = sf::st_crs(full_bind_cleaned_lon_lat_sf)) %>%
+  sf::st_geometry()
+# Rename lat lon to keep after sf::join()
+full_bind_cleaned_lon_lat <- full_bind_cleaned_lon_lat %>% mutate(lon_keep = lon, lat_keep = lat)
+# Convert the coordinate class of the geometry in the combined cleaned df and the shape file to the same class
+full_bind_cleaned_lon_lat_sf <- full_bind_cleaned_lon_lat %>%
+  select(-lon, -lat) %>%
+  rename(lat = lat_keep, lon = lon_keep) %>%
+  sf::st_as_sf(coords = c("lon", "lat"), crs = sf::st_crs(gpkg_africa_shp))
+
+# Merge combined cleaned df and the shape filebased on the geometry
+merged_full_bind_cleaned_lon_lat <- sf::st_join(full_bind_cleaned_lon_lat_sf, gpkg_africa_shp, left = TRUE)
+
+# iso3c does not match iso3 from geometry
+mismatch_iso3c_cleaned <- merged_full_bind_cleaned_lon_lat %>% filter(iso3c != GID_0)
+
+# Check which survey_IDs are NA
+na_admin2_cleaned <- merged_full_bind_cleaned_lon_lat %>% filter(is.na(NAME_2))
+
+dim(mismatch_iso3c)
+dim(mismatch_iso3c_cleaned)
+dim(na_admin2)
+dim(na_admin2_cleaned)
