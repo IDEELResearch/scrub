@@ -27,6 +27,7 @@ clean_wwarn <- safe_read(here("analysis", "data-derived", "wwarn_clean.rds"))
 clean_pf7k <- safe_read(here("analysis", "data-derived", "pf7k_clean.rds"))
 clean_who <- safe_read(here("analysis", "data-derived", "who_clean.rds"))
 
+# Define African iso3 countries
 africa_iso3 <- c(
   "DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CPV", "CMR", "CAF", "TCD",
   "COM", "COD", "COG", "DJI", "EGY", "GNQ", "ERI", "SWZ", "ETH", "GAB",
@@ -40,7 +41,7 @@ africa_iso3 <- c(
 clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
 clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
 
-# make our full bind across
+# Combine all cleaned df into on dataframe
 column_names <- get_column_names_for_clean()
 full_bind <- rbind(
   clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
@@ -49,15 +50,17 @@ full_bind <- rbind(
   clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
-# TO-DO CECILE: improve this function
 # Obtain collection year for deduplication
 full_bind$collection_year_start <- lubridate::year(full_bind$collection_start)
 full_bind$collection_year_end <- lubridate::year(full_bind$collection_end)
 
-# identify studies that may be duplicates
+# Identify studies that may be duplicates
 dedup_output = deduplicate(full_bind)
-dedup_df = dedup_output$df
+# Final dataframe with added column indicating if a row should be keeped or removed
+dedup_df = dedup_output$df 
+# Dataframe showing duplicates within the same study_ID
 summary_same_study = dedup_output$summary_same
+# Dataframe showing duplicates across studies
 summary_diff_study = dedup_output$summary_diff
 
 dim(full_bind)
