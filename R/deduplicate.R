@@ -1,29 +1,37 @@
-#' Deduplicate Data in a Principled Way
+#' Identify and summarize potential duplicate studies across multiple databases
 #'
-#' This function deduplicates a dataset, ensuring each entry is unique based on 
-#' specified criteria, and returns a cleaned data frame suitable for input into STAVE.
+#' This function identifies potential duplicates among WHO, Pf7k, and GEOFF datasets,
+#' groups them by relevant variables, filters by spatial proximity, tags which to keep/remove,
+#' and summarizes the results.
 #'
 #' @param df A data.frame to be deduplicated. It must contain the following columns:
-#'   - `"iso3c"`: ISO3 country code
-#'   - `"admin_0"`: Country-level administrative division
-#'   - `"admin_1"`: First-level administrative division
-#'   - `"site"`: Site name or identifier
+#'   - `"study_ID"`: Study ID
+#'   - `"study_name"`: Name of the study
+#'   - `"study_type"`: Type of study conducted
+#'   - `"authors"`: Authors of the study
+#'   - `"publication_year"`: Year the study was published
+#'   - `"url"`: URL for additional source information
+#'   - `"survey_ID"`: Survey ID
+#'   - `"country_name"`: Name of the country
+#'   - `"site_name"`: Site name or identifier
 #'   - `"lat"`: Latitude of the site
-#'   - `"long"`: Longitude of the site
-#'   - `"year"`: Year of the data entry
-#'   - `"study_start_year"`: Starting year of the study
-#'   - `"study_end_year"`: Ending year of the study
-#'   - `"variant_num"`: Numeric variable
+#'   - `"lon"`: Longitude of the site
+#'   - `"spatial_notes"`: Notes on spatial data
+#'   - `"collection_start"`: Start date of sample collection
+#'   - `"collection_end"`: End date of sample collection
+#'   - `"collection_day"`: Day of sample collection
+#'   - `"time_notes"`: Notes on time or collection period
+#'   - `"variant_string"`: Gene-mutation combination identifier
+#'   - `"variant_num"`: Numeric representation of the variant
 #'   - `"total_num"`: Sample size
+#'   - `"iso3c"`: ISO3 country code
+#'   - `"continent"`: Continent of the study site
+#'   - `"pmid"`: PubMed ID for the source
 #'   - `"prev"`: Prevalence value
 #'   - `"gene"`: Gene identifier
-#'   - `"mut"`: Mutation identifier
-#'   - `"variant_string"`: Gene-mutation combination identifier
-#'   - `"annotation"`: Annotation details
 #'   - `"database"`: Source database
-#'   - `"pmid"`: PubMed identifier for source
-#'   - `"url"`: URL for additional source information
-#'   - `"source"`: Source of the data
+#'   - `"collection_year_start"`: Starting year of the sample collection
+#'   - `"collection_year_end"`: Ending year of the sample collection
 #'
 #' @return A cleaned data.frame ready for use in STAVE 
 #'   (see \url{https://github.com/mrc-ide/STAVE}).
@@ -33,55 +41,115 @@ deduplicate <- function(df) {
   ### Scenario 1: Identify potential duplicates reported across different study_IDs
   # Group by administrative region, mutation, and collection timeframe
   # Keep groups where more than one unique study_ID reports the same data
-  same_data_diff_study <- df %>%
-    dplyr::group_by(variant_string, prev, total_num, collection_year_start) %>%
-    dplyr::filter(n_distinct(study_ID) > 1) %>%
-    dplyr::ungroup()
   
-  # Split the dataframe into a list where each list element represents a potential duplicate group
-  duplicate_diff_study_list <- same_data_diff_study %>%
-    dplyr::group_by(variant_string, prev,  total_num, collection_year_start) %>%
-    dplyr::filter(n() > 1) %>%
-    dplyr::group_split()
+  # ---- Subgroup A: Duplicates among WHO and Pf7k ----
+  df_who_pf7k <- df %>% filter(database %in% c("WHO", "Pf7k"))
   
-  # Check if list of potential duplicates are within 50km radius of one another
-  duplicate_diff_study_50km_list <- lapply(duplicate_diff_study_list, filter_duplicates_within_radius)
+  # Find duplicates by collection_year_start
+  dup_who_pf7k_start <- df_who_pf7k %>%
+    group_by(variant_string, prev, total_num, variant_num, collection_year_start) %>%
+    filter(n_distinct(study_ID) > 1) %>%
+    group_split()
+  
+  # Find duplicates by collection_year_end
+  dup_who_pf7k_end <- df_who_pf7k %>%
+    group_by(variant_string, prev, total_num, variant_num, collection_year_end) %>%
+    filter(n_distinct(study_ID) > 1) %>%
+    group_split()
+  
+  # ---- Subgroup B: Duplicates between GEOFF and WHO/Pf7k ----
+  df_geoff <- df %>% filter(database == "GEOFF")
+  
+  # Find GEOFF/WHO-Pf7k duplicates by collection_year_start
+  geoff_matches_start <- df_geoff %>%
+    semi_join(df_who_pf7k, by = c("iso3c", "gene", "collection_year_start"))
+  who_pf7k_matches_start <- df_who_pf7k %>%
+    semi_join(df_geoff, by = c("iso3c", "gene", "collection_year_start"))
+  dup_geoff_who_pf7k_start <- bind_rows(geoff_matches_start, who_pf7k_matches_start) %>%
+    group_by(iso3c, gene, collection_year_start) %>%
+    filter(n() > 1) %>%
+    group_split()
+  
+  # Find GEOFF/WHO-Pf7k duplicates by collection_year_end
+  geoff_matches_end <- df_geoff %>%
+    semi_join(df_who_pf7k, by = c("iso3c", "gene", "collection_year_end"))
+  who_pf7k_matches_end <- df_who_pf7k %>%
+    semi_join(df_geoff, by = c("iso3c", "gene", "collection_year_end"))
+  dup_geoff_who_pf7k_end <- bind_rows(geoff_matches_end, who_pf7k_matches_end) %>%
+    group_by(iso3c, gene, collection_year_end) %>%
+    filter(n() > 1) %>%
+    group_split()
+  
+  # ---- Subgroup C: Duplicates within GEOFF ----
+  # Find GEOFF duplicates by collection_year_start
+  dup_geoff_start <- df_geoff %>%
+    group_by(variant_string, prev, total_num, variant_num, collection_year_start) %>%
+    filter(n_distinct(study_ID) > 1) %>%
+    group_split()
+  
+  # Find GEOFF duplicates by collection_year_end
+  dup_geoff_end <- df_geoff %>%
+    group_by(variant_string, prev, total_num, variant_num, collection_year_end) %>%
+    filter(n_distinct(study_ID) > 1) %>%
+    group_split()
+  
+  # ---- Generate signatures for each group ----
+  sigs_who_pf7k_start <- map_chr(dup_who_pf7k_start, group_signature_who_pf7k)
+  sigs_who_pf7k_end  <- map_chr(dup_who_pf7k_end, group_signature_who_pf7k)
+  sigs_geoff_who_pf7k_start <- map_chr(dup_geoff_who_pf7k_start, group_signature_geoff_who_pf7k)
+  sigs_geoff_who_pf7k_end <- map_chr(dup_geoff_who_pf7k_end, group_signature_geoff_who_pf7k)
+  sigs_geoff_start <- map_chr(dup_geoff_start, group_signature_geoff)
+  sigs_geoff_end <- map_chr(dup_geoff_end, group_signature_geoff)
+  
+  # ---- Combine all groups and remove duplicates based on signature ----
+  all_groups_diff_study <- c(dup_who_pf7k_start, dup_who_pf7k_end, dup_geoff_who_pf7k_start, dup_geoff_who_pf7k_end, dup_geoff_start, dup_geoff_end)
+  all_sigs_diff_study <- c(sigs_who_pf7k_start, sigs_who_pf7k_end, sigs_geoff_who_pf7k_start, sigs_geoff_who_pf7k_end, sigs_geoff_start, sigs_geoff_end)
+  
+  # Keep only unique groups
+  diff_data_diff_study_list <- all_groups_diff_study[!duplicated(all_sigs_diff_study)]
+  
+  # ---- Filter by spatial proximity (e.g., within 50km) ----
+  duplicate_diff_study_50km_list <- lapply(diff_data_diff_study_list, filter_duplicates_within_radius)
   duplicate_diff_study_50km_list <- duplicate_diff_study_50km_list[!sapply(duplicate_diff_study_50km_list, is.null)] # Remove NULL elements dataframes that didn't meet the condition)
   
-  # Apply tagging function to flag which studies to keep or remove
-  tagged_duplicate_diff_study_list <- purrr::map(duplicate_diff_study_50km_list, add_tags_diff_studyID)
-  
-  # Get summary of duplicates
-  summary_diff_study <- summarize_duplicates(tagged_duplicate_diff_study_list)
+  # ---- Tag which studies to keep or remove ----
+  tagged_duplicate_diff_study_list <- lapply(duplicate_diff_study_50km_list, add_tags_diff_studyID)
+  tagged_duplicate_diff_study_list <- tagged_duplicate_diff_study_list[!sapply(tagged_duplicate_diff_study_list, is.null)]
   
   ### Scenario 2: Identify potential duplicate entries within the same study_ID
   # Group by administrative region, site, mutation, collection timeframe, and study_ID
   # Keep groups with more than one entry (i.e., internal duplication within the study)
-  same_data_same_study <- df %>%
-    dplyr::group_by(variant_string, prev,  total_num, collection_year_start, study_ID) %>%
+  same_data_same_study_start <- df %>%
+    dplyr::group_by(variant_string, prev, total_num, variant_num, study_ID, collection_year_start) %>%
     dplyr::filter(n() > 1) %>%
     dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
-    dplyr::ungroup()
-  
-  # Split into a list where each list element is a group of internal duplicates
-  duplicate_same_study_list <- same_data_same_study %>%
-    dplyr::group_by(variant_string, prev,  total_num, collection_year_start, study_ID) %>%
-    dplyr::filter(n() > 1) %>%
     dplyr::group_split()
   
-  # Check if list of potential duplicates are within 50km radius of one another
+  same_data_same_study_end <- df %>%
+    dplyr::group_by(variant_string, prev, total_num, variant_num, study_ID, collection_year_end) %>%
+    dplyr::filter(n() > 1) %>%
+    dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
+    dplyr::group_split()
+  
+  # ---- Generate signatures for each group ----
+  sigs_same_study_start <- map_chr(same_data_same_study_start, group_signature_same_study)
+  sigs_same_study_end  <- map_chr(same_data_same_study_end, group_signature_same_study)
+  
+  # ---- Combine all groups and remove duplicates based on signature ----
+  all_groups_same_study <- c(same_data_same_study_start, same_data_same_study_end)
+  all_sigs_same_study   <- c(sigs_same_study_start, sigs_same_study_end)
+  
+  duplicate_same_study_list <- all_groups_same_study[!duplicated(all_sigs_same_study)]
+  
+  # ---- Filter by spatial proximity (e.g., within 50km) ----
   duplicate_same_study_50km_list <- lapply(duplicate_same_study_list, filter_duplicates_within_radius)
   duplicate_same_study_50km_list <- duplicate_same_study_50km_list[!sapply(duplicate_same_study_50km_list, is.null)] # Remove NULL elements dataframes that didn't meet the condition)
   
-  # Apply logic to determine which row to keep for internal duplicates
+  # ---- Tag which studies to keep or remove ----
   tagged_duplicate_same_study_list <- lapply(duplicate_same_study_50km_list, add_tags_same_studyID)
-  tagged_duplicate_same_study_list <- tagged_duplicate_same_study_list[!sapply(tagged_duplicate_same_study_list, is.null)] # Remove null elements from the list (these represent cases where no valid tag was applied)
-  length(tagged_duplicate_same_study_list)
+  tagged_duplicate_same_study_list <- tagged_duplicate_same_study_list[!sapply(tagged_duplicate_same_study_list, is.null)]
   
-  # Get summary of duplicates
-  summary_same_study <- summarize_duplicates(tagged_duplicate_same_study_list)
-  
-  ### Combine duplicates
+  # ---- Combine duplicates between different study IDs and within the same study ID ----
   # Combine duplicates identified across studies and within studies
   duplicate_list <- c(tagged_duplicate_diff_study_list, tagged_duplicate_same_study_list)
   duplicates_df <- dplyr::bind_rows(duplicate_list) # Convert list of duplicates into one dataframe
@@ -97,8 +165,130 @@ deduplicate <- function(df) {
   deduplicate_df_with_tags <- bind_rows(duplicates_df, non_duplicate_rows)
   
   return(list(df = deduplicate_df_with_tags, 
-              summary_same = summary_same_study, 
-              summary_diff = summary_diff_study))
+              list_same = duplicate_same_study_50km_list, 
+              list_diff = duplicate_diff_study_50km_list))
+}
+
+#' Generate a Group Signature for WHO/Pf7k Data
+#'
+#' Creates a unique signature string for a WHO or Pf7k dataset by concatenating key fields 
+#' (variant information, prevalence, sample sizes, and collection years). This is useful 
+#' for identifying and comparing groups of observations in deduplication tasks.
+#'
+#' @param df A data frame containing the following columns:
+#'   - `variant_string`
+#'   - `prev`
+#'   - `total_num`
+#'   - `variant_num`
+#'   - `collection_year_start`
+#'   - `collection_year_end`
+#'
+#' @return A single string that uniquely identifies the group, with values concatenated 
+#' using underscores and records separated by `|`.
+#' @export
+group_signature_who_pf7k <- function(df) {
+  df %>%
+    select(variant_string, prev, total_num, variant_num, collection_year_start, collection_year_end) %>%
+    distinct() %>%
+    arrange(across(everything())) %>%
+    mutate_all(as.character) %>%
+    unite("sig", everything(), sep = "_", remove = TRUE) %>%
+    pull(sig) %>%
+    paste(collapse = "|")
+}
+
+#' Generate a Group Signature for GEOFF vs WHO/Pf7k Comparison
+#'
+#' Creates a unique signature string to compare a GEOFF dataset to WHO or Pf7k datasets.
+#' Uses either `collection_year_start` or `collection_year_end`, depending on which is 
+#' available. Useful in deduplication and data harmonization.
+#'
+#' @param df A data frame containing the following columns:
+#'   - `variant_string`
+#'   - `collection_year_start`
+#'   - `collection_year_end`
+#'
+#' @return A single string representing the group signature, with values concatenated 
+#' using underscores and records separated by `|`.
+#' @export
+group_signature_geoff_who_pf7k <- function(df) {
+  # Use the year that is not all NA
+  if (all(is.na(df$collection_year_start))) {
+    df %>%
+      select(variant_string, collection_year_end) %>%
+      distinct() %>%
+      arrange(across(everything())) %>%
+      mutate_all(as.character) %>%
+      unite("sig", everything(), sep = "_", remove = TRUE) %>%
+      pull(sig) %>%
+      paste(collapse = "|")
+  } else {
+    df %>%
+      select(variant_string, collection_year_start) %>%
+      distinct() %>%
+      arrange(across(everything())) %>%
+      mutate_all(as.character) %>%
+      unite("sig", everything(), sep = "_", remove = TRUE) %>%
+      pull(sig) %>%
+      paste(collapse = "|")
+  }
+}
+
+#' Generate a Group Signature for GEOFF Data
+#'
+#' Creates a unique signature string for GEOFF datasets based on variant and prevalence data,
+#' as well as sample sizes and collection years. This aids in identifying and distinguishing 
+#' unique groups in deduplication workflows.
+#'
+#' @param df A data frame containing the following columns:
+#'   - `variant_string`
+#'   - `prev`
+#'   - `total_num`
+#'   - `variant_num`
+#'   - `collection_year_start`
+#'   - `collection_year_end`
+#'
+#' @return A single concatenated string signature for the group.
+#' @export
+group_signature_geoff <- function(df) {
+  df %>%
+    select(variant_string, prev, total_num, variant_num, collection_year_start, collection_year_end) %>%
+    distinct() %>%
+    arrange(across(everything())) %>%
+    mutate_all(as.character) %>%
+    unite("sig", everything(), sep = "_", remove = TRUE) %>%
+    pull(sig) %>%
+    paste(collapse = "|")
+}
+
+#' Generate Study-Specific Signature for Deduplication
+#'
+#' Creates a unique string signature for a group of entries originating from the same study.
+#' This is used for identifying and deduplicating records that share the same `study_ID` and
+#' other key identifying variables such as variant information, prevalence, and collection years.
+#'
+#' @param df A data frame containing at least the following columns:
+#'   - `"study_ID"`: Unique study identifier
+#'   - `"variant_string"`: Identifier combining gene and mutation
+#'   - `"prev"`: Prevalence estimate
+#'   - `"total_num"`: Total sample size
+#'   - `"variant_num"`: Number of samples with the variant
+#'   - `"collection_year_start"`: Start year of data collection
+#'   - `"collection_year_end"`: End year of data collection
+#'
+#' @return A single character string that concatenates all unique combinations of
+#' the input fields, sorted and joined by underscores, and collapsed using `"|"`.
+#'
+#' @export
+group_signature_same_study <- function(df){
+  df %>%
+    select(study_ID, variant_string, prev, total_num, variant_num, collection_year_start, collection_year_end) %>%
+    distinct() %>%
+    arrange(across(everything())) %>%
+    mutate_all(as.character) %>%
+    unite("sig", everything(), sep = "_", remove = TRUE) %>%
+    pull(sig) %>%
+    paste(collapse = "|")
 }
 
 #' Tag rows in a data.frame for duplicates across different study_IDs
@@ -195,29 +385,15 @@ add_tags_diff_studyID <- function(df) {
 #'
 #' @export
 add_tags_same_studyID <- function(df) { 
-  # Round longitude and latitude to 1 decimal place
-  df$lon_rounded <- round(df$lon, 2)
-  df$lat_rounded <- round(df$lat, 2)
-  
   # Check for GEOFF studies
   if (all(df$database == "GEOFF")) {
     # Check if the rounded coordinates are the same across all rows
-    if (length(unique(paste(df$lon_rounded, df$lat_rounded))) != 1 || length(unique(df$collection_day)) != 1) {
-      return(NULL)  # If coordinates are not the same (after rounding), return NULL
-    } else {
-      # For GEOFF studies with the same coordinates, keep only the first row
-      df <- df %>%
-        dplyr::mutate(keep_row = ifelse(dplyr::row_number() == 1, "keep", "remove"))
+    return (NULL)
     }
-  } else {
-    # For all other cases, keep only the first row
-    df <- df %>%
-      dplyr::mutate(keep_row = ifelse(dplyr::row_number() == 1, "keep", "remove"))
-  }
   
   # Remove the rounded columns before returning
-  df <- df %>% dplyr::select(-lon_rounded, -lat_rounded)
-  
+  df <- df %>% 
+    dplyr::mutate(keep_row = if_else(row_number() == 1, "keep", "remove"))
   return(df)
 }
 
@@ -258,78 +434,6 @@ filter_duplicates_within_radius <- function(df, radius_km = 50) {
   return(df)  # Keep the dataframe if all points are within the radius
 }
 
-#' Summarize Duplicates Across Multiple Dataframes
-#'
-#' This function takes a list of dataframes containing potential duplicate records and summarizes their similarities and differences.
-#' It identifies matching columns, checks for unique values in specific fields, rounds and compares latitude/longitude values, 
-#' and determines which study should be kept based on the "keep_row" column.
-#'
-#' @param duplicate_dfs A list of dataframes, where each dataframe contains potential duplicate entries.
-#'                      Each dataframe must have a `study_ID` column and optionally other relevant columns.
-#' @param round_digits A numeric value indicating how many decimal places longitude and latitude values should be rounded to
-#'                     before checking for duplicates. Default is 1.
-#'
-#' @return A dataframe summarizing duplicate pairs with the following columns:
-#' \item{study_ID_1}{The study ID of the first entry in the duplicate dataframe.}
-#' \item{study_ID_2}{The study ID of the second entry in the duplicate dataframe.}
-#' \item{matching_columns}{A comma-separated list of columns that have identical values across duplicates.}
-#' \item{variant_string, total_num, variant_num, prev, site_name, iso3c}{Columns that maintain their unique value if consistent across duplicates, otherwise marked as "not duplicate".}
-#' \item{lon, lat}{Rounded longitude and latitude values if consistent across duplicates, otherwise marked as "not duplicate".}
-#' \item{keep}{The study ID that should be retained based on the "keep_row" column. If no entry has "keep", it is set to NA.}
-#'
-#' @export
-summarize_duplicates <- function(duplicate_dfs, round_digits = 1) {
-  summary_list <- lapply(duplicate_dfs, function(df) {
-    # Extract study IDs (assuming first two columns contain the IDs)
-    study_ID_1 <- df$study_ID[1]
-    study_ID_2 <- df$study_ID[2]
-    
-    # Find matching columns where all values are identical
-    matching_columns <- names(df)[sapply(df, function(col) length(unique(col)) == 1)]
-    
-    # Columns to check for uniqueness
-    cols_to_check <- c("variant_string", "total_num", "variant_num", "prev", "site_name", "iso3c")
-    
-    # Extract unique values, set "not duplicate" if multiple unique values exist
-    additional_info <- sapply(cols_to_check, function(col) {
-      unique_values <- unique(df[[col]])
-      if (length(unique_values) == 1) {
-        return(unique_values)
-      } else {
-        return("not duplicate")  # Mark non-duplicate values explicitly
-      }
-    })
-    
-    # Special handling for long/lat: round and check uniqueness
-    long_lat_info <- sapply(c("lon", "lat"), function(col) {
-      rounded_values <- unique(round(df[[col]], round_digits))
-      if (length(rounded_values) == 1) {
-        return(rounded_values)
-      } else {
-        return("not duplicate")  # Mark non-duplicate values explicitly
-      }
-    })
-    
-    # Determine which study_ID should be marked for "keep"
-    keep_value <- ifelse(any(df$keep_row == "keep"), df$study_ID[df$keep_row == "keep"][1], NA)
-    
-    # Return as a data frame
-    data.frame(
-      study_ID_1 = study_ID_1,
-      study_ID_2 = study_ID_2,
-      matching_columns = paste(matching_columns, collapse = ", "),
-      as.list(additional_info),  # Add extracted unique values
-      as.list(long_lat_info),    # Add rounded long/lat values
-      keep = keep_value, 
-      stringsAsFactors = FALSE
-    )
-  })
-  
-  # Combine all results into a single data frame
-  summary_df <- do.call(rbind, summary_list)
-  return(summary_df)
-}
-
 #' Helper function to identify rows removed by distinct and corresponding kept rows
 #'
 #' This function identifies duplicate rows in a data frame based on a specified set of columns,
@@ -359,36 +463,35 @@ rows_removed_by_distinct <- function(df, ...) {
   # Capture columns specified in ...
   grouping_cols <- dplyr::ensyms(...)
   
-# Identify and keep rows to show removed and retained rows
-df_with_flags <- df %>%
-  dplyr::group_by(...) %>%
-  dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
-  dplyr::ungroup()
-
-# Rows being kept (distinct rows)
-kept_rows <- df_with_flags %>%
-  dplyr::filter(.data$keep_row) %>%
-  dplyr::select(-.data$keep_row)
-
-# Rows being removed (duplicates)
-removed_rows <- df_with_flags %>%
-  dplyr::filter(!.data$keep_row) %>%
-  dplyr::select(-.data$keep_row)
-
-# Filter `kept_rows` to match unique combinations in `removed_rows`
-matching_kept_rows <- kept_rows %>%
-  dplyr::semi_join(removed_rows, by = as.character(grouping_cols))  # Only keeps matching rows
-
-# Bind the matching kept rows with removed rows
-paired_rows <- dplyr::bind_rows(removed_rows, matching_kept_rows, .id = "type") %>%
-  dplyr::mutate(type = ifelse(.data$type == "1", "removed", "kept"))
-
-
-# Split into a list by the grouping columns to show each set of duplicates separately
-paired_list <- paired_rows %>%
-  dplyr::group_by(...) %>%
-  dplyr::group_split()
+  # Identify and keep rows to show removed and retained rows
+  df_with_flags <- df %>%
+    dplyr::group_by(...) %>%
+    dplyr::mutate(keep_row = dplyr::row_number() == 1) %>%
+    dplyr::ungroup()
+  
+  # Rows being kept (distinct rows)
+  kept_rows <- df_with_flags %>%
+    dplyr::filter(.data$keep_row) %>%
+    dplyr::select(-.data$keep_row)
+  
+  # Rows being removed (duplicates)
+  removed_rows <- df_with_flags %>%
+    dplyr::filter(!.data$keep_row) %>%
+    dplyr::select(-.data$keep_row)
+  
+  # Filter `kept_rows` to match unique combinations in `removed_rows`
+  matching_kept_rows <- kept_rows %>%
+    dplyr::semi_join(removed_rows, by = as.character(grouping_cols))  # Only keeps matching rows
+  
+  # Bind the matching kept rows with removed rows
+  paired_rows <- dplyr::bind_rows(removed_rows, matching_kept_rows, .id = "type") %>%
+    dplyr::mutate(type = ifelse(.data$type == "1", "removed", "kept"))
+  
+  
+  # Split into a list by the grouping columns to show each set of duplicates separately
+  paired_list <- paired_rows %>%
+    dplyr::group_by(...) %>%
+    dplyr::group_split()
 
 return(paired_list)
-
 }

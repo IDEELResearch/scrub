@@ -59,15 +59,15 @@ dedup_output = deduplicate(full_bind)
 # Final dataframe with added column indicating if a row should be keeped or removed
 dedup_df = dedup_output$df 
 # Dataframe showing duplicates within the same study_ID
-summary_same_study = dedup_output$summary_same
+list_same_study = dedup_output$list_same
 # Dataframe showing duplicates across studies
-summary_diff_study = dedup_output$summary_diff
+list_diff_study = dedup_output$list_diff
+
+length(list_same_study)
+length(list_diff_study)
 
 dim(full_bind)
 dim(dedup_df)
-
-dim(summary_same_study)
-dim(summary_diff_study)
 
 # save ready to go to stave
 saveRDS(dedup_df, here("analysis/data-derived/final_data.rds"))
