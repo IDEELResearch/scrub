@@ -32,8 +32,8 @@ convert_stave <- function(data) {
     dplyr::select(.data$study_key, .data$survey_ID, .data$country_name, .data$site_name,
                   .data$lat, .data$lon, .data$spatial_notes, .data$collection_start, .data$collection_end, 
                   .data$collection_day, .data$time_notes) %>%
-    dplyr::mutate(lat = as.integer(.data$lat)) %>% 
-    dplyr::mutate(lon = as.integer(.data$lon)) %>% 
+    dplyr::mutate(lat = as.numeric(.data$lat)) %>% 
+    dplyr::mutate(lon = as.numeric(.data$lon)) %>% 
     dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE)
   
   studies <- studies %>%
