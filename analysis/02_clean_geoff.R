@@ -130,15 +130,31 @@ check_values_in_column(master_table_clean, "site_study_type", allowed_site_types
 
 # Expand all gene mutation ranges for reference range syntax
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
-
 master_table_clean$gene_mutation[indices_to_transform] <- sapply(
   master_table_clean$gene_mutation[indices_to_transform],
   collapse_k13_range, 
   mutation_key = mutation_key
 )
 
-# TODO: Check with Isabela about the s0054 extraction for 1034
-master_table_clean$gene_mutation[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- "MDR1:1034:C"
+# And the same for the individual asterisk
+indices_to_transform <- which(grepl("^k13:[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)) &
+                                master_table_clean$mutant_num == 0)
+master_table_clean$gene_mutation[indices_to_transform] <- as.character(sapply(
+  master_table_clean$gene_mutation[indices_to_transform],
+  convert_k13_asterisk, 
+  mutation_key = mutation_key
+))
+
+# And this last one had a STOP codon based on the paper
+# No way to handle so remove
+indices_to_transform <- which(grepl("^k13:[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
+master_table_clean <- master_table_clean[-indices_to_transform,]
+
+# They did enter FC which is what the paper says. All samples were 0 for this, so likely
+# short hand for saying 0 F, and 0C.  So correcting to say these were all wild type S 
+master_table_clean$mutant_num[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- 
+  master_table_clean$total_num[master_table_clean$gene_mutation == "MDR1:1034:FC"] 
+master_table_clean$gene_mutation[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- "MDR1:1034:S"
 
 # Adjust and add dates and survey IDs
 convstart <- adjust_invalid_date(unique(master_table_clean$date_start), is_start = TRUE)
@@ -152,6 +168,7 @@ master_table_clean <- master_table_clean %>% rowwise() %>%
   ungroup()
 
 # Fix long and lat which got read in as formula vs values
+# This has now been manually corrected higehr up but leave for now just in case reappears
 master_table_clean$lat_n <- clean_excel_formulas(master_table_clean$lat_n)
 master_table_clean$lon_e <- clean_excel_formulas(master_table_clean$lon_e)
 
@@ -173,6 +190,11 @@ master_table_clean <- master_table_clean |>
                 mut = str_extract(gene_mutation, "(?<=:).*")) |>
   dplyr::filter(total_num > 0) # zeroes are because these codons weren't genotyped
 
+# One manual fix to data entry issue in 
+# s0128_voumbo-matoumona_2018_v01_prevalence_data_LONG_validated.tsv.gz
+master_table_clean <- master_table_clean %>% 
+  mutate(mutant_num = replace(mutant_num, mutant_num == 31 & total_num == 24 & site_uid == "koulamoutou", 21))
+
 if(sum(master_table_clean$total_num < master_table_clean$mutant_num) > 0) {
   errorCondition("Entries with more mutant samples than total samples")
 }
@@ -183,7 +205,7 @@ if(sum(master_table_clean$total_num == 0) > 0) {
 # rename the columns so that they make sense
 column_names <- get_column_names_for_clean()
 
-# first add in extra information needed within column_names - !IMPORTANT NOTE! we are losing 12 studies here... may not be appropriate to dplyr::filter(grepl("calculated", substudy) == 0)
+# first add in extra information needed within column_names
 master_table_formatted <- master_table_clean %>% 
   group_by(study_uid) %>% 
   dplyr::mutate(study_uid = janitor::make_clean_names(study_uid[1], "big_camel")) %>% 
@@ -226,10 +248,12 @@ master_table_formatted <- master_table_clean %>%
                 prev = "prev",
                 gene = "gene",
                 database = "database"
-  ) %>% 
-  # filter out any entries that are calculated - these reflect extra data entries for total genotype counts
-  # which are already captured within haplotype counts
-  dplyr::filter(grepl("calculated", substudy) == 0)
+  )
+
+# filter out any entries that are day0 calculated - these reflect extra data entries for total genotype counts
+# which are already captured within haplotype counts
+master_table_formatted <- master_table_formatted %>% 
+  dplyr::filter(grepl("day0calculated", substudy) == 0)
 
 ################################################################################
 # Impute k13 reference survey records not explicitly entered in data entry
@@ -273,9 +297,25 @@ if (nrow(duplicates) > 0) {
 # Append imputed records to master_table_formatted
 master_table_formatted <- bind_rows(master_table_formatted, imputed_data)
 
-# TODO: add check to confirm all k13_alleles (24 validated and candidate) are present for each survey (year/location)
+# Check to confirm all k13_alleles (24 validated and candidate) are present for each survey (year/location) at least (should return 0)
+master_table_formatted %>% filter(gene == "k13") %>% group_by(survey_ID) %>% 
+  summarise(n = str_extract_all(variant_string, "(?<=k13:)([\\d_]+)") %>%
+                unlist() %>%
+                str_split("_") %>%
+                unlist() %>%
+                as.numeric() %>%
+                unique() %>% length,
+            min = as.integer(unique(k13_min)), 
+            max = as.integer(unique(k13_max)), 
+            pos = sum(as.integer(unique(substr(k13_mutations$mut,1,3))) < max & 
+                        as.integer(unique(substr(k13_mutations$mut,1,3))) > min)) %>% 
+  filter(n < post)
 
-# remove site="none" records from study_ID==S0006WrairKenreadKen which were generated automatically from MIP pipeline reading metadata for samples without site info which have no lat/lon. To be fixed manually in entry eventually.
+
+# remove site="none" records from study_ID==S0006WrairKenreadKen for which lat and lon was not available
+# the meta file for this has a none location so it passed through
+# automatically from MIP pipeline reading metadata for samples without site info which have no lat/lon. 
+# To be fixed manually in entry eventually.
 master_table_formatted <- master_table_formatted[!(master_table_formatted$study_ID == "S0006WrairKenreadKen" & 
                                                      is.na(master_table_formatted$lat) & 
                                                      is.na(master_table_formatted$lon)), ]
@@ -283,6 +323,7 @@ master_table_formatted <- master_table_formatted[!(master_table_formatted$study_
 # flag any study which has NA for lat or long after format conversion
 lat_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$lat)])
 lon_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$lon)])
+
 # flag any study which has NA for substudy which is selectively used for inclusion of data in next scripts (ex we must use this field to exclude categories like tesday0treatmentfailure or treatedextracted for population prevalence calcs)
 substudy_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$substudy)])
 cat("Studies with missing or improper latitudes:\n", paste(lat_missing_or_improper, collapse = ", "), "\n\n")
@@ -298,7 +339,6 @@ master_table_simplified <- master_table_formatted %>%
 low_prev_studies <- master_table_formatted %>%
   filter(variant_string == "k13:469:C", prev < 0.40) %>%
   distinct(study_ID, data_entry_author)  # Get unique pairs
-
 print(low_prev_studies)
 
 # Save the final merged_df as an RDS file

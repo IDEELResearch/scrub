@@ -52,7 +52,7 @@ process_survey <- function(each_survey) {
   
   # Only keep codons that exist in `k13_mutations`
   # Extract numeric codon numbers from k13_mutations$mut
-  valid_k13_codons <- as.numeric(gsub("[A-Z]$", "", k13_mutations$mut))  # Remove trailing letter
+  valid_k13_codons <- as.integer(gsub("[A-Z]$", "", k13_mutations$mut))  # Remove trailing letter
   missing_codons <- missing_codons[missing_codons %in% valid_k13_codons]  # Keep only valid codons
   
   missing_variants <- mutation_key %>%
