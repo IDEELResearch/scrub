@@ -41,7 +41,7 @@ process_survey <- function(each_survey) {
   unique_k13_max <- suppressWarnings(as.numeric(ifelse(unique_k13_max == "", NA, unique_k13_max)))
   
   # Skip surveys with missing or invalid k13_min/k13_max
-  if (length(unique_k13_min) != 1 || length(unique_k13_max) != 1 || is.na(unique_k13_min) || is.na(unique_k13_max)) {
+  if (length(unique_k13_min) != 1 || length(unique_k13_max) != 1 || is.na(unique_k13_min) || is.na(unique_k13_max) || length(existing_codons)==0) {
     message(sprintf("Skipping survey_ID: %s - Missing or invalid k13_min/k13_max values", each_survey))
     return(NULL)  # Skip this survey
   }
