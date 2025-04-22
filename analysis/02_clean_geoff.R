@@ -25,11 +25,7 @@ mutation_key <- read.csv(here("analysis", "data-raw",
 ## start by looking at the data - explore this in the console
 master_unique <- lapply(master_table, unique)
 
-# TODO: fix collection location entry: this is to do with how it's read in 01 
-# "MBanza Congo Municipal Hospital\tAngola\tAGO\t-6.265461256\t14.2530007\tMBanza Congo Municipal Hospital"
-# refers to these study keys:"s0050_davlantes_v01" "s0052_ljolje_v01"  # have asked team to investigate
-# TODO: fix all "na" to be NA
-
+# Initial main clean
 master_table_clean <- master_table |>
   dplyr::mutate(substudy = gsub(" ","", substudy)) |>
   dplyr::mutate(substudy = gsub("_","", substudy)) |>
@@ -43,9 +39,10 @@ master_table_clean <- master_table |>
     lat_n = if_else(study_uid == "s0020_some_2024", "11.79479482", lat_n),
     lon_e = if_else(study_uid == "s0020_some_2024", "-2.919282118", lon_e)
   ) |>
-  mutate(lat_n = as.numeric(if_else(grepl("^‚àí", lat_n), 
-                                    gsub("^‚àí", "-", lat_n), 
-                                    lat_n))) |> # does not appear to work - Ronald will need to fix manually in S0147Jeang2024 entry
+  # OJ: I checked this and there is no issue here - suggest deleting
+  # mutate(lat_n = as.numeric(if_else(grepl("^‚àí", lat_n), 
+  #                                   gsub("^‚àí", "-", lat_n), 
+  #                                   lat_n))) |> # does not appear to work - Ronald will need to fix manually in S0147Jeang2024 entry
   dplyr::mutate(site_name = gsub(" ", "_", tolower(site_name))) |>
   dplyr::mutate(collection_location = gsub(" ", "_", tolower(collection_location))) |>
   dplyr::mutate(collection_location = gsub(",", "", tolower(collection_location))) |>
@@ -73,6 +70,7 @@ master_table_clean <- master_table |>
                                                               "s0057_koko", 
                                                               "s0059_osborne"),
                                              "peer_reviewed", publication_status)) |>
+  dplyr::mutate(publication_status = if_else(publication_status == "published" & pmid == "37420265", "peer_reviewed", publication_status)) |>
   dplyr::mutate(publication_year = if_else(publication_status == "unpublished", NA, publication_year)) |>
   dplyr::mutate(countries_covered = gsub(",", ", ", countries_covered)) |>
   dplyr::mutate(countries_covered = stringr::str_to_title(countries_covered)) |>
@@ -84,7 +82,9 @@ master_table_clean <- master_table |>
   dplyr::mutate(iso3c = replace(iso3c, iso3c == "DRC", "COD")) |> 
   dplyr::mutate(iso3c = replace(iso3c, iso3c == "ERT", "ERI")) |>
   dplyr::mutate(country = replace(country, country == "Gqn", "Gnq")) |>
-  dplyr::mutate(iso3c = replace(iso3c, iso3c == "GQN", "GNQ"))
+  dplyr::mutate(iso3c = replace(iso3c, iso3c == "GQN", "GNQ")) %>% 
+  dplyr::mutate(site_study_type = replace(site_study_type, is.na(site_study_type) & pmid == "32459360", "COMMUNITY")) %>% 
+  dplyr::mutate(site_study_type = replace(site_study_type, is.na(site_study_type) & pmid == "37670357", "COMMUNITY"))
 
 # additional cleaning to correct for malformed iso3cs
 master_table_clean <- master_table_clean %>% 
@@ -113,7 +113,7 @@ allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
                       "tesday0treatmentfailure","day0reinfectionextracted",
                       "day0recrudescenceextracted") # 
 allowed_pretreatment <- c("no", "yes", NA)
-allowed_publication <- c("peer_reviewed", "published" ,"preprint", "unpublished", "data_incomplete")
+allowed_publication <- c("peer_reviewed","preprint", "unpublished", "data_incomplete")
 allowed_pub_year <- c(as.character(seq(from = 2000, to = (lubridate::year(Sys.Date())))), NA) # automatically update as years change
 allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS", "REFUGEERECEPTIONCENTER", "UNKNOWN", "SURVEILLANCE")
 
