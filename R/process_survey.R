@@ -41,7 +41,7 @@ process_survey <- function(each_survey) {
   unique_k13_max <- suppressWarnings(as.numeric(ifelse(unique_k13_max == "", NA, unique_k13_max)))
   
   # Skip surveys with missing or invalid k13_min/k13_max
-  if (length(unique_k13_min) != 1 || length(unique_k13_max) != 1 || is.na(unique_k13_min) || is.na(unique_k13_max)) {
+  if (length(unique_k13_min) != 1 || length(unique_k13_max) != 1 || is.na(unique_k13_min) || is.na(unique_k13_max) || length(existing_codons)==0) {
     message(sprintf("Skipping survey_ID: %s - Missing or invalid k13_min/k13_max values", each_survey))
     return(NULL)  # Skip this survey
   }
@@ -52,7 +52,7 @@ process_survey <- function(each_survey) {
   
   # Only keep codons that exist in `k13_mutations`
   # Extract numeric codon numbers from k13_mutations$mut
-  valid_k13_codons <- as.numeric(gsub("[A-Z]$", "", k13_mutations$mut))  # Remove trailing letter
+  valid_k13_codons <- as.integer(gsub("[A-Z]$", "", k13_mutations$mut))  # Remove trailing letter
   missing_codons <- missing_codons[missing_codons %in% valid_k13_codons]  # Keep only valid codons
   
   missing_variants <- mutation_key %>%
