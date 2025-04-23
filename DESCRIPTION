@@ -14,13 +14,15 @@ Depends:
     R (>= 2.10)
 Imports:
     ggplot2,
+    sp,
     here,
     magrittr,
     ragg,
     readr,
     stringr,
     dplyr,
-    lubridate
+    lubridate,
+    purrr
 Suggests:
     knitr,
     rmarkdown,
