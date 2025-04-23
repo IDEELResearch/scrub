@@ -39,6 +39,7 @@ convert_stave <- function(data) {
     dplyr::mutate(longitude = as.numeric(.data$longitude)) %>% 
     dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE) %>% 
     dplyr::rename(survey_id = survey_ID)
+
   
   studies <- studies %>%
     dplyr::filter(.data$study_id %in% surveys$study_key)  
