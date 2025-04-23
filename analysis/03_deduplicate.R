@@ -1,6 +1,9 @@
 library(tidyverse)
 library(here)
 
+# source functions
+devtools::load_all()
+
 # Read each file if it exists
 safe_read <- function(path) {
   if (file.exists(path)) {
@@ -24,10 +27,21 @@ clean_wwarn <- safe_read(here("analysis", "data-derived", "wwarn_clean.rds"))
 clean_pf7k <- safe_read(here("analysis", "data-derived", "pf7k_clean.rds"))
 clean_who <- safe_read(here("analysis", "data-derived", "who_clean.rds"))
 
-# consistent set of names we want
-column_names <- get_column_names_for_clean()
+africa_iso3 <- c(
+  "DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CPV", "CMR", "CAF", "TCD",
+  "COM", "COD", "COG", "DJI", "EGY", "GNQ", "ERI", "SWZ", "ETH", "GAB",
+  "GMB", "GHA", "GIN", "GNB", "CIV", "KEN", "LSO", "LBR", "LBY", "MDG",
+  "MWI", "MLI", "MRT", "MUS", "MAR", "MOZ", "NAM", "NER", "NGA", "RWA",
+  "STP", "SEN", "SYC", "SLE", "SOM", "ZAF", "SSD", "SDN", "TGO", "TUN",
+  "UGA", "TZA", "ZMB", "ZWE", "ESH"
+)
+
+### TO-DO CECILE: DELETE IF clean_pf7k, clean_who will only be Africa countries in the future
+clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
+clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
 
 # make our full bind across
+column_names <- get_column_names_for_clean()
 full_bind <- rbind(
   clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
   # clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
@@ -35,39 +49,22 @@ full_bind <- rbind(
   clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
-# TODO: Cecile:
-
-# 1. approach could be to add extra columns to help with deduplication
-# e.g. if collection start and end we think is too specific then perhaps year
+# TO-DO CECILE: improve this function
+# Obtain collection year for deduplication
 full_bind$collection_year_start <- lubridate::year(full_bind$collection_start)
 full_bind$collection_year_end <- lubridate::year(full_bind$collection_end)
 
-# 2. there is a little helper function to show what gets removed by a specific set of columns
-rm_ex <- rows_removed_by_distinct(full_bind, url, country_name, lat, lon, gene, 
-                                  variant_string, total_num, collection_year_start, 
-                                  collection_year_end)
+# identify studies that may be duplicates
+dedup_output = deduplicate(full_bind)
+dedup_df = dedup_output$df
+summary_same_study = dedup_output$summary_same
+summary_diff_study = dedup_output$summary_diff
 
-# this could then help possibly to help identify data entry issues e.g.
-# (which perhaps we should just be grouping by and summing)
-as.data.frame(rm_ex[[1]])
+dim(full_bind)
+dim(dedup_df)
 
-# or it could identify that perhaps filtering based on year is too stringent 
-# e.g. the below data entry is probably correct from within the same study 
-as.data.frame(rm_ex[[2]])
-
-# and in fact all of these are only 2 rows long so likely these are fine
-lengths(rm_ex)
-
-# in truth Cecile - this deduplication will likely only really come in when WWARN
-# is in which does have large crossover i suspect with WHO, so perhaps just using
-# the approach above to help identify possible errors of the first kind that can be 
-# grouped and summed would be very helpful
-
-# 3. once we have all the columns we want then the function that is called is
-# below so add into this function defined in scrub for this
-# deduplication
-full_bind <- deduplicate(full_bind)
+dim(summary_same_study)
+dim(summary_diff_study)
 
 # save ready to go to stave
-saveRDS(full_bind, here("analysis/data-derived/final_data.rds"))
-
+saveRDS(dedup_df, here("analysis/data-derived/final_data.rds"))

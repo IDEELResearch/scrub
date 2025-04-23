@@ -18,12 +18,12 @@ deduplicate(df)
 \item \code{"year"}: Year of the data entry
 \item \code{"study_start_year"}: Starting year of the study
 \item \code{"study_end_year"}: Ending year of the study
-\item \code{"x"}: Numeric variable
-\item \code{"n"}: Sample size
+\item \code{"variant_num"}: Numeric variable
+\item \code{"total_num"}: Sample size
 \item \code{"prev"}: Prevalence value
 \item \code{"gene"}: Gene identifier
 \item \code{"mut"}: Mutation identifier
-\item \code{"gene_mut"}: Gene-mutation combination identifier
+\item \code{"variant_string"}: Gene-mutation combination identifier
 \item \code{"annotation"}: Annotation details
 \item \code{"database"}: Source database
 \item \code{"pmid"}: PubMed identifier for source
