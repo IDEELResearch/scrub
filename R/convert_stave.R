@@ -37,8 +37,7 @@ convert_stave <- function(data) {
                   .data$collection_day, .data$time_notes) %>%
     dplyr::mutate(lat = as.numeric(.data$lat)) %>% 
     dplyr::mutate(lon = as.numeric(.data$lon)) %>% 
-    dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE) %>%
-    dplyr::rename(survey_id = survey_ID)
+    dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE) 
   
   studies <- studies %>%
     dplyr::filter(.data$study_id %in% surveys$study_key)  
