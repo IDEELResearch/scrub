@@ -35,10 +35,9 @@ convert_stave <- function(data) {
                   latitude = .data$lat, longitude = .data$lon, .data$spatial_notes, 
                   .data$collection_start, .data$collection_end, 
                   .data$collection_day, .data$time_notes) %>%
-    dplyr::mutate(latitude = as.integer(.data$latitude)) %>% 
-    dplyr::mutate(longitude = as.integer(.data$longitude)) %>% 
-    dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE) %>% 
-    dplyr::rename(survey_id = survey_ID)
+    dplyr::mutate(lat = as.numeric(.data$lat)) %>% 
+    dplyr::mutate(lon = as.numeric(.data$lon)) %>% 
+    dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE) 
   
   studies <- studies %>%
     dplyr::filter(.data$study_id %in% surveys$study_key)  
