@@ -114,7 +114,7 @@ mdf2 %>% pivot_longer(matches("^[[:alnum:]]*_\\d*_[[:alnum:]]$|k13_markers")) %>
 pf7k_res_df <- res %>% 
   na.omit() %>% 
   group_by(across(study:name)) %>%
-  mutate(total_num = sum(!is.na(value))) %>%
+  mutate(total_num = length(unique(sample))) %>%
   ungroup() %>%
   group_by(across(study:total_num)) %>%
   summarise(variant_string = unique(value), 

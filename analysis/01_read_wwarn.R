@@ -202,13 +202,13 @@ iss1 <- k13wwdf %>%
   filter(xs>n) %>% 
   arrange(uuid) 
 
-# There are 65 nids where this fails... FML
+# There are 62 nids where this fails... FML
 nid_concerns <- unique(iss1$nid)
 
 # Firstly, we can ignore any that have pmid 33146722 as we dealt with these before
 nid_concerns <- k13wwdf %>% filter(nid %in% nid_concerns) %>% filter(pmid!="33146722" | is.na(pmid)) %>% pull(nid) %>% unique()
 
-# Great now only 43 nids
+# Great now only 40 nids
 
 # Secondly, if there are only 3 entries, WT and two mutants, and the sum of x for the
 # highest two observations equals n, then there is a mixed infection. 
@@ -225,14 +225,14 @@ nids_not_okay <- c("192"="R645T_E668K")
 # TODO: Handle any that are not okay and update k13wwdf
 k13wwdf %>% filter(nid %in% nids_maybe_okay) %>% split(.$nid)
 
-# Last remove these from the list of concerns
+# Last remove these from the list of concerns 
 nid_concerns <- nid_concerns[!(nid_concerns %in% nids_maybe_okay)]
 
 # ---------------------------------------------------- o
 ### 2.2.2 3 rows where sum(x) != n and look weird ----
 # ---------------------------------------------------- o
 
-# There are 32 uuids where this fails... FML
+# There are 29 uuids where this fails... FML
 
 # Lets look at the remaning 3 ones
 nids_d_not_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  %>% lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) != unique(n)) %>% filter(g) %>% pull(nid)
@@ -251,7 +251,7 @@ new_nid$prev <- new_nid$x/new_nid$n
 # update k13wwdf
 k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site == "Epe" & k13wwdf$pmid == "31132213"),], 
                      new_nid)
-nid_concerns <- nid_concerns[which(nid_concerns != 830)]
+nid_concerns <- nid_concerns[which(nid_concerns != 833)]
 
 # https://pubmed.ncbi.nlm.nih.gov/31132213/
 # https://malariajournal.biomedcentral.com/articles/10.1186/s12936-018-2625-6/tables/1
@@ -268,12 +268,12 @@ new_nid2$prev <- new_nid2$x/new_nid2$n
 # update k13wwdf
 k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site == "Pathoumphone DH, Pathoumphone, Champasak" & k13wwdf$pmid == "30587196"),], 
                      new_nid2)
-nid_concerns <- nid_concerns[which(nid_concerns != 578)]
+nid_concerns <- nid_concerns[which(nid_concerns != 580)]
 
 # https://pubmed.ncbi.nlm.nih.gov/32795367/
 # https://malariajournal.biomedcentral.com/articles/10.1186/s12936-020-03358-7/tables/1
 # was sanger so no way to know how so leave as okay
-nid_concerns <- nid_concerns[which(nid_concerns != 479)]
+nid_concerns <- nid_concerns[which(nid_concerns != 481)]
 
 # ---------------------------------------------------- o
 ### 2.2.3 remaining sum(x) != n and look weird ----
@@ -291,8 +291,27 @@ k13wwdf <- k13wwdf[-which(k13wwdf$site == "Tuy Duc" & k13wwdf$mut == "V520I"),]
 ### 2.2.4 TODO: Decide how much we care about looking for where sum(x) == n, but they have not reported double mutants----
 # ---------------------------------------------------- o
 
+
 # ---------------------------------------------------- o
-## 2.3 Now format after having assumed we have corrected all possible issues  ----
+### 2.3.1 Creating list of possible concerns based on sum(x) < n  ----
+# ---------------------------------------------------- o
+
+iss2 <- k13wwdf %>%
+  group_by(nid) %>%
+  mutate(xs = sum(x)) %>%
+  filter(xs < n) %>%
+  arrange(uuid) 
+
+# There are 23 nids where this fails... FML
+nid_lconcerns <- unique(iss2$nid)
+
+# TODO: Go through these and work out what the denominator should actually be
+# nid 250 - typo in wwarn - WT should be more
+# however https://journals.asm.org/doi/full/10.1128/aac.00802-19?rfr_dat=cr_pub++0pubmed&url_ver=Z39.88-2003&rfr_id=ori%3Arid%3Acrossref.org
+# looking at the paper, they have also missed a number of SNPs as well...
+
+# ---------------------------------------------------- o
+## 2.4 Now format after having assumed we have corrected all possible issues  ----
 # ---------------------------------------------------- o
 
 # this should now be TRUE
@@ -300,20 +319,18 @@ nrow(k13wwdf) == (k13wwdf %>% select(-uuid, -nid, -iid) %>%
                     group_by(across(c(-x, -n, -prev))) %>% 
                     group_indices() %>% unique() %>% length)
 
-# and group by to record prevalence of k13 valid mutations
-# TODO: Fix handle of / and _ corectly (think just _ not working) in clean_mutations
+# and sort out the columns etc
 k13ww_final_res_df <- k13wwdf %>% 
   select(-uuid, -nid, -iid) %>%
-  mutate(mut = if_else(mut == "wildtype", "WT", substring(mut, 2))) %>%
-  mutate(gene_mut = paste0(gene, "-", mut)) %>%
-  mutate(mut = sub("k13-", "", gene_mut)) %>%
-  select(iso3c, admin_0, admin_1, site, lat, long,
-         year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, gene_mut, database, pmid, url, source) %>%
-  ungroup %>%
+  mutate(mut = if_else(mut == "wildtype", "WT", mut)) %>% 
+  ungroup() %>%
   dplyr::rowwise() %>%
-  dplyr::mutate(gene_mut = clean_mutations(gene_mut))
-
+  dplyr::mutate(gene_mut = wwarn_format_k13_for_stave(mut)) %>% 
+  ungroup() %>% 
+  mutate(mut = if_else(mut == "WT", "WT", substring(mut, 2))) %>%
+    select(iso3c, admin_0, admin_1, site, lat, long,
+           year, study_start_year, study_end_year,
+           x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
 
 # TODO: Gina - the above is done (except for all the TODOs) - i.e. with 
 # just these TODOs then k13 is done
