@@ -15,34 +15,77 @@ validated <- validated %>%
   dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
 validated_mut <- paste0(validated$mut, collapse = "|")
 
-
 # read in WWARN study info
 k13ww <- readxl::read_xls("analysis/data-raw/WWARN_K13_database_04-12-2033.xls", sheet = 1)
 pdww <- readxl::read_xls("analysis/data-raw/WWARN_partnerdrug_database_04-12-2023.xls", sheet = 1)
 
+# add iso
+k13ww$iso <- countrycode::countrycode(k13ww$country, "country.name.en", "iso3c")
+pdww$iso <- countrycode::countrycode(pdww$country, "country.name.en", "iso3c")
+
+## 1.1. WWARN K13 admin mapping ----
+
 # We need to find admin 1 globally based on lat long.
 # file sourced from Malaria Atlas Project
-goodmap <- readRDS("analysis/data-raw/admin1_map.rds")
+# map_1 <- malariaAtlas::getShp("ALL",admin_level = c("admin1")) %>% sf::st_as_sf()
+# saveRDS(map_1, file = "analysis/data-raw/alt_map.rds")
+map_1 <- readRDS("analysis/data-raw/alt_map.rds")
+k13_map <- map_1 %>% filter(iso %in% unique(k13ww$iso)) 
 
 # create coords
 k13coords <- sf::st_as_sf(k13ww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
-pdcoords <- sf::st_as_sf(pdww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
 
 # identify k13 matches
-k13ins <- as.integer(sf::st_within(k13coords, goodmap, prepared = TRUE))
-k13nears <- as.integer(sf::st_nearest_feature(k13coords, goodmap))
+k13ins <- as.integer(sf::st_within(k13coords, k13_map, prepared = TRUE))
+
+# There are 2 samples in French Guiana that the approach below for nearest admin makes no sense for so correct after
+# Having gone to manuscript these represent travellers from FG that were sequenced in France
+ggplot() +
+  geom_sf(data = k13_map[,"name_0"], fill = "gray90", colour = "white") +
+  geom_point(data = k13ww[which(is.na(k13ins)), ], size = 2, aes(color = country, x = as.numeric(lon), y = as.numeric(lat))) +
+  ggrepel::geom_text_repel(data = k13ww[which(is.na(k13ins)), ], size = 2, aes(label = country, x = as.numeric(lon), y = as.numeric(lat)), max.overlaps = 30) +
+  theme_minimal() +
+  labs(title = "Distribution of samples with missing k13ins")
+
+k13nears <- as.integer(sf::st_nearest_feature(k13coords, k13_map))
 k13ins[which(is.na(k13ins))] <- k13nears[which(is.na(k13ins))]
-k13ww$admin_1 <- goodmap$name_1[k13ins]
+k13ww$admin_1 <- k13_map$name_1[k13ins]
+
+# These are the 2 samples that this approach makes no sense for
+k13ww$admin_1[which(k13ww$site == "Saint-Georges")] <- "Cayenne"
+
+## 1.2. WWARN PD admin mapping ----
+
+# start with the map and the coords
+pd_map <- map_1 %>% filter(iso %in% unique(pdww$iso)) 
+pdcoords <- sf::st_as_sf(pdww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
 
 # identify pd matches
-pdins <- as.integer(sf::st_within(pdcoords, goodmap, prepared = TRUE))
-pdnears <- as.integer(sf::st_nearest_feature(pdcoords, goodmap))
+pdins <- as.integer(sf::st_within(pdcoords, pd_map, prepared = TRUE))
+
+# There is a clump of samples in India that the approach below for nearest admin makes no sense for so correct after
+ggplot() +
+  geom_sf(data = pd_map[,"name_0"], fill = "gray90", colour = "white") +
+  geom_point(data = pdww[which(is.na(pdins)), ], size = 2, aes(color = country, x = as.numeric(lon), y = as.numeric(lat))) +
+  ggrepel::geom_text_repel(data = pdww[which(is.na(pdins)), ], size = 2, aes(label = country, x = as.numeric(lon), y = as.numeric(lat)), max.overlaps = 30) +
+  theme_minimal() +
+  labs(title = "Distribution of samples with missing pdins")
+
+pdnears <- as.integer(sf::st_nearest_feature(pdcoords, pd_map))
 pdins[which(is.na(pdins))] <- pdnears[which(is.na(pdins))]
-pdww$admin_1 <- goodmap$name_1[pdins]
+pdww$admin_1 <- pd_map$name_1[pdins]
+
+pdww$admin_1[which(pdww$site == "West Bengal")] <- "West Bengal"
+
+# Lastly save to make downstream analysis quicker as the above is a little slow...
+saveRDS(k13ww, "analysis/data-derived/k13ww.rds")
+saveRDS(pdww, "analysis/data-derived/pdww.rds")
 
 # ---------------------------------------------------- o
 # 2. Sort k13 ----
 # ---------------------------------------------------- o
+
+k13ww <- readRDS("analysis/data-derived/k13ww.rds")
 
 # sort names as wanted
 k13wwdf <- k13ww %>%
@@ -63,199 +106,216 @@ k13wwdf <- k13ww %>%
   rename(source = authors) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source,
-         val) %>%
-  group_by(across(c(-x, -n, -prev, -mut, -val))) %>%
+         x, n, prev, gene, mut, database, pmid, url, source)
+
+# sort out val grouping issue
+k13wwdf <- bind_rows(
+  k13wwdf %>% group_by(across(c(-x, -n, -prev))) %>% 
+    mutate(ns = n()) %>% 
+    filter(ns==1), # because we removed val, we have extra entries , 
+  k13wwdf %>% group_by(across(c(-x, -n, -prev))) %>% 
+    mutate(ns = n()) %>% 
+    filter(ns>1) %>% # because we removed val, we have extra entries 
+    summarise(x = sum(x), n = sum(x), prev = x/n)
+)
+
+# ---------------------------------------------------- o
+## 2.1 Correct data extraction from source for known pubs  ----
+# ---------------------------------------------------- o
+
+# before doing manual cleaning - one study corresponds to many of the issues
+tf <- tempfile()
+download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/jid/223/6/10.1093_infdis_jiaa687/1/jiaa687_suppl_supplementary_table_s3.xlsx?Expires=1748452824&Signature=PjWn-A7qw1OTfQo4hrvOee1909kD~hyO-lT9jA2dQIhZmS8Jmcp8-HjqydW9iI3GuNx3sLPFz2GmT-Hm7i-58NoOSff~g84yASXtA3HcAJOy6maFSWXMNu3PtZibzklibTLZdXFqzh1n0aQCFsrzs8YEN70NE6hQZE9skxgQnrG6ipfqQWGICNkkzdCea-AcoP4Clgcma159BE3Mlac4R1RGtuzbTCYgEk-End4tck-Zk0ApCnjhnLcM7zA4DSLEyJ98rka29DEwKG8raNDj~MXR5yh1i6~6MScgAQpM6JIVB7UM~~euH4Qsc3XJlrR63kuVUUwzk12aLXrcuO6S7A__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA", tf)
+
+# clean up and create our correct table
+df <- readxl::read_excel(tf) %>% janitor::clean_names()
+df <- df %>% filter(gene_name == "k13") %>% filter(!(grepl("fs", mutation_name))) # remove frame shift
+df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique
+aa_lookup <- setNames(
+  variantstring::allowed_amino_acids()$IUPAC_amino_acid_code,
+  variantstring::allowed_amino_acids()$three_letter_code
+)
+df <- df %>%
+  mutate(mutation_name = str_remove(mutation_name, "^k13-")) %>%
+  mutate(mutation_name = str_replace_all(mutation_name, aa_lookup))
+
+# function to split duplicated entries
+split_rows_by_and <- function(data, column) {
+  # Use tidyr's separate_rows to split the specified column
+  data %>%
+    separate_rows(!!sym(column), sep = "\\s*&&\\s*")
+}
+
+# combine per sample, split any multiple loci samples as assume these are unphased
+correct_st <- df %>% filter(!is.na(genotype)) %>% 
+  group_by(district, year, sample_id) %>% 
+  summarise(mut = paste(mutation_name[genotype==1], collapse = "&&")) %>% 
+  split_rows_by_and("mut") %>% 
+  group_by(district, year) %>% 
+  mutate(n = length(unique(sample_id))) %>% 
+  group_by(district, year, mut, n) %>% 
+  summarise(x = n()) %>% 
+  group_by(district, year) %>% 
+  mutate(mut = replace(mut, mut == "", "wildtype")) %>% 
+  mutate(prev = x/n) %>% 
+  rename(site = district) %>% 
+  mutate(pmid = "33146722") %>% 
+  mutate(year = as.character(year))
+
+# left join with the data in k13wwdf (no year as we have found new years for some sites)
+correct_k13st <- k13wwdf %>% filter(pmid=="33146722") %>% 
+  select(-x,-n,-prev, -mut, -year) %>% unique %>% left_join(correct_st, .)
+
+k13wwdf <- bind_rows(k13wwdf %>% filter(pmid!="33146722" | is.na(pmid)), 
+          correct_k13st)
+
+# ---------------------------------------------------- o
+## 2.2 Identify possible issues  ----
+# ---------------------------------------------------- o
+
+# assign to uuids 
+assign_ids <- function(x) {
+x %>%
+  group_by(across(c(-x, -n, -prev, -mut))) %>%
   mutate(uuid = cur_group_id()) %>%
-  ungroup
+  ungroup %>% 
+  group_by(across(c(-x, -prev, -mut))) %>%
+  mutate(nid = cur_group_id()) %>%
+  ungroup() %>% 
+  mutate(iid = seq_len(n()))
+}
+  
+# ---------------------------------------------------- o
+### 2.2.1 Creating list of possible concerns based on sum(x) != n  ----
+# ---------------------------------------------------- o
 
+# assign to uuids 
+k13wwdf <- assign_ids(k13wwdf)
 
-# for the final grouping to work the following needs to have all prev summing to 1
-# otherwise there is data entry
-prev_checks <- k13wwdf %>%
-  group_by(uuid) %>%
-  summarise(prev = sum(prev))
+# Check 1 to scan over possible issues where sum of x equals n
+iss1 <- k13wwdf %>%
+  group_by(nid) %>%
+  mutate(xs = sum(x)) %>% 
+  filter(xs>n) %>% 
+  arrange(uuid) 
 
-# this is not true so we have inaccuracies in the WWARN data
-all(abs(prev_checks$prev - 1) < 0.000001)
-pooruuid <- prev_checks$uuid[which(!(abs(prev_checks$prev - 1) < 0.000001))]
+# There are 65 nids where this fails... FML
+nid_concerns <- unique(iss1$nid)
 
-# what is the problem
-# k13wwdf %>% filter(
-#   uuid %in% pooruuid
-# ) %>%
-#   split(.$uuid)
+# Firstly, we can ignore any that have pmid 33146722 as we dealt with these before
+nid_concerns <- k13wwdf %>% filter(nid %in% nid_concerns) %>% filter(pmid!="33146722" | is.na(pmid)) %>% pull(nid) %>% unique()
 
-# 1. Mixed infections are not reported as such - it is impossible
-# from the data as it is to identify which alleles go together as
-# they just report prevalence of each mutation
+# Great now only 43 nids
 
-# In response, let's assign each mutation as either WT or k13-valid
-# using the clearance phenotype and marker information
+# Secondly, if there are only 3 entries, WT and two mutants, and the sum of x for the
+# highest two observations equals n, then there is a mixed infection. 
+# The only way to know if this is a double mutatnt or mixed infection is to look at the paper
 
-# A. ART
+# Most will likely not have been phased as PCR but to be correct should look into these
+nids_maybe_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid) %>% lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) == unique(n)) %>% filter(g) %>% pull(nid)
 
-k13ww_res_df <- k13wwdf %>%
-  # no longer need res scores and instead are pulling in from the validated csv
-  dplyr::mutate(mut = if_else(mut == "wildtype", "WT", substring(mut, 2))) %>%
-  dplyr::mutate(gene_mut = paste0(gene, "-", mut)) %>%
-  # add annotations of classification
-  dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
-  dplyr::mutate(annotation = if_else(mut == "WT", "wildtype", annotation)) %>%
-  dplyr::mutate(annotation = if_else(is.na(annotation), "unknown", annotation)) %>%
-  group_by(across(c(-x, -n, -prev, -mut, -gene_mut, -annotation))) %>%
-  mutate(uuid = cur_group_id()) %>%
-  ungroup
+# Okay nids based on paper's methods, i.e. they could not have detected double mutant
+# TODO: Still reading through these and pulling out which are fine to leave and which need to have double mutant noted
+nids_okay <- c(26, 227)
+nids_not_okay <- c("192"="R645T_E668K")
 
-# From this let's then split into the uuids and do some
-# data cleaning and checking
-k13ww_res_df$include <- TRUE
-k13ww_res_df_spl <- split(k13ww_res_df, k13ww_res_df$uuid)
+# TODO: Handle any that are not okay and update k13wwdf
+k13wwdf %>% filter(nid %in% nids_maybe_okay) %>% split(.$nid)
 
-# for each poor uuid (i.e. mixed infections or other errors) correct these
-# in as best a way as possible
-# k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
-k13ww_res_df_spl_new <- k13ww_res_df_spl[pooruuid] %>%
-  lapply(function(x){
-    
-    # Error 1: Different ns
-    if(length(unique(x$n)) != 1){
-      
-      # if within n they all add to n then they are fine
-      # and likely reflect multiple samples in the same site.
-      fine <- x %>% group_by(n) %>%
-        summarise(fine = sum(x) == unique(n))
-      if(all(fine$fine)){
-        return(x)
-      } else {
-        
-        # Kilifi scale ups for odd sample sizes across
-        # These won't impact prevaelnces later as non validated
-        # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6879256/
-        if(x$site[1] == "Kilifi" & x$year[1] == 1995) {
-          # One loci only amplified in 82/137
-          # so scale up
-          x$x[x$n==82] <- 12
-          x$n <- 137
-        }
-        if(x$site[1] == "Kilifi" & x$year[1] == 1998) {
-          # same again to scale accordingly, and easiest way to increase n
-          x$n <- 127
-        }
-        if(x$site[1] == "Kilifi" & x$year[1] == 2005) {
-          # same again to scale accordingly,
-          x$x <- c(116,1,15)
-          x$n <- 132
-        }
-        if(x$site[1] == "Kilifi" & x$year[1] == 2015) {
-          # same again to scale accordingly,
-          x$x <- c(122,1,19)
-          x$n <- 142
-        }
-        if(x$site[1] == "Myawaddy, Kayin") {
-          # can't find the paper and the title listed suggests India but the country is Myanmar
-          x$include <- FALSE
-        }
-        if(x$site[1] == "Komé") {
-          # all the mutants are not associated with slow clearance so they are all
-          # WT in effect, so simply set the x to add up to the n and the prev and
-          # sample size will then be correct
-          x$x[x$n == 180] <- x$x[x$n == 180]/sum(x$x[x$n == 180]) * 180
-        }
-        
-        return(x)
-        
-      }
-      
-    } else { # They all have the same n so need to work out how to allocate
-      
-      # Catch 1:
-      # If they are all WT then just normalise and divide by n
-      if(all(x$mut == "WT")) {
-        x$x <- (x$x/sum(x$x))*unique(x$n)
-        return(x)
-      }
-      
-      # Catch 2:
-      # For the rest also just normalise as well but with respect to
-      # val. i.e. if we have 3 too manu x, where would those most likely
-      # come from based on the total size of each of the val compartments
-      to_rm <- sum(x$x) - x$n[1]
-      groupings <- x %>% group_by(val) %>% summarise(x = sum(x))
-      
-      # expected classes to have had a multipe haplotype in
-      expect <- round((groupings$x / sum(groupings$x)) * to_rm)
-      if(sum(expect) == to_rm) {
-        
-        newx <- x
-        for(i in seq_along(groupings$val)){
-          if(expect[i] > 0) {
-            before <- newx$x[newx$val == groupings$val[i]]
-            new <- (before / sum(before)) * (groupings$x[i] - expect[i])
-            newx$x[newx$val == groupings$val[i]] <- new
-          }
-        }
-        
-        # and does this still sum to the n or is there annoying rounding error
-        if(sum(newx$x) == newx$n[1]) {
-          x <- newx
-          return(x)
-        }
-        
-      }
-      
-      # Catch 3:
-      # There are 4 remaining studies where this approach does not round
-      # back to n so simply distribute equally
-      x$x <- (x$x/sum(x$x))*unique(x$n)
-      return(x)
-      
-    }
-    
-    
-  })
+# Last remove these from the list of concerns
+nid_concerns <- nid_concerns[!(nid_concerns %in% nids_maybe_okay)]
 
-# assign these back over now
-k13ww_res_df_spl[pooruuid] <- k13ww_res_df_spl_new
+# ---------------------------------------------------- o
+### 2.2.2 3 rows where sum(x) != n and look weird ----
+# ---------------------------------------------------- o
 
-# and group back to gether
-k13ww_res_df_new <- do.call(rbind, k13ww_res_df_spl)
-k13ww_res_df_new <- k13ww_res_df_new %>% filter(include)
-k13ww_res_df_new$prev <- k13ww_res_df_new$x / k13ww_res_df_new$n
+# There are 32 uuids where this fails... FML
 
-# we checked that n should be allowed to change within uuids if this
-# is due to different samples in the same time period. So add n to uuid
-k13ww_res_df_new <- k13ww_res_df_new %>%
-  ungroup %>%
-  group_by(across(c(-x, -prev, -mut, -val))) %>%
-  mutate(uuid = cur_group_id()) %>%
-  ungroup
+# Lets look at the remaning 3 ones
+nids_d_not_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  %>% lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) != unique(n)) %>% filter(g) %>% pull(nid)
 
-# does the prev check work now
-prev_check_new <- k13ww_res_df_new %>%
-  group_by(uuid) %>%
-  summarise(prev = sum(prev))
+# these actually look like data entry issues
 
-# this is now TRUE!!! ## this is not true now though... 600+ fail
-all(abs(prev_check_new$prev - 1) < 0.000001)
+# https://pubmed.ncbi.nlm.nih.gov/31132213/
+new_nid <- rbind(k13wwdf %>% filter(site == "Epe" & pmid == "31132213"),
+      k13wwdf %>% filter(site == "Epe" & pmid == "31132213" & mut == "Q613H"))
+new_nid$mut[4] <- "D464N"
+new_nid$x[1] <- 190
+new_nid$x[new_nid$mut == "Q613H"] <- 3
+new_nid$n <- 195
+new_nid$prev <- new_nid$x/new_nid$n
 
-remove <- which((abs(prev_check_new$prev - 1) < 0.000001))
+# update k13wwdf
+k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site == "Epe" & k13wwdf$pmid == "31132213"),], 
+                     new_nid)
+nid_concerns <- nid_concerns[which(nid_concerns != 830)]
+
+# https://pubmed.ncbi.nlm.nih.gov/31132213/
+# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-018-2625-6/tables/1
+# This study did actually work out whether infections were mixed or double mutations
+# FML - reading through, Thateng had 1 C580Y_Y493H and Khong had 1 C580Y_R539T
+# TODO: need to find and correct these 2 double mutants
+# But below is correct correction for this site
+new_nid2 <- rbind(k13wwdf %>% filter(site == "Pathoumphone DH, Pathoumphone, Champasak" & pmid == "30587196"))
+new_nid2$x[new_nid2$mut == "wildtype"] <- 90
+new_nid2$x[new_nid2$mut == "R539T"] <- 33
+new_nid2$x[new_nid2$mut == "C580Y"] <- 219
+new_nid2$prev <- new_nid2$x/new_nid2$n
+
+# update k13wwdf
+k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site == "Pathoumphone DH, Pathoumphone, Champasak" & k13wwdf$pmid == "30587196"),], 
+                     new_nid2)
+nid_concerns <- nid_concerns[which(nid_concerns != 578)]
+
+# https://pubmed.ncbi.nlm.nih.gov/32795367/
+# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-020-03358-7/tables/1
+# was sanger so no way to know how so leave as okay
+nid_concerns <- nid_concerns[which(nid_concerns != 479)]
+
+# ---------------------------------------------------- o
+### 2.2.3 remaining sum(x) != n and look weird ----
+# ---------------------------------------------------- o
+
+# TODO: Still to look through all these and work out if the are okay and up date
+# k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  
+
+# 2241 - https://pmc.ncbi.nlm.nih.gov/articles/instance/4955562/bin/NIHMS802595-supplement-app.pdf
+# V520I & T474I in the same sample
+k13wwdf$mut[which(k13wwdf$site == "Tuy Duc" & k13wwdf$mut == "T474I")] <- "T474I_V520I"
+k13wwdf <- k13wwdf[-which(k13wwdf$site == "Tuy Duc" & k13wwdf$mut == "V520I"),]
+
+# ---------------------------------------------------- o
+### 2.2.4 TODO: Decide how much we care about looking for where sum(x) == n, but they have not reported double mutants----
+# ---------------------------------------------------- o
+
+# ---------------------------------------------------- o
+## 2.3 Now format after having assumed we have corrected all possible issues  ----
+# ---------------------------------------------------- o
+
+# this should now be TRUE
+nrow(k13wwdf) == (k13wwdf %>% select(-uuid, -nid, -iid) %>%
+                    group_by(across(c(-x, -n, -prev))) %>% 
+                    group_indices() %>% unique() %>% length)
 
 # and group by to record prevalence of k13 valid mutations
-# this is where the code starts to deviate from {arms}
-k13ww_final_res_df <- k13ww_res_df_new[-remove,] %>% #TODO: remove the indexing when this works
-  #TODO: debugging but filtering out the ones where the prev check fails now
-  select(-include, -val, -uuid) %>%
-  group_by(across(c(-x, -n, -prev, -mut))) %>%
-  summarise(n = sum(unique(n)), x = n - sum(x[mut == "WT"]), prev = x/n) %>%
+# TODO: Fix this
+# 1. gene is missing from outside propeller region (or for other reasons)
+# 2. handle / and _ corectly (think just _ not working)
+k13ww_final_res_df <- k13wwdf %>% 
+  select(-uuid, -nid, -iid, -ns) %>%
+  mutate(mut = if_else(mut == "wildtype", "WT", substring(mut, 2))) %>%
+  mutate(gene_mut = paste0(gene, "-", mut)) %>%
   mutate(mut = sub("k13-", "", gene_mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, gene_mut, annotation, database, pmid, url, source) %>%
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source) %>%
   ungroup %>%
   dplyr::rowwise() %>%
   dplyr::mutate(gene_mut = clean_mutations(gene_mut))
 
+
+# TODO: Gina - the above is done (except for all the TODOs) - i.e. with 
+# just these TODOs then k13 is done
 
 # ---------------------------------------------------- o
 # 3. Sort PD Names ----
