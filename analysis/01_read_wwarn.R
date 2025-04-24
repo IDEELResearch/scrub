@@ -329,7 +329,6 @@ new_nid2b <- rbind(k13wwdf %>% filter(site == "Thateng DH, Thateng, Sekong" & pm
 new_nid2b$mut[which(new_nid2b$mut == "C580C/Y")] <- "C580Y_Y493H"
 new_nid2b$prev <- new_nid2b$x/new_nid2b$n
 
-# "Khong DH, Khong, Champasak"  
 new_nid2c <- rbind(k13wwdf %>% filter(site == "Khong DH, Khong, Champasak" & pmid == "30587196"))
 new_nid2c$x[new_nid2$mut == "wildtype"] <- 20
 # duplicate a row to add a double mutant 
@@ -338,12 +337,13 @@ new_nid2c <- new_nid2c %>%
 new_nid2c$mut[4] <- "C580Y_R539T"
 new_nid2c$x[4] <- 1
 new_nid2c$prev <- new_nid2c$x/new_nid2c$n
+
 # update k13wwdf
 k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site %in% c("Pathoumphone DH, Pathoumphone, Champasak",
                                                         "Thateng DH, Thateng, Sekong",
                                                         "Khong DH, Khong, Champasak") & k13wwdf$pmid == "30587196"),], 
                      rbind(new_nid2, new_nid2b, new_nid2c))
-nid_concerns <- nid_concerns[which(nid_concerns != 580)]
+nid_concerns <- nid_concerns[which(nid_concerns != 580)] # I think this was a typo - the nid of above is 580
 
 # https://pubmed.ncbi.nlm.nih.gov/32795367/
 # https://malariajournal.biomedcentral.com/articles/10.1186/s12936-020-03358-7/tables/1
@@ -354,13 +354,81 @@ nid_concerns <- nid_concerns[which(nid_concerns != 481)]
 ### 2.2.3 remaining sum(x) != n and look weird ----
 # ---------------------------------------------------- o
 
-# TODO: Still to look through all these and work out if the are okay and up date
-# k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  
+# # pmid 99999999 doesn't seem to exist - I cannot find this paper. I'm going to exclude this paper. this removes a lot of the issues
+nid_removed <- k13wwdf |>
+  dplyr::filter(pmid == 99999999) |>
+  dplyr::filter(nid %in% nid_concerns) |>
+  dplyr::pull(nid) |> unique()
+# remove data that corresponds to this study and has an nid causing issues
+# TODO: check with OJ if this was actually the correct thing to do 
+k13wwdf <- k13wwdf |>
+  dplyr::filter((nid %in% nid_removed) == FALSE)
 
-# 2241 - https://pmc.ncbi.nlm.nih.gov/articles/instance/4955562/bin/NIHMS802595-supplement-app.pdf
+nid_concerns <- nid_concerns[which((nid_concerns %in% nid_removed) == FALSE)]
+
+# TODO: Still to look through all these and work out if the are okay and up date
+k13wwdffix <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)
+
+# prioritise African studies for now
+# nids in Africa: 188, 186, 640, 644, 234, 274, 276, 452, 891, 895
+
+# pmid 26667053; nid 188 186; incorrect extraction fixing
+k13wwdffix$`186`$x[which(k13wwdffix$`186`$mut == "S477Y")] <- 0
+k13wwdffix$`186` <- k13wwdffix$`186` |>
+  dplyr::filter(x > 0) |>
+  dplyr::mutate(prev = x/n)
+
+# fixing incorrect extractions and double mutant
+k13wwdffix$`188`$x[which(k13wwdffix$`188`$mut == "A578S")] <- 1
+k13wwdffix$`188`$mut[which(k13wwdffix$`188`$mut == "I526M")] <- "I526M_A578S"
+k13wwdffix$`188`$prev <- k13wwdffix$`188`$x/k13wwdffix$`188`$n
+
+# pmid 29436339 nid 234 - two of the mutants were actually mixed infection, no doubles
+
+# nid = 640 or 644 - prev sums > 1 so I think some of these are mixed
+# impossible to disentangle what's happening
+
+# 28797235; nid 274 and 276 = mixed markers 
+# 452 is mixed also
+
+# nid 891 https://academic.oup.com/jid/article/225/8/1411/6314293#supplementary-data
+# incorrect extraction
+k13wwdffix$`891`$x[which(k13wwdffix$`891`$mut == "Q661E")] <- 1
+k13wwdffix$`891`$x[which(k13wwdffix$`891`$mut == "P667S")] <- 1
+k13wwdffix$`891`$prev <- k13wwdffix$`891`$x/k13wwdffix$`891`$n
+
+# nid 895 implies mixed infections vs double mutants - unclear from methods
+
+# studies outside of Africa
+# 665 - 668, 737 and 79 all have the same pmid and all mixed so leave 25927592
+
+# 493 27001814
+# https://journals.asm.org/doi/10.1128/aac.02370-15
+# states one of the parasites had two mutants but doesn't specify haplotype
+
+
+# 1180 27332904 https://pmc.ncbi.nlm.nih.gov/articles/instance/4955562/bin/NIHMS802595-supplement-app.pdf
 # V520I & T474I in the same sample
-k13wwdf$mut[which(k13wwdf$site == "Tuy Duc" & k13wwdf$mut == "T474I")] <- "T474I_V520I"
-k13wwdf <- k13wwdf[-which(k13wwdf$site == "Tuy Duc" & k13wwdf$mut == "V520I"),]
+k13wwdffix$`1180`$mut[which(k13wwdffix$`1180`$mut == "T474I")] <- "T474I_V520I"
+k13wwdffix$`1180`$x[which(k13wwdffix$`1180`$mut == "V520I")] <- 0
+k13wwdffix$`1180` <- k13wwdffix$`1180` |>
+  dplyr::filter(x > 0) |>
+  dplyr::mutate(prev = x/n)
+
+# 592 30587196
+k13wwdffix$`592`$x[which(k13wwdffix$`592`$mut == "wildtype")] <- 29
+k13wwdffix$`592`$prev <- k13wwdffix$`592`$x/k13wwdffix$`592`$n
+
+# 319 & 320  32393498 - talks about mixed infections and no mention of doubles 
+
+nid_fixed <- c(186, 188, 891, 1180, 592)
+nid_checked <- c(234, 640, 644,274, 276, 452, 895, 665:668, 737, 79, 493, 319, 320)
+
+nid_concerns <- nid_concerns[intersect(which(!nid_concerns %in% nid_fixed), which(! nid_concerns %in% nid_checked))]
+
+# bind everything back together
+k13wwdffix <- do.call(rbind, k13wwdffix) 
+k13wwdf <- rbind(filter(k13wwdf, (nid %in% c(nid_fixed, nid_checked) == FALSE)), k13wwdffix) # checked we have same # of nids
 
 # ---------------------------------------------------- o
 ### 2.2.4 TODO: Decide how much we care about looking for where sum(x) == n, but they have not reported double mutants----
