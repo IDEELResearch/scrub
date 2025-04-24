@@ -85,6 +85,7 @@ saveRDS(pdww, "analysis/data-derived/pdww.rds")
 # 2. Sort k13 ----
 # ---------------------------------------------------- o
 
+# GINA: Just start here as the above is long to run
 k13ww <- readRDS("analysis/data-derived/k13ww.rds")
 
 # sort names as wanted
@@ -117,7 +118,9 @@ k13wwdf <- bind_rows(
     mutate(ns = n()) %>% 
     filter(ns>1) %>% # because we removed val, we have extra entries 
     summarise(x = sum(x), n = sum(x), prev = x/n)
-)
+) %>% 
+  select(-ns) %>% 
+  ungroup()
 
 # ---------------------------------------------------- o
 ## 2.1 Correct data extraction from source for known pubs  ----
@@ -298,11 +301,9 @@ nrow(k13wwdf) == (k13wwdf %>% select(-uuid, -nid, -iid) %>%
                     group_indices() %>% unique() %>% length)
 
 # and group by to record prevalence of k13 valid mutations
-# TODO: Fix this
-# 1. gene is missing from outside propeller region (or for other reasons)
-# 2. handle / and _ corectly (think just _ not working)
+# TODO: Fix handle of / and _ corectly (think just _ not working) in clean_mutations
 k13ww_final_res_df <- k13wwdf %>% 
-  select(-uuid, -nid, -iid, -ns) %>%
+  select(-uuid, -nid, -iid) %>%
   mutate(mut = if_else(mut == "wildtype", "WT", substring(mut, 2))) %>%
   mutate(gene_mut = paste0(gene, "-", mut)) %>%
   mutate(mut = sub("k13-", "", gene_mut)) %>%
