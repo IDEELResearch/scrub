@@ -93,7 +93,7 @@ k13wwdf <- k13ww %>%
   rename(admin_0 = country) %>%
   mutate(iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c")) %>%
   rename(long = lon) %>%
-  mutate(study_start_year = NA) %>%
+  mutate(study_start_year = NA) %>% # start and end year do not exist in wwarn k13 - only "year"
   mutate(study_end_year = NA) %>%
   mutate(n = as.integer(tested)) %>%
   mutate(x = as.integer(present)) %>%
@@ -133,7 +133,7 @@ download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journ
 # clean up and create our correct table
 df <- readxl::read_excel(tf) %>% janitor::clean_names()
 df <- df %>% filter(gene_name == "k13") %>% filter(!(grepl("fs", mutation_name))) # remove frame shift
-df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique
+df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique()
 aa_lookup <- setNames(
   variantstring::allowed_amino_acids()$IUPAC_amino_acid_code,
   variantstring::allowed_amino_acids()$three_letter_code
@@ -167,10 +167,10 @@ correct_st <- df %>% filter(!is.na(genotype)) %>%
 
 # left join with the data in k13wwdf (no year as we have found new years for some sites)
 correct_k13st <- k13wwdf %>% filter(pmid=="33146722") %>% 
-  select(-x,-n,-prev, -mut, -year) %>% unique %>% left_join(correct_st, .)
+  select(-x,-n,-prev, -mut, -year) %>% unique() %>% left_join(correct_st, .)
 
 k13wwdf <- bind_rows(k13wwdf %>% filter(pmid!="33146722" | is.na(pmid)), 
-          correct_k13st)
+                     correct_k13st)
 
 # ---------------------------------------------------- o
 ## 2.2 Identify possible issues  ----
@@ -178,16 +178,16 @@ k13wwdf <- bind_rows(k13wwdf %>% filter(pmid!="33146722" | is.na(pmid)),
 
 # assign to uuids 
 assign_ids <- function(x) {
-x %>%
-  group_by(across(c(-x, -n, -prev, -mut))) %>%
-  mutate(uuid = cur_group_id()) %>%
-  ungroup %>% 
-  group_by(across(c(-x, -prev, -mut))) %>%
-  mutate(nid = cur_group_id()) %>%
-  ungroup() %>% 
-  mutate(iid = seq_len(n()))
+  x %>%
+    group_by(across(c(-x, -n, -prev, -mut))) %>%
+    mutate(uuid = cur_group_id()) %>%
+    ungroup %>% 
+    group_by(across(c(-x, -prev, -mut))) %>%
+    mutate(nid = cur_group_id()) %>%
+    ungroup() %>% 
+    mutate(iid = seq_len(n()))
 }
-  
+
 # ---------------------------------------------------- o
 ### 2.2.1 Creating list of possible concerns based on sum(x) != n  ----
 # ---------------------------------------------------- o
@@ -206,25 +206,78 @@ iss1 <- k13wwdf %>%
 nid_concerns <- unique(iss1$nid)
 
 # Firstly, we can ignore any that have pmid 33146722 as we dealt with these before
-nid_concerns <- k13wwdf %>% filter(nid %in% nid_concerns) %>% filter(pmid!="33146722" | is.na(pmid)) %>% pull(nid) %>% unique()
+nid_concerns <- k13wwdf %>% filter(nid %in% nid_concerns) %>% filter(pmid!="33146722" | is.na(pmid)) %>% 
+  pull(nid) %>% unique()
 
 # Great now only 40 nids
 
 # Secondly, if there are only 3 entries, WT and two mutants, and the sum of x for the
 # highest two observations equals n, then there is a mixed infection. 
-# The only way to know if this is a double mutatnt or mixed infection is to look at the paper
+# The only way to know if this is a double mutant or mixed infection is to look at the paper
 
 # Most will likely not have been phased as PCR but to be correct should look into these
-nids_maybe_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid) %>% lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) == unique(n)) %>% filter(g) %>% pull(nid)
+nids_maybe_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid) %>% 
+  lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% 
+  group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) == unique(n)) %>% 
+  filter(g) %>% pull(nid)
 
 # Okay nids based on paper's methods, i.e. they could not have detected double mutant
-# TODO: Still reading through these and pulling out which are fine to leave and which need to have double mutant noted
-nids_okay <- c(26, 227)
-nids_not_okay <- c("192"="R645T_E668K")
+# read through the methodology for these papers and figured out which are mixed mutants and which are explicitly double
+# nids_not_okay includes those with doubles to be fixed
+# more details here: https://docs.google.com/document/d/1SwLdHDbkhi-eLvf9BKe2fWlk0DfDdOG4tNCppdzTNf0/edit?usp=sharing
+nids_okay <- c(26, 227, 
+               # Gina added -- assuming this means that these are definitely mixed
+               939, 
+               1118, 1121) # both studies reported no double k13
 
-# TODO: Handle any that are not okay and update k13wwdf
+nids_not_okay <- c(192, 352, 353, 354, 738, 1189)
+  # c("192"="R645T_E668K",
+  # "352" = "M579T_N657H", # 12 double, 1 with M579T only
+  # "353" = "M579T_N657H", # 16 double, 1 with M579T only - same pmid as above different year,
+  # "354" = "M579T_N657H", # all double mutant - again, same pmid
+  # "738" = "F446I_P574L", # 1 double, 2 single
+  # "1189" = "S477F_T677I") # 1 double mutant
+  
 k13wwdf %>% filter(nid %in% nids_maybe_okay) %>% split(.$nid)
 
+# fix these ones manually
+k13wwdffix <- k13wwdf %>%
+  filter(nid %in% nids_not_okay) %>%
+  split(.$nid)
+
+k13wwdffix$`192` <- k13wwdffix$`192` |> 
+  dplyr::mutate(mut = c("wildtype", "R645T_E668K", "R645T_E668K")) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`352` <- k13wwdffix$`352` |> 
+  dplyr::mutate(mut = c("wildtype", "M579T", "M579T_N657H"),
+                x = c(26, 1, 12)) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`353` <- k13wwdffix$`353` |> 
+  dplyr::mutate(mut = c("wildtype", "M579T", "M579T_N657H"),
+                x = c(28, 1, 16)) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+# all double mutants
+k13wwdffix$`354` <- k13wwdffix$`354` |> 
+  dplyr::mutate(mut = c("wildtype", "M579T_N657H", "M579T_N657H"),
+                x = c(29, 22, 22)) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`738` <- k13wwdffix$`738` |> 
+  dplyr::mutate(mut = c("wildtype", "F446I", "F446I_P574L"),
+                x = c(2, 2, 1)) |># 2 WT, 2 single, 1 double
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`1189` <- k13wwdffix$`1189` |> 
+  dplyr::mutate(mut = c("wildtype", "S477F_T677I", "S477F_T677I")) |>
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+# combine back in with the rest of k13wwdf
+k13wwdffix <- do.call(rbind, k13wwdffix) 
+k13wwdf <- rbind(filter(k13wwdf, (nid %in% nids_not_okay) == FALSE), k13wwdffix) # checked we have same # of nids
+  
 # Last remove these from the list of concerns 
 nid_concerns <- nid_concerns[!(nid_concerns %in% nids_maybe_okay)]
 
@@ -235,13 +288,15 @@ nid_concerns <- nid_concerns[!(nid_concerns %in% nids_maybe_okay)]
 # There are 29 uuids where this fails... FML
 
 # Lets look at the remaning 3 ones
-nids_d_not_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  %>% lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) != unique(n)) %>% filter(g) %>% pull(nid)
+nids_d_not_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  %>% 
+  lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% 
+  summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) != unique(n)) %>% filter(g) %>% pull(nid)
 
 # these actually look like data entry issues
 
 # https://pubmed.ncbi.nlm.nih.gov/31132213/
 new_nid <- rbind(k13wwdf %>% filter(site == "Epe" & pmid == "31132213"),
-      k13wwdf %>% filter(site == "Epe" & pmid == "31132213" & mut == "Q613H"))
+                 k13wwdf %>% filter(site == "Epe" & pmid == "31132213" & mut == "Q613H"))
 new_nid$mut[4] <- "D464N"
 new_nid$x[1] <- 190
 new_nid$x[new_nid$mut == "Q613H"] <- 3
@@ -328,9 +383,9 @@ k13ww_final_res_df <- k13wwdf %>%
   dplyr::mutate(gene_mut = wwarn_format_k13_for_stave(mut)) %>% 
   ungroup() %>% 
   mutate(mut = if_else(mut == "WT", "WT", substring(mut, 2))) %>%
-    select(iso3c, admin_0, admin_1, site, lat, long,
-           year, study_start_year, study_end_year,
-           x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
 
 # TODO: Gina - the above is done (except for all the TODOs) - i.e. with 
 # just these TODOs then k13 is done
@@ -845,7 +900,7 @@ crtww_final_res_df <-
                                x, n, prev, gene, mut, database, pmid, url, source)
     }) %>% do.call(rbind,.)  %>%
     pull(uuid) %>% length()) ==
-  (pdcrt$uuid %>% unique %>% length())
+  (pdcrt$uuid %>% unique()%>% length())
 
 
 # ---------------------------------------------------- o
@@ -1040,7 +1095,7 @@ mdr1ww_final_res_df <- rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrspli
 # and the sanity check
 (rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrsplit5) %>%
     pull(uuid) %>% length()) ==
-  (pdmdr1$newid %>% unique %>% length())
+  (pdmdr1$newid %>% unique() %>% length())
 
 # ---------------------------------------------------- o
 # 6. Sort PFPM23 ----
