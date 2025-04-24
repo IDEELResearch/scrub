@@ -238,8 +238,6 @@ nids_not_okay <- c(192, 352, 353, 354, 738, 1189)
   # "738" = "F446I_P574L", # 1 double, 2 single
   # "1189" = "S477F_T677I") # 1 double mutant
   
-k13wwdf %>% filter(nid %in% nids_maybe_okay) %>% split(.$nid)
-
 # fix these ones manually
 k13wwdffix <- k13wwdf %>%
   filter(nid %in% nids_not_okay) %>%
@@ -312,7 +310,7 @@ nid_concerns <- nid_concerns[which(nid_concerns != 833)]
 # https://malariajournal.biomedcentral.com/articles/10.1186/s12936-018-2625-6/tables/1
 # This study did actually work out whether infections were mixed or double mutations
 # FML - reading through, Thateng had 1 C580Y_Y493H and Khong had 1 C580Y_R539T
-# TODO: need to find and correct these 2 double mutants
+
 # But below is correct correction for this site
 new_nid2 <- rbind(k13wwdf %>% filter(site == "Pathoumphone DH, Pathoumphone, Champasak" & pmid == "30587196"))
 new_nid2$x[new_nid2$mut == "wildtype"] <- 90
@@ -320,9 +318,31 @@ new_nid2$x[new_nid2$mut == "R539T"] <- 33
 new_nid2$x[new_nid2$mut == "C580Y"] <- 219
 new_nid2$prev <- new_nid2$x/new_nid2$n
 
+# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-018-2625-6/tables/1
+# see also additional file 8 with msp1 and msp2
+# tot = 112; C580Y = 16; Y493H = 26; C580Y_R538T = 1 (double not mixed - double and mixed are conflated in table 1)
+new_nid2b <- rbind(k13wwdf %>% filter(site == "Thateng DH, Thateng, Sekong" & pmid == "30587196"))
+new_nid2b$mut[which(new_nid2b$mut == "C580C/Y")] <- "C580Y_Y493H"
+
+new_nid2b <- rbind(k13wwdf %>% filter(site == "Thateng DH, Thateng, Sekong" & pmid == "30587196"))
+# I think this was misextracted as mixed vs double. cross-referenced tab 1 and AF 8
+new_nid2b$mut[which(new_nid2b$mut == "C580C/Y")] <- "C580Y_Y493H"
+new_nid2b$prev <- new_nid2b$x/new_nid2b$n
+
+# "Khong DH, Khong, Champasak"  
+new_nid2c <- rbind(k13wwdf %>% filter(site == "Khong DH, Khong, Champasak" & pmid == "30587196"))
+new_nid2c$x[new_nid2$mut == "wildtype"] <- 20
+# duplicate a row to add a double mutant 
+new_nid2c <- new_nid2c %>%
+  bind_rows(slice(., 2))
+new_nid2c$mut[4] <- "C580Y_R539T"
+new_nid2c$x[4] <- 1
+new_nid2c$prev <- new_nid2c$x/new_nid2c$n
 # update k13wwdf
-k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site == "Pathoumphone DH, Pathoumphone, Champasak" & k13wwdf$pmid == "30587196"),], 
-                     new_nid2)
+k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site %in% c("Pathoumphone DH, Pathoumphone, Champasak",
+                                                        "Thateng DH, Thateng, Sekong",
+                                                        "Khong DH, Khong, Champasak") & k13wwdf$pmid == "30587196"),], 
+                     rbind(new_nid2, new_nid2b, new_nid2c))
 nid_concerns <- nid_concerns[which(nid_concerns != 580)]
 
 # https://pubmed.ncbi.nlm.nih.gov/32795367/
