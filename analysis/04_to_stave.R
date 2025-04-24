@@ -3,7 +3,7 @@
 library(STAVE)
 library(tidyverse)
 
-# read in data from databases (excluding geoff)
+# read in data from databases
 data <- readRDS("analysis/data-derived/final_data.rds")
 
 # make an empty stave object

@@ -60,6 +60,32 @@ wwarn <- wwarn_data %>%
   dplyr::filter(continent == "Africa")
 
 
+# GINA: Simpler way (sort of) from pf7k script for this
+mutation_key_path <- here::here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
+mutation_key <- read.csv(mutation_key_path)
+indices_to_transform <- which(wwarn$gene_mut == "k13:WT")
+
+# GINA: In pf7k the range was "349-726" - the range noted in the original pf7k file
+# Here, for each indices_to_transform, I would find all the other rows for that study
+# extract the k13 loci, do the range of the loci, and then 
+# use collapse_k13_range for that range for each indices
+# something like
+
+# range_for_index <- find_range(indices_to_transform)
+# Note - range_for_index would then look like k13:349:726 or k13:442:*
+# Note - if there is only one locus then convert_k13_asterisk will work on the latter
+# for (i in seq_along(indices_to_transform)) {
+#   if(grepl("\\*", range_for_index[i])) {
+#     wwarn$gene_mut[indices_to_transform[i]] <- gsub("K13", "k13", convert_k13_asterisk(range_for_index[i], mutation_key))
+#   } else {
+#     wwarn$gene_mut[indices_to_transform[i]] <- gsub("K13", "k13", collapse_k13_range(range_for_index[i], mutation_key))
+#   }
+
+# GINA: Everything below likely not needed
+# Easiest way to check is to finish the script similar to the pf7k one so that all the required
+# column names are here. Save the clean file. And then go to script 4 and use readRDS("wwarn_clean.rds)
+# as the data object at the beginning and see if the to_stave script works - likely easiest way to find bugs
+
 # fix the wildtype mutations
 wt_studies <- wwarn %>%
   dplyr::filter(gene_mut == "k13:WT") %>%
