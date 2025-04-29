@@ -127,11 +127,13 @@ k13wwdf <- bind_rows(
 # ---------------------------------------------------- o
 
 # before doing manual cleaning - one study corresponds to many of the issues
-tf <- tempfile()
-download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/jid/223/6/10.1093_infdis_jiaa687/1/jiaa687_suppl_supplementary_table_s3.xlsx?Expires=1748452824&Signature=PjWn-A7qw1OTfQo4hrvOee1909kD~hyO-lT9jA2dQIhZmS8Jmcp8-HjqydW9iI3GuNx3sLPFz2GmT-Hm7i-58NoOSff~g84yASXtA3HcAJOy6maFSWXMNu3PtZibzklibTLZdXFqzh1n0aQCFsrzs8YEN70NE6hQZE9skxgQnrG6ipfqQWGICNkkzdCea-AcoP4Clgcma159BE3Mlac4R1RGtuzbTCYgEk-End4tck-Zk0ApCnjhnLcM7zA4DSLEyJ98rka29DEwKG8raNDj~MXR5yh1i6~6MScgAQpM6JIVB7UM~~euH4Qsc3XJlrR63kuVUUwzk12aLXrcuO6S7A__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA", tf)
-
-# clean up and create our correct table
-df <- readxl::read_excel(tf) %>% janitor::clean_names()
+# fails for Gina so commenting out for now
+# TODO: make sure this is in the PR
+# tf <- tempfile()
+# download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/jid/223/6/10.1093_infdis_jiaa687/1/jiaa687_suppl_supplementary_table_s3.xlsx?Expires=1748452824&Signature=PjWn-A7qw1OTfQo4hrvOee1909kD~hyO-lT9jA2dQIhZmS8Jmcp8-HjqydW9iI3GuNx3sLPFz2GmT-Hm7i-58NoOSff~g84yASXtA3HcAJOy6maFSWXMNu3PtZibzklibTLZdXFqzh1n0aQCFsrzs8YEN70NE6hQZE9skxgQnrG6ipfqQWGICNkkzdCea-AcoP4Clgcma159BE3Mlac4R1RGtuzbTCYgEk-End4tck-Zk0ApCnjhnLcM7zA4DSLEyJ98rka29DEwKG8raNDj~MXR5yh1i6~6MScgAQpM6JIVB7UM~~euH4Qsc3XJlrR63kuVUUwzk12aLXrcuO6S7A__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA", tf)
+# 
+# # clean up and create our correct table
+# df <- readxl::read_excel(tf) %>% janitor::clean_names()
 df <- df %>% filter(gene_name == "k13") %>% filter(!(grepl("fs", mutation_name))) # remove frame shift
 df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique()
 aa_lookup <- setNames(
@@ -231,13 +233,13 @@ nids_okay <- c(26, 227,
                1118, 1121) # both studies reported no double k13
 
 nids_not_okay <- c(192, 352, 353, 354, 738, 1189)
-  # c("192"="R645T_E668K",
-  # "352" = "M579T_N657H", # 12 double, 1 with M579T only
-  # "353" = "M579T_N657H", # 16 double, 1 with M579T only - same pmid as above different year,
-  # "354" = "M579T_N657H", # all double mutant - again, same pmid
-  # "738" = "F446I_P574L", # 1 double, 2 single
-  # "1189" = "S477F_T677I") # 1 double mutant
-  
+# c("192"="R645T_E668K",
+# "352" = "M579T_N657H", # 12 double, 1 with M579T only
+# "353" = "M579T_N657H", # 16 double, 1 with M579T only - same pmid as above different year,
+# "354" = "M579T_N657H", # all double mutant - again, same pmid
+# "738" = "F446I_P574L", # 1 double, 2 single
+# "1189" = "S477F_T677I") # 1 double mutant
+
 # fix these ones manually
 k13wwdffix <- k13wwdf %>%
   filter(nid %in% nids_not_okay) %>%
@@ -275,7 +277,7 @@ k13wwdffix$`1189` <- k13wwdffix$`1189` |>
 # combine back in with the rest of k13wwdf
 k13wwdffix <- do.call(rbind, k13wwdffix) 
 k13wwdf <- rbind(filter(k13wwdf, (nid %in% nids_not_okay) == FALSE), k13wwdffix) # checked we have same # of nids
-  
+
 # Last remove these from the list of concerns 
 nid_concerns <- nid_concerns[!(nid_concerns %in% nids_maybe_okay)]
 
@@ -366,7 +368,6 @@ k13wwdf <- k13wwdf |>
 
 nid_concerns <- nid_concerns[which((nid_concerns %in% nid_removed) == FALSE)]
 
-# TODO: Still to look through all these and work out if the are okay and up date
 k13wwdffix <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)
 
 # prioritise African studies for now
@@ -425,6 +426,9 @@ nid_fixed <- c(186, 188, 891, 1180, 592)
 nid_checked <- c(234, 640, 644,274, 276, 452, 895, 665:668, 737, 79, 493, 319, 320)
 
 nid_concerns <- nid_concerns[intersect(which(!nid_concerns %in% nid_fixed), which(! nid_concerns %in% nid_checked))]
+if(length(nid_concerns) == 0) {
+  print("nid_concerns all resolved in this section")
+}
 
 # bind everything back together
 k13wwdffix <- do.call(rbind, k13wwdffix) 
@@ -444,14 +448,184 @@ iss2 <- k13wwdf %>%
   mutate(xs = sum(x)) %>%
   filter(xs < n) %>%
   arrange(uuid) 
+# TODO: decide what to do about the N-terminal SNPs and stop codons in WWARN
+
+# write a function to add a row
+add_a_row <- function(df, x_new, mut_new) {
+  rows <- nrow(df) 
+  df <- df %>%
+    bind_rows(slice(., 1))
+  df$x[rows+1] <- x_new
+  df$mut[rows+1] <- mut_new
+  df$prev <- df$x/df$n
+  if(sum(df$x) != df$n[1]) {
+    print("x does not sum to n still")
+  }
+  return(df)
+}
 
 # There are 23 nids where this fails... FML
 nid_lconcerns <- unique(iss2$nid)
 
+k13wwdf_lfix <- k13wwdf %>%
+  filter(nid %in% nid_lconcerns) %>%
+  split(.$nid)
+
 # TODO: Go through these and work out what the denominator should actually be
-# nid 250 - typo in wwarn - WT should be more
+# going through each pmid at a time because many from same study
+
 # however https://journals.asm.org/doi/full/10.1128/aac.00802-19?rfr_dat=cr_pub++0pubmed&url_ver=Z39.88-2003&rfr_id=ori%3Arid%3Acrossref.org
-# looking at the paper, they have also missed a number of SNPs as well...
+# nid 250; pmid 31427297 - specific issue with "forest region" in paper
+# 10 mutations plus WT -- 11 rows
+
+k13wwdf_lfix$`250` <- k13wwdf_lfix$`250` %>%
+  bind_rows(slice(., 2:3))
+
+fixed_cols <- data.frame(
+  x = c(199,2,2,2,13,5,2,1,2,1),
+  mut = c("wildtype", "N408S", "L422F",
+          "S466N", "G496G", # removed the stop codon
+          "R515I", "R539I", "C542W",
+          "E606D", "K607E")
+)
+
+k13wwdf_lfix$`250` <- k13wwdf_lfix$`250` %>% 
+  dplyr::mutate(x = fixed_cols$x,
+                mut = fixed_cols$mut,
+                prev = x/n)
+
+# nid 414 pmid 25691626 - typo 
+k13wwdf_lfix$`414` <- k13wwdf_lfix$`414` %>% 
+  dplyr::mutate(x = c(15,1),
+                prev = x/n)
+
+# nid 648 pmid 28249583 - add wildtype
+k13wwdf_lfix$`648` <- k13wwdf_lfix$`648` %>%
+  bind_rows(slice(.,1)) # add a new top row
+k13wwdf_lfix$`648`$x[1] <-  k13wwdf_lfix$`648`$n[1] - sum(k13wwdf_lfix$`648`$x[2:5])
+k13wwdf_lfix$`648`$mut[1] <- "wildtype"
+k13wwdf_lfix$`648`$prev <- k13wwdf_lfix$`648`$x/k13wwdf_lfix$`648`$n
+
+# pmid 29582728 nid 458 and 466
+k13wwdf_lfix$`458` <- add_a_row(k13wwdf_lfix$`458`, 1,
+                                "A676V")
+
+# nid 466 n is wrong, missing mutations and ones extracted are also wrong...
+kisumu_cols <- data.frame(
+  x = c(32,1,1,2,4,1),
+  mut = c("wildtype", "E509G", "V568G",
+          "D584Y", "N585K", "T677R")
+)
+k13wwdf_lfix$`466` <- k13wwdf_lfix$`466` %>%
+  bind_rows(slice(.,5)) %>%
+  dplyr::mutate(x = kisumu_cols$x,
+                mut = kisumu_cols$mut, 
+                n = 41, 
+                prev = x/n)
+
+# nid 705 pmid 25537878 
+# n and tot mutants correct
+# based on the text (plus a typo FML) there is one D516Y mut
+k13wwdf_lfix$`705` <- add_a_row(k13wwdf_lfix$`705`, 1,
+                                "D516Y")
+
+# 743 pmid 31833468 - missing one mutation
+k13wwdf_lfix$`743` <- add_a_row(k13wwdf_lfix$`743`, 1,
+                                "G453D")
+
+# 877 34270452 -- I can't even find this site in study
+# remove this entry
+k13wwdf_lfix$`877` <- NULL
+
+# 1136 34551228 Table S7 https://www.nejm.org/doi/suppl/10.1056/NEJMoa2101746/suppl_file/nejmoa2101746_appendix.pdf
+k13wwdf_lfix$`1136` <- add_a_row(k13wwdf_lfix$`1136`,
+                                 x_new = 1, mut_new = "V661I")
+
+# 682 - pmid 99999999 cannot find. 1 short of equal
+# 683 is missing loads - leave 682 and omit 683
+
+k13wwdf_lfix$`683` <- NULL
+
+# 710 pmid 99999999 - no WT so assume missing val is WT
+k13wwdf_lfix$`710` <- add_a_row(k13wwdf_lfix$`710`, 1,
+                                "wildtype")
+
+# 381 99% WT but cannot find out the missing mutant
+
+# nids resolved so far
+nid_lresolved <- c(250, 414, 648, 466, 458, 705, 743, 
+                   877, 1136, 683, 710) |> as.character()
+
+# add the resolved nids back into WWARN
+k13wwdf_lfixed <- do.call(rbind, k13wwdf_lfix[nid_lresolved])
+
+# pmid 31591113 nid 443 445 446 450  444 442  447 449
+# all data in frequencies
+# for now, ignore N-terminal SNPs 
+# due to the different # sequenced, different ns.
+# TODO: decide how to handle this
+
+# it looks like 957 and all with source 
+# "Suttipat Srisutham, Nguyen Than Thuy-Nhien, Ranitha Vongpromek, Teeradet Khomvarn, Mayfong Mayxay, Olivo Miotto, Francois Nosten, Frank Smithuis, Rob van der Pluijm, Lorenz von Seidlein, Carol H Sibley, Philippe J. Guérin, Nicholas P. J. Day, Arjen Dondorp, Mehul Dhorda, Mallika Imwong"
+# may actually come from Das study: https://link.springer.com/article/10.1186/s12936-022-04095-9
+# this is based on shared authors, study year and location
+# looking at the Das study, almost all of the data is missing... ugh
+# fixing an additional issue 
+# Das study (PMID 35279140) is almost entirely missing (lots of datapoints in Chad)
+# source "Suttipat Srisutham, Nguyen Than Thuy-Nhien, Ranitha Vongpromek, Teeradet Khomvarn, Mayfong Mayxay, Olivo Miotto, Francois Nosten, Frank Smithuis, Rob van der Pluijm, Lorenz von Seidlein, Carol H Sibley, Philippe J. Guérin, Nicholas P. J. Day, Arjen Dondorp, Mehul Dhorda, Mallika Imwong"
+# looks like the same markers but also with missing info
+# removed Srisutham et al. and full extracted Das et al.
+# need to figure out a way to do this that won't break everything...
+
+# https://link.springer.com/article/10.1186/s12936-022-04095-9/tables/2
+fix_das <- data.frame(
+  year = c(rep("2016", 10), rep("2017", 14)),
+  x = c(6, 76, 8, 1, 1, 1, 1, 1, 6, 56,
+        1, 1, 2, 83, 1, 1, 1, 17,1, 1, 1, 5, 1, 76),
+  n = c(rep(157, 10), rep(192, 14)),
+  mut = c("K189N", "K189T", "K189T/K",
+          "K189T_I354V", # haplotypes
+          "K189T_N197D",
+          "L258M", "N197D", "Q633R", 
+          "R255K", "wildtype", # 2016 mutations
+          "A578S", "K189N", "K189N/K", "K189T",
+          "K189T_N197D/N",
+          "K189T_V636A/V",
+          "K189T_W660C",
+          "K189T/K",
+          "K189T/K_N197D/N",
+          "N195D/N",
+          "N195K/N",
+          "R255K", "S213G/S", "wildtype") # 2017 muts
+) |> dplyr::mutate(pmid = "35279140")
+
+
+k13wwdf_das <- k13wwdf |>
+  dplyr::filter(pmid == 35279140) |>
+  dplyr::select(-c(year, x, n, mut)) 
+
+# between studies had nids 
+k13wwdf_das <- rbind(k13wwdf_das,
+                     k13wwdf_das[rep(1, 22),]) |>
+  dplyr::mutate(x = fix_das$x,
+                year = fix_das$year,
+                n = fix_das$n,
+                mut = fix_das$mut) |>
+  dplyr::relocate(names(k13wwdf)) |>
+  dplyr::mutate(x = as.integer(x),
+                n = as.integer(n)) |>
+  dplyr::select(-iid) |> # need to add this back in after its added to rest of df
+  dplyr::mutate(nid = if_else(year == "2016", 952, 953)) |> # 952:959 is original nids
+  dplyr::mutate(pmid = "35279140")
+  
+# add Das back in 
+k13wwdf <- k13wwdf |>
+  dplyr::select(-iid) |>
+  dplyr::filter(pmid != "35279140") |>
+  dplyr::filter(source != "Suttipat Srisutham, Nguyen Than Thuy-Nhien, Ranitha Vongpromek, Teeradet Khomvarn, Mayfong Mayxay, Olivo Miotto, Francois Nosten, Frank Smithuis, Rob van der Pluijm, Lorenz von Seidlein, Carol H Sibley, Philippe J. Guérin, Nicholas P. J. Day, Arjen Dondorp, Mehul Dhorda, Mallika Imwong") |>
+  bind_rows(k13wwdf_das) |>
+  dplyr::mutate(iid = seq_len(n()))
+
 
 # ---------------------------------------------------- o
 ## 2.4 Now format after having assumed we have corrected all possible issues  ----
