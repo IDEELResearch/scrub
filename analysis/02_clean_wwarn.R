@@ -196,4 +196,4 @@ wwarn_edit <- wwarn_edit %>% rowwise() %>%
 wwarn_clean <- wwarn_edit %>% 
   select(all_of(column_names))
 
-saveRDS(wwarn, "analysis/data-derived/wwarn_clean.rds")
+saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")
