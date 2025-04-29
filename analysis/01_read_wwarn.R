@@ -559,7 +559,7 @@ nid_lresolved <- c(250, 414, 648, 466, 458, 705, 743,
 # add the resolved nids back into WWARN
 k13wwdf_lfixed <- do.call(rbind, k13wwdf_lfix[nid_lresolved])
 
-# pmid 31591113 nid 443 445 446 450  444 442  447 449
+# pmid 31591113 nid 442:450
 # all data in frequencies
 # for now, ignore N-terminal SNPs 
 # due to the different # sequenced, different ns.
@@ -626,6 +626,10 @@ k13wwdf <- k13wwdf |>
   bind_rows(k13wwdf_das) |>
   dplyr::mutate(iid = seq_len(n()))
 
+# TODO: still need to resolve pmid 31591113 - data still included but very wrong 
+k13wwdf <- k13wwdf |>
+  dplyr::filter(pmid != "31591113")
+
 
 # ---------------------------------------------------- o
 ## 2.4 Now format after having assumed we have corrected all possible issues  ----
@@ -648,6 +652,9 @@ k13ww_final_res_df <- k13wwdf %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
+
+# TODO: update this so that it also includes the partner drug data
+saveRDS(k13ww_final_res_df, here::here("analysis/data-derived/wwarn_res.rds"))
 
 # TODO: Gina - the above is done (except for all the TODOs) - i.e. with 
 # just these TODOs then k13 is done
