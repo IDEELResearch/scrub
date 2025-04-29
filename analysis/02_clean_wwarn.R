@@ -194,6 +194,8 @@ wwarn_edit <- wwarn_edit %>% rowwise() %>%
 
 # Grab just the columns we need for pairing with WWARN etc
 wwarn_clean <- wwarn_edit %>% 
-  select(all_of(column_names))
+  select(all_of(column_names)) %>%
+# TODO: fix variant string k13:470:X - for now, just exclude them
+  dplyr::filter(variant_string != "k13:470:X")
 
 saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")
