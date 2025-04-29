@@ -59,11 +59,18 @@ wwarn <- wwarn_data %>%
   dplyr::mutate(continent = countrycode::countrycode(iso3c, origin = "iso3c", destination = "continent")) %>%
   dplyr::filter(continent == "Africa")
 
-
 # GINA: Simpler way (sort of) from pf7k script for this
 mutation_key_path <- here::here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
 mutation_key <- read.csv(mutation_key_path)
 indices_to_transform <- which(wwarn$gene_mut == "k13:WT")
+
+# do similar to the code on line 141 0.1_read_pf7k but with wwarn
+# need to work out the collapse range per study
+test <- wwarn |> # group them by "survey" -- think about what that means
+  dplyr::group_by(across(-(c(x, n, prev, mut, gene_mut))))
+
+
+wwarn$variant_string[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726", mutation_key))
 
 # GINA: In pf7k the range was "349-726" - the range noted in the original pf7k file
 # Here, for each indices_to_transform, I would find all the other rows for that study
