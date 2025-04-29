@@ -63,6 +63,34 @@ wwarn_format_k13_for_stave <- function(marker) {
     return(res)
   }
   
+  # Case 6: Mixed phased/unphased (_ and / both present)
+  if (grepl("\\_", marker) && grepl("\\/", marker)) {
+    spl <- toupper(strsplit(marker, "\\_")[[1]])  # split by '_'
+    
+    all_loci <- c()
+    all_snps <- c()
+    
+    for (s in spl) {
+      # If there is a "/", handle it accordingly
+      if (grepl("\\/", s)) {
+        # Extract base locus, e.g., from "N197D/N" → 197
+        loc <- gsub("(^\\w)(\\d+)(\\w)(\\/\\w)?", "\\2", s)
+        snp <- gsub("(^\\w)(\\d+)(\\w\\/\\w)", "\\3", s)
+      } else {
+        loc <- gsub("(^\\w)(\\d+)(\\w)", "\\2", s)
+        snp <- gsub("(^\\w)(\\d+)(\\w)", "\\3", s)
+      }
+      all_loci <- c(all_loci, loc)
+      all_snps <- c(all_snps, snp)
+    }
+    
+    res <- paste0("k13:",
+                  paste0(sort(as.numeric(all_loci)), collapse = "_"),
+                  ":",
+                  paste0(all_snps[order(as.numeric(all_loci))], collapse = "_"))
+    return(res)
+  }
+  
   stop("Unexpected mutation")
   
 }
