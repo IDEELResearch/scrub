@@ -53,6 +53,10 @@ who_edit <- who_edit %>% rowwise() %>%
   mutate(collection_day = median(c(collection_start, collection_end))) %>% 
   ungroup()
 
+# and assign a url to those that are national entity publications without URL 
+who_edit <- who_edit %>% 
+  mutate(url = replace(url, is.na(url) & grepl("^who", study_ID), "WHO MTM"))
+
 # Grab just the columns we need for pairing with WWARN etc
 who_clean <- who_edit %>% 
   select(all_of(column_names))
