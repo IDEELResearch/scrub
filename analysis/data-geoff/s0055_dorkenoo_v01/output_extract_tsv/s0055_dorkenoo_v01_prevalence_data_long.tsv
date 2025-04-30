@@ -1,0 +1,17 @@
+site_uid	substudy	date_start	date_end	gene_mutation	mutant_num	total_num
+Anie	Day0extracted	2021-09-14	2022-01-29	k13:557:S	0	165
+Anie	Day0extracted	2021-09-14	2022-01-29	k13:578:S	0	165
+Anie	Day0extracted	2021-09-14	2022-01-29	crt:72_73_74_75_76:CVIET	0	165
+Anie	Day0calculated	2021-09-14	2022-01-29	crt:76:T	0	165
+Anie	Day0extracted	2021-09-14	2022-01-29	mdr1:86_184_1246:NFD	121	165
+Anie	Day0extracted	2021-09-14	2022-01-29	mdr1:86_184_1246:YFD	1	165
+Anie	Day0calculated	2021-09-14	2022-01-29	mdr1:86:Y	1	165
+Anie	Day0calculated	2021-09-14	2022-01-29	mdr1:184:F	122	165
+Kouve	Day0extracted	2021-09-14	2022-01-29	k13:557:S	1	192
+Kouve	Day0extracted	2021-09-14	2022-01-29	k13:578:S	2	192
+Kouve	Day0extracted	2021-09-14	2022-01-29	crt:72_73_74_75_76:CVIET	6	192
+Kouve	Day0calculated	2021-09-14	2022-01-29	crt:76:T	6	192
+Kouve	Day0extracted	2021-09-14	2022-01-29	mdr1:86_184_1246:NFD	149	192
+Kouve	Day0extracted	2021-09-14	2022-01-29	mdr1:86_184_1246:YFD	0	192
+Kouve	Day0calculated	2021-09-14	2022-01-29	mdr1:86:Y	0	192
+Kouve	Day0calculated	2021-09-14	2022-01-29	mdr1:184:F	149	192
