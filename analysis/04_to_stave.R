@@ -4,7 +4,8 @@ library(STAVE)
 library(tidyverse)
 
 # read in data from databases
-data <- readRDS("analysis/data-derived/final_data.rds")
+data <- readRDS("analysis/data-derived/wwarn_clean.rds")
+#data <- readRDS("analysis/data-derived/final_data.rds")
 
 # make an empty stave object
 stave <- STAVE::STAVE_object$new()
@@ -119,6 +120,24 @@ counts_df <- rbind(
 
 # Convert to STAVE and save-------------------
 
+## NEED TO DELETE BUT CURRENT SOLUTION SINCE STAVE WANTS THE SURVEY_ID COLUMN TO CONTAIN VALID CHARACTERS
+data_stave2 <- data_stave
+
+data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
+  mutate(
+    survey_id = survey_id %>%
+      str_replace_all("[^A-Za-z0-9_]", "_") %>%
+      str_replace_all("^[_0-9]+", "X"),
+    collection_start = ymd(collection_start),
+    collection_end   = ymd(collection_end)
+  )
+
+stave$append_data(
+  studies_dataframe = head(data_stave$studies_dataframe, 5),
+  surveys_dataframe = head(data_stave$surveys_dataframe, 5),
+  counts_dataframe = head(counts_df, 5)
+)
+
 # Convert into a STAVE object
 stave$append_data(studies_dataframe = data_stave$studies_dataframe,
                   surveys_dataframe = data_stave$surveys_dataframe,
@@ -126,4 +145,4 @@ stave$append_data(studies_dataframe = data_stave$studies_dataframe,
 
 # Save the output in data-out ready for downstream analysis
 dir.create("analysis/data-out", showWarnings = FALSE)
-saveRDS(stave, "analysis/data-out/stave_data.rds")
+saveRDS(stave, "analysis/data-out/stave_wwarn_data.rds")
