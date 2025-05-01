@@ -76,7 +76,7 @@ wwarn_with_codons <- wwarn %>%
 group_cols <- setdiff(names(wwarn), c("x", "n", "prev", "mut", "gene_mut"))
 
 # Step 3: Get codon range per survey
-codon_ranges <- df_with_codons %>%
+codon_ranges <- wwarn_with_codons %>%
   distinct(across(all_of(group_cols)), codon) %>%
   group_by(across(all_of(group_cols))) %>%
   summarise(
@@ -197,5 +197,9 @@ wwarn_clean <- wwarn_edit %>%
   select(all_of(column_names)) %>%
 # TODO: fix variant string k13:470:X - for now, just exclude them
   dplyr::filter(variant_string != "k13:470:X")
+
+# Last extra cleans to align with STAVE
+wwarn_clean$survey_ID <- gsub("'", "", wwarn_clean$survey_ID)
+
 
 saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")

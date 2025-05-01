@@ -42,14 +42,17 @@ africa_iso3 <- c(
 )
 
 ### TO-DO CECILE: DELETE IF clean_pf7k, clean_who will only be Africa countries in the future
-clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
-clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
+## OJ 010525: I have commented - filtering to Africa only would be an outside scrub task
+# clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
+# clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
+# clean_wwarn <- clean_who %>% filter(iso3c %in% africa_iso3)
+# clean_geoff <- clean_geoff %>% filter(iso3c %in% africa_iso3)
 
 # make our full bind across
 column_names <- get_column_names_for_clean()
 full_bind <- rbind(
   clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
-  # clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
   clean_pf7k %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
   clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
@@ -72,4 +75,13 @@ dim(summary_same_study)
 dim(summary_diff_study)
 
 # save ready to go to stave
+# OJ 010525: 
+# ---------------
+# I am still just using full_bind (original data) as the deduplicate is adding samples
+# > dim(full_bind)
+# [1] 115818     27
+# > dim(dedup_df)
+# [1] 115822     28
+# This is true if we filter to Africa or not
+# # ---------------
 saveRDS(full_bind, here("analysis/data-derived/final_data.rds"))
