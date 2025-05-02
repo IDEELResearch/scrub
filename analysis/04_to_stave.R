@@ -133,9 +133,9 @@ data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
   )
 
 stave$append_data(
-  studies_dataframe = head(data_stave$studies_dataframe, 5),
-  surveys_dataframe = head(data_stave$surveys_dataframe, 5),
-  counts_dataframe = head(counts_df, 5)
+  studies_dataframe = data_stave$studies_dataframe,
+  surveys_dataframe = data_stave$surveys_dataframe,
+  counts_dataframe = counts_df
 )
 
 # Convert into a STAVE object

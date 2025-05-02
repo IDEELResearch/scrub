@@ -43,37 +43,37 @@ deduplicate <- function(df) {
   # Keep groups where more than one unique study_ID reports the same data
   
   # ---- Subgroup A: Duplicates among WHO and Pf7k ----
-  df_who_pf7k <- df %>% filter(database %in% c("WHO", "Pf7k"))
+  df_who_pf7k_wwarn <- df %>% filter(database %in% c("WHO", "Pf7k", "WWARN"))
   
   # Find duplicates by collection_year_start
-  dup_who_pf7k_start <- df_who_pf7k %>%
+  dup_who_pf7k_start <- df_who_pf7k_wwarn %>%
     group_by(variant_string, prev, total_num, variant_num, collection_year_start) %>%
     filter(n_distinct(study_ID) > 1) %>%
     group_split()
   
   # Find duplicates by collection_year_end
-  dup_who_pf7k_end <- df_who_pf7k %>%
+  dup_who_pf7k_end <- df_who_pf7k_wwarn %>%
     group_by(variant_string, prev, total_num, variant_num, collection_year_end) %>%
     filter(n_distinct(study_ID) > 1) %>%
     group_split()
   
-  # ---- Subgroup B: Duplicates between GEOFF and WHO/Pf7k ----
+  # ---- Subgroup B: Duplicates between GEOFF and WHO/Pf7k/WWARN ----
   df_geoff <- df %>% filter(database == "GEOFF")
   
-  # Find GEOFF/WHO-Pf7k duplicates by collection_year_start
+  # Find GEOFF and WHO, WWARN or Pf7k duplicates by collection_year_start
   geoff_matches_start <- df_geoff %>%
-    semi_join(df_who_pf7k, by = c("iso3c", "gene", "collection_year_start"))
-  who_pf7k_matches_start <- df_who_pf7k %>%
+    semi_join(df_who_pf7k_wwarn, by = c("iso3c", "gene", "collection_year_start"))
+  who_pf7k_matches_start <- df_who_pf7k_wwarn %>%
     semi_join(df_geoff, by = c("iso3c", "gene", "collection_year_start"))
   dup_geoff_who_pf7k_start <- bind_rows(geoff_matches_start, who_pf7k_matches_start) %>%
     group_by(iso3c, gene, collection_year_start) %>%
     filter(n() > 1) %>%
     group_split()
   
-  # Find GEOFF/WHO-Pf7k duplicates by collection_year_end
+  # Find GEOFF and WHO, WWARN or Pf7k duplicates by collection_year_end
   geoff_matches_end <- df_geoff %>%
-    semi_join(df_who_pf7k, by = c("iso3c", "gene", "collection_year_end"))
-  who_pf7k_matches_end <- df_who_pf7k %>%
+    semi_join(df_who_pf7k_wwarn, by = c("iso3c", "gene", "collection_year_end"))
+  who_pf7k_matches_end <- df_who_pf7k_wwarn %>%
     semi_join(df_geoff, by = c("iso3c", "gene", "collection_year_end"))
   dup_geoff_who_pf7k_end <- bind_rows(geoff_matches_end, who_pf7k_matches_end) %>%
     group_by(iso3c, gene, collection_year_end) %>%
@@ -94,8 +94,8 @@ deduplicate <- function(df) {
     group_split()
   
   # ---- Generate signatures for each group ----
-  sigs_who_pf7k_start <- map_chr(dup_who_pf7k_start, group_signature_who_pf7k)
-  sigs_who_pf7k_end  <- map_chr(dup_who_pf7k_end, group_signature_who_pf7k)
+  sigs_who_pf7k_wwarn_start <- map_chr(dup_who_pf7k_start, group_signature_who_pf7k)
+  sigs_who_pf7k_wwarn_end  <- map_chr(dup_who_pf7k_end, group_signature_who_pf7k)
   sigs_geoff_who_pf7k_start <- map_chr(dup_geoff_who_pf7k_start, group_signature_geoff_who_pf7k)
   sigs_geoff_who_pf7k_end <- map_chr(dup_geoff_who_pf7k_end, group_signature_geoff_who_pf7k)
   sigs_geoff_start <- map_chr(dup_geoff_start, group_signature_geoff)
@@ -103,7 +103,7 @@ deduplicate <- function(df) {
   
   # ---- Combine all groups and remove duplicates based on signature ----
   all_groups_diff_study <- c(dup_who_pf7k_start, dup_who_pf7k_end, dup_geoff_who_pf7k_start, dup_geoff_who_pf7k_end, dup_geoff_start, dup_geoff_end)
-  all_sigs_diff_study <- c(sigs_who_pf7k_start, sigs_who_pf7k_end, sigs_geoff_who_pf7k_start, sigs_geoff_who_pf7k_end, sigs_geoff_start, sigs_geoff_end)
+  all_sigs_diff_study <- c(sigs_who_pf7k_wwarn_start, sigs_who_pf7k_wwarn_end, sigs_geoff_who_pf7k_start, sigs_geoff_who_pf7k_end, sigs_geoff_start, sigs_geoff_end)
   
   # Keep only unique groups
   diff_data_diff_study_list <- all_groups_diff_study[!duplicated(all_sigs_diff_study)]
@@ -167,6 +167,60 @@ deduplicate <- function(df) {
   return(list(df = deduplicate_df_with_tags, 
               list_same = duplicate_same_study_50km_list, 
               list_diff = duplicate_diff_study_50km_list))
+}
+
+#' Deduplicate Studies by PMID with Conflicting Study Identifiers
+#'
+#' Identifies groups of records that share the same PubMed ID (`pmid`) but have different 
+#' `study_ID`s, and applies a deduplication strategy to tag each row as `"keep"` or `"remove"`. 
+#' The deduplication logic is defined in the helper function `add_tags_diff_studyID()`, 
+#' which applies a set of prioritized rules based on the `database` source.
+#'
+#' @param df A data frame containing at minimum the following columns:
+#'   - `pmid`: PubMed identifier
+#'   - `study_ID`: Study identifier
+#'   - `database`: Data source (e.g., WHO, GEOFF, Pf7k, WWARN)
+#'   - Any additional fields required by `add_tags_diff_studyID()` (e.g., `publication_year`)
+#'
+#' @return A list of data frames, each corresponding to a set of records with the same 
+#' `pmid` but different `study_ID`s. Each data frame includes a `keep_row` column 
+#' indicating which rows to retain (`"keep"`) or discard (`"remove"`).
+#'
+#' @export
+deduplicate_pmid <- function(df){
+  # Identify groups with duplicate pmids but differing study_IDs
+  duplicate_pmid_list <- df %>%
+    filter(!is.na(pmid)) %>%
+    group_by(pmid) %>%
+    filter(n_distinct(study_ID) > 1) %>%
+    group_split()
+  
+  # Apply tagging logic to each group
+  tagged_deduplicate_pmid_list <- lapply(duplicate_pmid_list, add_tags_diff_studyID)
+  
+  # Remove the duplicates with Pf7k since they all have the same pmid
+  deduplicate_pmid_list_filtered <- tagged_deduplicate_pmid_list[
+    !sapply(tagged_deduplicate_pmid_list, function(df) all(df$database == "Pf7k"))]
+  
+  # Combine tagged duplicates into a single dataframe
+  tagged_duplicates_df <- dplyr::bind_rows(deduplicate_pmid_list_filtered)
+  
+  # Ensure numeric comparison compatibility for coordinates
+  df <- df %>% dplyr::mutate(lat = as.numeric(lat), lon = as.numeric(lon))
+  tagged_duplicates_df <- tagged_duplicates_df %>% dplyr::mutate(lat = as.numeric(lat), lon = as.numeric(lon))
+  
+  # Identify all rows not involved in deduplication
+  non_duplicate_rows <- df %>%
+    dplyr::anti_join(tagged_duplicates_df, by = colnames(df)) %>%
+    dplyr::mutate(keep_row = NA)
+  
+  # Combine tagged duplicates and untouched rows into one complete dataframe
+  deduplicate_df_with_tags <- bind_rows(tagged_duplicates_df, non_duplicate_rows)
+  
+  return(list(
+    tagged_list = deduplicate_pmid_list_filtered,
+    deduplicated_df = deduplicate_df_with_tags
+  ))
 }
 
 #' Generate a Group Signature for WHO/Pf7k Data
@@ -320,20 +374,28 @@ group_signature_same_study <- function(df){
 #'
 #' @export
 add_tags_diff_studyID <- function(df) {
-  # Case 1: All records are from WHO or Pf7k
-  if (all(df$database %in% c("WHO", "Pf7k"))) {
-    # Identify first study_ID
-    first_study_id <- df %>%
-      dplyr::arrange(study_ID) %>%
-      dplyr::slice(1) %>%
-      dplyr::pull(study_ID)
-    # Keep the first study_ID (alphabetically) and remove the others
-    df <- df %>%
-      dplyr::mutate(keep_row = case_when(
-        study_ID == first_study_id ~ "keep",
-        TRUE ~ "remove"))
+  # Case 1: Mixture of GEOFF and WHO, WWARN or Pf7k
+  if (any(df$database == "GEOFF") & any(df$database %in% c("WHO", "WWARN", "Pf7k"))) {
+    df <- df %>% mutate(keep_row = if_else(database == "GEOFF", "keep", "remove"))
   } 
-  # Case 2: All records are from GEOFF
+  # Case 2: Pf7k, WWARN and WHO only, keep Pf7k as priority
+  else if (all(df$database %in% c("WHO", "Pf7k", "WWARN"))) {
+    df <- df %>%
+      mutate(keep_row = if_else(database == "Pf7k", "keep", "remove"))
+  } 
+  # Case 3: WWARN and WHO only, keep WWARN as priority
+  else if (all(df$database %in% c("WHO", "WWARN"))) {
+    df <- df %>%
+      mutate(keep_row = if_else(database == "WWARN", "keep", "remove"))
+  }
+  # Case 4: All WHO, pick one random study_ID to keep
+  else if (all(df$database == "WHO")) {
+    set.seed(42)  # for reproducibility
+    one_study <- sample(unique(df$study_ID), 1)
+    df <- df %>%
+      mutate(keep_row = if_else(study_ID == one_study, "keep", "remove"))
+  } 
+  # Case 5: All records are from GEOFF, pick study_ID with S01 over S00, or keep most recent publication
   else if (all(df$database == "GEOFF")) {
     df <- df %>%
       dplyr::mutate(keep_row = case_when(
@@ -353,19 +415,9 @@ add_tags_diff_studyID <- function(df) {
         TRUE ~ NA_character_
       ))
   }
-  # Case 3: Mixture of GEOFF and WHO or Pf7k
-  else if (any(df$database == "GEOFF") & any(df$database %in% c("WHO", "Pf7k"))) {
-    # Prefer GEOFF data over WHO/Pf7k
-    df$keep_row <- ifelse(df$database == "GEOFF", "keep", "remove")
-  } 
-  # Case 4: Pf7k and WHO only (again), use Pf7k as priority
-  else if (any(df$database %in% c("Pf7k", "WHO"))) {
-    df <- df %>%
-      dplyr::mutate(keep_row = case_when(
-        database == "Pf7k" ~ "keep",
-        database == "WHO" ~ "remove",
-        TRUE ~ NA_character_  # For any other unexpected entries
-      ))
+  # Case 6: Fallback assigned NA
+  else {
+    df <- df %>% mutate(keep_row = "remove")
   }
   return(df)
 }

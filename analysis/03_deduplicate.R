@@ -37,23 +37,33 @@ africa_iso3 <- c(
   "UGA", "TZA", "ZMB", "ZWE", "ESH"
 )
 
-### TO-DO CECILE: DELETE IF clean_pf7k, clean_who will only be Africa countries in the future
-clean_pf7k <- clean_pf7k %>% filter(iso3c %in% africa_iso3)
-clean_who <- clean_who %>% filter(iso3c %in% africa_iso3)
-
 # Combine all cleaned df into on dataframe
 column_names <- get_column_names_for_clean()
 full_bind <- rbind(
-  clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
-  # clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-  clean_pf7k %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-  clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
+  clean_geoff %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
+  clean_wwarn %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_pf7k %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_who %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
 # Obtain collection year for deduplication
 full_bind$collection_year_start <- lubridate::year(full_bind$collection_start)
 full_bind$collection_year_end <- lubridate::year(full_bind$collection_end)
 
+# ---- Remove duplicates based on pmid ----
+duplicate_pmid <- deduplicate_pmid(full_bind)
+duplicate_pmid_list <- duplicate_pmid$tagged_list
+duplicate_pmid_df <- duplicate_pmid$deduplicated_df
+
+deduplicate_pmid_df <- duplicate_pmid_df %>% filter(keep_row == "keep")
+deduplicate_pmid_df_remove <- duplicate_pmid_df %>% 
+  filter(keep_row == "remove") %>%
+  select(!keep_row)
+
+df_filtered_remove <- full_bind %>%
+  anti_join(deduplicate_pmid_df_remove, by = colnames(full_bind))
+
+# ---- Remove duplicates based on data ----
 # Identify studies that may be duplicates
 dedup_output = deduplicate(full_bind)
 # Final dataframe with added column indicating if a row should be keeped or removed
