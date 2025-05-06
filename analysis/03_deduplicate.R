@@ -39,11 +39,18 @@ africa_iso3 <- c(
 
 # Combine all cleaned df into on dataframe
 column_names <- get_column_names_for_clean()
+# full_bind <- rbind(
+#   clean_geoff %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
+#   clean_wwarn %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+#   clean_pf7k %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+#   clean_who %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
+# )
+
 full_bind <- rbind(
-  clean_geoff %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
-  clean_wwarn %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-  clean_pf7k %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-  clean_who %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
+  clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
+  clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_pf7k %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_who %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
 )
 
 # Obtain collection year for deduplication
@@ -55,29 +62,86 @@ duplicate_pmid <- deduplicate_pmid(full_bind)
 duplicate_pmid_list <- duplicate_pmid$tagged_list
 duplicate_pmid_df <- duplicate_pmid$deduplicated_df
 
-deduplicate_pmid_df <- duplicate_pmid_df %>% filter(keep_row == "keep")
-deduplicate_pmid_df_remove <- duplicate_pmid_df %>% 
-  filter(keep_row == "remove") %>%
-  select(!keep_row)
+# Remove data points that have duplicate IDs
+filtered_pmid_df <- duplicate_pmid_df %>%
+  filter(is.na(keep_row) | keep_row == "keep")
 
-df_filtered_remove <- full_bind %>%
-  anti_join(deduplicate_pmid_df_remove, by = colnames(full_bind))
+# Identify data points that should be removed
+removed_pmid_df <- duplicate_pmid_df %>%
+  filter(keep_row == "remove")
 
 # ---- Remove duplicates based on data ----
 # Identify studies that may be duplicates
-dedup_output = deduplicate(full_bind)
+dedup_output = deduplicate(filtered_pmid_df)
 # Final dataframe with added column indicating if a row should be keeped or removed
 dedup_df = dedup_output$df 
 # Dataframe showing duplicates within the same study_ID
-list_same_study = dedup_output$list_same
+duplicate_same_list = dedup_output$list_same
 # Dataframe showing duplicates across studies
-list_diff_study = dedup_output$list_diff
+duplicate_diff_list = dedup_output$list_diff
 
-length(list_same_study)
-length(list_diff_study)
-
-dim(full_bind)
-dim(dedup_df)
+# Combine the tagged duplictaed rows with the duplictate pmid rows
+dedup_df_overall <- rbind(dedup_output$df, removed_pmid_df)
 
 # save ready to go to stave
-saveRDS(dedup_df, here("analysis/data-derived/final_data.rds"))
+saveRDS(dedup_df_overall, here("analysis/data-derived/final_data.rds"))
+
+##### SUMMARY STATS
+create_summary <- function(duplicate_list) {
+  # Step 1: Tag each list item with its database_signature
+  database_signatures <- sapply(duplicate_list, function(df) {
+    paste(sort(unique(df$database)), collapse = "|")
+  })
+  
+  # Step 2: Get all unique combinations
+  unique_combinations <- unique(database_signatures)
+  
+  # Step 3: For each combination, bind relevant list entries and count unique values
+  combo_summary <- do.call(rbind, lapply(unique_combinations, function(combination) {
+    # Get indices of list entries with this combination
+    matching_indices <- which(database_signatures == combination)
+    
+    # Bind rows from all matching entries
+    combined_df <- bind_rows(duplicate_list[matching_indices])
+    
+    # Keep only rows marked as "keep"
+    kept_df <- combined_df %>% filter(keep_row == "keep")
+    remove_df <- combined_df %>% filter(keep_row == "remove")
+    
+    # Count unique studies and surveys
+    data.frame(
+      database_signature = combination,
+      total_unique_studies = n_distinct(combined_df$study_ID),
+      total_keep_studies = n_distinct(kept_df$study_ID),
+      total_remove_studies = n_distinct(remove_df$study_ID),
+      total_unique_surveys = n_distinct(combined_df$survey_ID),
+      total_keep_surveys = n_distinct(kept_df$survey_ID),
+      total_remove_surveys = n_distinct(remove_df$survey_ID),
+      total_rows = nrow(combined_df),
+      total_kept_rows = nrow(kept_df),
+      total_remove_rows = nrow(remove_df), 
+      n_list_entries = length(matching_indices),
+      stringsAsFactors = FALSE
+    )
+  }))
+  
+  # Optional: arrange
+  combo_summary <- combo_summary %>%
+    arrange(desc(total_unique_studies))
+  
+  return(combo_summary)
+}
+
+# PubMed ID
+pmid_summary_df <- create_summary(duplicate_pmid_list)
+
+# Different Studies
+diff_study_summary_df <- create_summary(duplicate_diff_list)
+
+# Same studies
+same_study_summary_df <- create_summary(duplicate_same_list)
+
+geoff_entries <- duplicate_pmid_list[
+  sapply(duplicate_pmid_list, function(df) any(df$database == "GEOFF"))
+]
+
