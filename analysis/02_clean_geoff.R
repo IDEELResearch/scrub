@@ -324,6 +324,37 @@ summary_stats <- tibble(
 
 print(summary_stats)
 
+# Find study uids missing in the cleaned data using a list of expected study uids (as of may 19, 2025) from the geoff data and covidence data overview google sheets
+all_expected_sample_uids <- read.table(
+  here("analysis", "data-raw", "entered_geoff_study_ids.txt"),
+  stringsAsFactors = FALSE
+)[[1]]
+
+# Step 2: Capitalize first letter of each underscore-separated part
+capitalize_underscore_parts <- function(x) {
+  parts <- strsplit(x, "_")[[1]]
+  parts_cap <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
+  paste0(parts_cap, collapse = "")  # no underscore on re-join
+}
+
+# Step 3: Apply the function and also remove any spaces
+all_expected_sample_uids_cleaned <- all_expected_sample_uids %>%
+  lapply(capitalize_underscore_parts) %>%
+  unlist() %>%
+  gsub(" ", "", .)  # remove any accidental spaces
+
+# Ensure character vector for comparison
+all_expected_sample_uids_cleaned <- as.character(all_expected_sample_uids_cleaned)
+
+# Find unique study_IDs in master_table_formatted that are NOT in the expected list
+unexpected_study_ids <- master_table_simplified %>%
+  distinct(study_ID) %>%
+  filter(!study_ID %in% all_expected_sample_uids_cleaned)
+
+# Display study_IDs found in master_table_formatted that are NOT in the expected list
+cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
+print(unexpected_study_ids)
+
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
 saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
