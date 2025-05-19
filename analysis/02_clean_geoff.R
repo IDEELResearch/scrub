@@ -301,6 +301,29 @@ low_prev_studies <- master_table_formatted %>%
 
 print(low_prev_studies)
 
+# Check that reference allele imputation worked
+
+# Count unique survey_IDs with valid k13_min and k13_max
+surveys_with_k13_range <- master_table_formatted %>%
+  filter(k13_min != "", k13_max != "", !is.na(k13_min), !is.na(k13_max)) %>%
+  distinct(survey_ID)
+
+n_surveys_with_k13_range <- nrow(surveys_with_k13_range)
+
+# Count unique survey_IDs containing 527 arbitrarily (assuming many 527 records are imputed and not hand entered as its not common in africa)
+surveys_with_527P <- master_table_formatted %>%
+  filter(variant_string == "k13:527:P") %>%
+  distinct(survey_ID)
+
+n_surveys_with_527P <- nrow(surveys_with_527P)
+
+summary_stats <- tibble(
+  surveys_with_k13_range = n_surveys_with_k13_range,
+  surveys_with_k13_527P = n_surveys_with_527P
+)
+
+print(summary_stats)
+
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
 saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
