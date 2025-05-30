@@ -42,7 +42,7 @@ deduplicate <- function(df) {
   # Group by administrative region, mutation, and collection timeframe
   # Keep groups where more than one unique study_ID reports the same data
   
-  # ---- Subgroup A: Duplicates among WHO and Pf7k ----
+  # ---- Subgroup A: Duplicates among WHO, WWARN and Pf7k ----
   df_who_pf7k_wwarn <- df %>% dplyr::filter(database %in% c("WHO", "Pf7k", "WWARN"))
   
   # Find duplicates by variant_string, prev, total_num, variant_num, collection_year_start, collection_year_end
