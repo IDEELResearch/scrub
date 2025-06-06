@@ -329,38 +329,6 @@ if (nrow(duplicates) > 0) {
                             by = c("survey_ID", "variant_string"))
 }
 
-# Find study uids missing in the cleaned data using a list of expected study uids (as of may 19, 2025) from the geoff data and covidence data overview google sheetsAdd commentMore actions
-all_expected_sample_uids <- read.table(
-  here("analysis", "data-raw", "entered_geoff_study_ids.txt"),
-  stringsAsFactors = FALSE
-)[[1]]
-
-# Step 2: Capitalize first letter of each underscore-separated part
-capitalize_underscore_parts <- function(x) {
-  parts <- strsplit(x, "_")[[1]]
-  parts_cap <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
-  paste0(parts_cap, collapse = "")  # no underscore on re-join
-}
-
-# Step 3: Apply the function and also remove any spaces
-all_expected_sample_uids_cleaned <- all_expected_sample_uids %>%
-  lapply(capitalize_underscore_parts) %>%
-  unlist() %>%
-  gsub(" ", "", .)  # remove any accidental spaces
-
-# Ensure character vector for comparison
-all_expected_sample_uids_cleaned <- as.character(all_expected_sample_uids_cleaned)
-
-# Find unique study_IDs in master_table_formatted that are NOT in the expected list
-unexpected_study_ids <- master_table_simplified %>%
-  distinct(study_ID) %>%
-  filter(!study_ID %in% all_expected_sample_uids_cleaned)
-
-# Display study_IDs found in master_table_formatted that are NOT in the expected list
-cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
-print(unexpected_study_ids)Add commentMore actions
-
-
 # Append imputed records to master_table_formatted
 master_table_formatted <- bind_rows(master_table_formatted, imputed_data)
 
@@ -457,11 +425,47 @@ master_table_formatted$variant_string[master_table_formatted$variant_string == "
 #https://malariajournal.biomedcentral.com/articles/10.1186/s12936-017-1777-0/tables/2
 master_table_formatted$variant_string[master_table_formatted$variant_string == "crt:76:TK"] <- "crt:76:T/K"
 
-# 9. Step 9 - Save Formatted Data ---------
+# 9. Step 9 - subset cols needed downstream ---------
 
 # Grab just the columns we need for pairing with WWARN etc
 master_table_simplified <- master_table_formatted %>% 
   select(all_of(column_names))
+
+# 10. Step 10 - Report studies which did not make it through cleaning or validation ---------
+
+# Find study uids missing in the cleaned data using a list of expected study uids (as of may 19, 2025) from the geoff data and covidence data overview google sheetsAdd commentMore actions
+all_expected_sample_uids <- read.table(
+  here("analysis", "data-raw", "entered_geoff_study_ids.txt"),
+  stringsAsFactors = FALSE
+)[[1]]
+
+# Capitalize first letter of each underscore-separated part
+capitalize_underscore_parts <- function(x) {
+  parts <- strsplit(x, "_")[[1]]
+  parts_cap <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
+  paste0(parts_cap, collapse = "")  # no underscore on re-join
+}
+
+# Apply the function and also remove any spaces
+all_expected_sample_uids_cleaned <- all_expected_sample_uids %>%
+  lapply(capitalize_underscore_parts) %>%
+  unlist(use.names = FALSE) %>%       # drop names that might mess things up
+  gsub(" ", "", .) %>%
+  (\(x) paste0("geoff_", x))()        # explicitly prepend "geoff_
+
+# Ensure character vector for comparison
+all_expected_sample_uids_cleaned <- as.character(all_expected_sample_uids_cleaned)
+
+# Find unique study_IDs in master_table_formatted that are NOT in the expected list
+unexpected_study_ids <- master_table_simplified %>%
+  distinct(study_ID) %>%
+  filter(!study_ID %in% all_expected_sample_uids_cleaned)
+
+# Display study_IDs found in master_table_formatted that are NOT in the expected list
+cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
+print(unexpected_study_ids) #Add commentMore actions
+
+# 11. Step 11 - Save Formatted Data ---------
 
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
