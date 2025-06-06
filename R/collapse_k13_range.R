@@ -38,3 +38,33 @@ collapse_k13_range <- function(gene_mutation, mutation_key) {
   
   return(collapsed_mutation)
 }
+
+#' Convert K13 Asterisk Mutation
+#'
+#' This function converts a single-codon mutation string in the format `"k13:codon:*"` 
+#' into a standardized format by looking up the reference amino acid from a provided mutation key dataframe.
+#' If the specified codon position does not exist in the mutation key, it will return `"K13:codon:NA"`.
+#'
+#' @param gene_mutation A string representing the mutation in the format `"k13:codon:*"`.
+#' @param mutation_key A dataframe containing mutation codon information with columns 
+#'        `"PROTEIN"`, `"CODON"`, and `"REF"`.
+#' @return A string in the format `"K13:codon:amino_acid"`. If no matching codon is found, returns 
+#'         `"K13:codon:NA"`.
+#' @examples
+#' mutation_key <- data.frame(PROTEIN = "k13", CODON = 440:450, REF = letters[1:11])
+#' convert_k13_asterisk("k13:442:*", mutation_key)
+#' # Returns: "K13:442:c"
+#'
+#' @export
+convert_k13_asterisk <- function(gene_mutation, mutation_key) {
+  parts <- strsplit(gene_mutation, ":")
+  codon <- as.numeric(unlist(lapply(parts, "[[", 2)))
+  
+  # Filter the reference amino acids for the specific SNP
+  ref_amino_acids <- mutation_key[mutation_key$PROTEIN == "k13",]$REF[
+    match(codon, mutation_key[mutation_key$PROTEIN == "k13",]$CODON)
+  ]
+  
+  return(paste("K13", codon, ref_amino_acids, sep = ":"))
+  
+}
