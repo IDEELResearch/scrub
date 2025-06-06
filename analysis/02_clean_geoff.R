@@ -329,6 +329,38 @@ if (nrow(duplicates) > 0) {
                             by = c("survey_ID", "variant_string"))
 }
 
+# Find study uids missing in the cleaned data using a list of expected study uids (as of may 19, 2025) from the geoff data and covidence data overview google sheetsAdd commentMore actions
+all_expected_sample_uids <- read.table(
+  here("analysis", "data-raw", "entered_geoff_study_ids.txt"),
+  stringsAsFactors = FALSE
+)[[1]]
+
+# Step 2: Capitalize first letter of each underscore-separated part
+capitalize_underscore_parts <- function(x) {
+  parts <- strsplit(x, "_")[[1]]
+  parts_cap <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
+  paste0(parts_cap, collapse = "")  # no underscore on re-join
+}
+
+# Step 3: Apply the function and also remove any spaces
+all_expected_sample_uids_cleaned <- all_expected_sample_uids %>%
+  lapply(capitalize_underscore_parts) %>%
+  unlist() %>%
+  gsub(" ", "", .)  # remove any accidental spaces
+
+# Ensure character vector for comparison
+all_expected_sample_uids_cleaned <- as.character(all_expected_sample_uids_cleaned)
+
+# Find unique study_IDs in master_table_formatted that are NOT in the expected list
+unexpected_study_ids <- master_table_simplified %>%
+  distinct(study_ID) %>%
+  filter(!study_ID %in% all_expected_sample_uids_cleaned)
+
+# Display study_IDs found in master_table_formatted that are NOT in the expected list
+cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
+print(unexpected_study_ids)Add commentMore actions
+
+
 # Append imputed records to master_table_formatted
 master_table_formatted <- bind_rows(master_table_formatted, imputed_data)
 
