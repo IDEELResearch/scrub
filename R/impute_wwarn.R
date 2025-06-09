@@ -41,16 +41,19 @@ extract_from_entry <- function(entry) {
 #' @param df WWARN dataframe that you want to add a row to. 
 #' Note: this will probably be a specific survey
 #' @param x_new The value of x in the new row. For imputing wild type, x_new == n
-#' @param mut_new The value of mut in the new row. For imputing wild type, these are the 
+#' @param gene_mut_new The value of mut in the new row. For imputing wild type, these are the 
 #' WT encodings for codons not detected in the survey
 
-add_a_row <- function(df, x_new, mut_new) {
+add_a_row <- function(df, x_new, gene_mut_new) {
   rows <- nrow(df) 
   df <- df %>%
-    bind_rows(slice(., 1))
+    bind_rows(df[1, ])
   df$x[rows+1] <- x_new
-  df$gene_mut[rows+1] <- mut_new
+  df$gene_mut[rows+1] <- gene_mut_new
   df$prev <- df$x/df$n
+  df <- df |>
+    dplyr::mutate(mut = gsub("k13:", "", gene_mut)) |> 
+    dplyr::mutate(mut = gsub(":", "", mut)) 
   return(df)
 }
 
@@ -61,49 +64,58 @@ add_a_row <- function(df, x_new, mut_new) {
 #' @export
 #' 
 #' @param survey_df WWARN dataframe for this survey (note: not the study)
-#' @param study_markers Validated markers, including the gene-mut of the WT,
-#' within the min and max codons of that study
+#' @param impute_markers The df of markers to impute for the survey
+#' When there are validated markers in the study, this is all of the WT markers
+#' in the min-max codon range
+#' In the case where only non-validated markers were found, this is the WT 
 #' study_markers == study_validated in {impute_study}
 #' @return df Returns the df of a survey with the imputed WT rows added
 #' 
-impute_survey <- function(survey_df, study_markers) {
+impute_survey <- function(survey_df, impute_markers) {
+  ## now split by the classification
+  classification <- impute_markers$classification[1]
+  if((classification %in% c("validated", "non-validated"))==FALSE) {
+    stop("Classification not eligible for imputation")
+  }
   
-  mutations <- survey_df$mut[survey_df$mut != "WT"]
-  survey_mut <- unlist(lapply(mutations, extract_from_entry))
-  survey_imputation <- study_markers |>
-    dplyr::filter((codon %in% survey_mut) == FALSE) |>
-    dplyr::pull(gene_mut) |>
-    unique()
-  
-  if(length(survey_imputation) == 0) {
-    if(length(mutations) != 0) {
-      # impute the codons with reported mutants, from the dataframe with all of them
-      non_val_wt <- mutation_key |>
-        dplyr::filter(CODON %in% survey_mut) |>
-        dplyr::mutate(gene_mut = paste0("k13:",CODON,":",REF))
-      
-      # sometimes there may only be a non validated marker
-      # I just need to filter out 
-      for(i in 1:length(non_val_wt)) {
-        add_a_row(survey_df)
+  if(classification == "validated") {
+    mutations <- survey_df$mut[survey_df$mut != "WT"]
+    survey_mut <- unlist(lapply(mutations, extract_from_entry))
+    survey_imputation <- impute_markers |>
+      dplyr::filter((codon %in% survey_mut) == FALSE) |>
+      dplyr::pull(gene_mut) |>
+      unique()
+    
+    for(i in 1:length(survey_imputation)) {
+      survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+    }
+  } else {
+    # this is where impute_markers is only WT at the codons with mutants
+    # WT and one mutant in survey -- remove WT
+    mutations <- survey_df$mut[survey_df$mut != "WT"]
+    survey_mut <- unlist(lapply(mutations, extract_from_entry))
+    survey_imputation <- impute_markers |>
+      dplyr::filter((codon %in% survey_mut) == FALSE) |>
+      dplyr::pull(gene_mut) |>
+      unique()
+    if(length(survey_imputation) == 0) {
+      survey_df <- survey_df |>
+        dplyr::filter(gene_mut != "k13:WT")
+    } else {
+      # there are additional markers to impute in this survey
+      for(i in 1:length(survey_imputation)) {
+        survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
       }
-      
     }
   }
-  
-  
-  for(i in 1:length(survey_imputation)) {
-    survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], mut_new = survey_imputation[i])
-  }
-    # need to fix mut
+  # now fix the formatting
   survey_df <- survey_df |>
     dplyr::filter(gene_mut != "k13:WT") |>
-    dplyr::mutate(mut = gsub("k13:", "", gene_mut)) |> # does this need further refining?
-    dplyr::mutate(mut = gsub(":", "", mut)) |> 
-    dplyr::distinct() # remove the duplicates at codon w/ two mutants
-  
+    dplyr::mutate(mut = gsub("k13:", "", gene_mut)) |> 
+    dplyr::mutate(mut = gsub(":", "", mut)) 
   return(survey_df)
 }
+
 
 #' @details
 #' 
@@ -142,23 +154,40 @@ impute_study <- function(study_df) {
       dplyr::mutate(codon = extract_from_entry(mut)) |>
       dplyr::filter(codon >= min) |>
       dplyr::filter(codon <= max) |>
-      dplyr::left_join(reference_validated, join_by("codon" == "CODON"))
+      dplyr::left_join(reference_validated, join_by("codon" == "CODON")) |>
+      dplyr::mutate(classification = "validated") |>
+      dplyr::select(gene, mut, gene_mut, codon, classification) |>
+      dplyr::arrange(codon) |>
+      dplyr::distinct(across(-mut), .keep_all = TRUE)  |>
+      dplyr::select(gene, mut, gene_mut, codon, classification)
+    study_impute <- study_validated
     
+    # if there are only non-validated codons with mutants reports
     if(nrow(study_validated) == 0) {
-      surveys <- study_df 
-      wt_only <- c(wt_only, unique(study_df$pmid)) # add to this list
-    } else {
+      # need to create a df with at least codon and gene_mut for the study imputation WT
+      wt_impute <- mutation_key |>
+        dplyr::filter(CODON %in% codon_numbers) |> 
+        dplyr::mutate(gene_mut = paste0("k13:",CODON,":",REF)) |>
+        dplyr::mutate(classification = "non-validated") |>
+        dplyr::rename(gene = PROTEIN,
+                      codon = CODON) |>
+        dplyr::mutate(mut = gsub("k13:", "", gene_mut)) |> 
+        dplyr::mutate(mut = gsub(":", "", mut)) |>
+        dplyr::select(gene, mut, gene_mut, codon, classification) |>
+        dplyr::arrange(codon)
       
-      # now for each survey, filter out the rows with mutants
-      surveys <- study_df |>
-        dplyr::group_by(site, year) |>
-        dplyr::mutate(siid = cur_group_id()) %>%
-        split(.$siid)
-      
-      surveys <- lapply(surveys, function(df) impute_survey(df, study_validated)) %>% do.call(rbind,.)
-      
+      study_impute <- wt_impute
     }
+    
+    # now for each survey, filter out the rows with mutants
+    surveys <- study_df |>
+      dplyr::group_by(site, year) |>
+      dplyr::mutate(siid = cur_group_id()) %>%
+      split(.$siid)
+    
+    # surveys <- lapply(surveys, function(df) impute_survey(df, study_impute)) %>% do.call(rbind,.)
     
   }
   return(surveys)
 }
+
