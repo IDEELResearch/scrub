@@ -85,9 +85,10 @@ impute_survey <- function(survey_df, impute_markers) {
       dplyr::filter((codon %in% survey_mut) == FALSE) |>
       dplyr::pull(gene_mut) |>
       unique()
-    
-    for(i in 1:length(survey_imputation)) {
-      survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+    if(length(survey_imputation) > 0) {
+      for(i in 1:length(survey_imputation)) {
+        survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+      }
     }
   } else {
     # this is where impute_markers is only WT at the codons with mutants
@@ -98,11 +99,7 @@ impute_survey <- function(survey_df, impute_markers) {
       dplyr::filter((codon %in% survey_mut) == FALSE) |>
       dplyr::pull(gene_mut) |>
       unique()
-    if(length(survey_imputation) == 0) {
-      survey_df <- survey_df |>
-        dplyr::filter(gene_mut != "k13:WT")
-    } else {
-      # there are additional markers to impute in this survey
+    if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
         survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
       }
@@ -185,7 +182,13 @@ impute_study <- function(study_df) {
       dplyr::mutate(siid = cur_group_id()) %>%
       split(.$siid)
     
-    # surveys <- lapply(surveys, function(df) impute_survey(df, study_impute)) %>% do.call(rbind,.)
+    # # to allow debugging
+    # study_impute
+    # for(j in 1:length(surveys)) {
+    #   impute_survey(surveys[[j]], study_impute)
+    # }
+    
+    surveys <- lapply(surveys, function(df) impute_survey(df, study_impute)) %>% do.call(rbind,.)
     
   }
   return(surveys)

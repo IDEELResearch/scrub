@@ -89,17 +89,8 @@ for(i in 1:length(studies)) {
   imputed <- rbind(imputed, impute_study(studies[[i]]))
 }
 
-start <- Sys.time()
-test <- lapply(studies, impute_study) %>% do.call(rbind,.)  
-Sys.time-start
-
-
-
-
-
-
-
-
+wwarn <- imputed |>
+  dplyr::select(-c(siid))
 
 # GINA: In pf7k the range was "349-726" - the range noted in the original pf7k file
 # Here, for each indices_to_transform, I would find all the other rows for that study
@@ -205,6 +196,5 @@ wwarn_clean <- wwarn_edit %>%
 
 # Last extra cleans to align with STAVE
 wwarn_clean$survey_ID <- gsub("'", "", wwarn_clean$survey_ID)
-
 
 saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")
