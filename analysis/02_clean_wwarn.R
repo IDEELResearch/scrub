@@ -65,6 +65,12 @@ wwarn <- wwarn_data %>%
   dplyr::filter(continent == "Africa") |>
   dplyr::rowwise() 
 
+studies_all_WT <- wwarn %>%
+  group_by(pmid) %>%
+  summarise(all_WT = all(gene_mut == "k13:WT")) %>%
+  filter(all_WT) %>%
+  pull(pmid)
+
 # based on conversations, understanding of WT is actually incorrect here
 # separate out the mutant data frame
 
@@ -82,13 +88,16 @@ reference_validated <- mutation_key |>
   dplyr::mutate(gene_mut = paste0(PROTEIN, ":", CODON, ":", REF))
 
 # to add the pmids that need manual investigation
-wt_only <- c()
 imputed <- data.frame()
 studies <- wwarn %>% split(.$pmid)
+
+# update the function so it actually updates wt_only w/i the function oops
 for(i in 1:length(studies)) {
   imputed <- rbind(imputed, impute_study(studies[[i]]))
 }
 
+# this is currently missing the 28 PMIDs with only WT from that study 
+# this needs manually checking 
 wwarn <- imputed |>
   dplyr::select(-c(siid))
 

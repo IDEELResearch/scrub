@@ -138,7 +138,6 @@ impute_study <- function(study_df) {
     unique() |> sort()
   
   if(length(codon_numbers) == 0) {
-    wt_only <- c(wt_only, unique(study_df$pmid))
     surveys <- NULL
   } else {
     # add these steps into the above function rather than separate
