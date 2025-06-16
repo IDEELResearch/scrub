@@ -1,0 +1,6 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Addis_Zemen	Addis Zemen	Amhara Regional State	Ethiopia	ETH	12.1245730633806	37.7788098930049	Addis Zemen Health Center	manual	yes	TES			both				
+Aykel	Aykel	Amhara Regional State	Ethiopia	ETH	12.5558058001356	37.0691478993617	Aykel Health Center	manual	yes	TES			both				
+Maksegnet	Maksegnet	Amhara Regional State	Ethiopia	ETH	12.3912724084632	37.5614034147133	Maksegnit Health Center	manual	yes	TES			both				
+Negade_Bahir	Negade Bahir	Amhara Regional State	Ethiopia	ETH	12.5938988994421	36.7737356012372	Negade Bahir Health Center	manual	yes	TES			both				
+Sanja	Sanja	Amhara Regional State	Ethiopia	ETH	12.9939904777955	37.2936662383105	Sanja Health Center	manual	yes	TES			both				

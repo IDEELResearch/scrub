@@ -2,33 +2,40 @@
 % Please edit documentation in R/deduplicate.R
 \name{deduplicate}
 \alias{deduplicate}
-\title{Deduplicate Data in a Principled Way}
+\title{Identify and summarize potential duplicate studies across multiple databases}
 \usage{
 deduplicate(df)
 }
 \arguments{
 \item{df}{A data.frame to be deduplicated. It must contain the following columns:
 \itemize{
-\item \code{"iso3c"}: ISO3 country code
-\item \code{"admin_0"}: Country-level administrative division
-\item \code{"admin_1"}: First-level administrative division
-\item \code{"site"}: Site name or identifier
+\item \code{"study_ID"}: Study ID
+\item \code{"study_name"}: Name of the study
+\item \code{"study_type"}: Type of study conducted
+\item \code{"authors"}: Authors of the study
+\item \code{"publication_year"}: Year the study was published
+\item \code{"url"}: URL for additional source information
+\item \code{"survey_ID"}: Survey ID
+\item \code{"country_name"}: Name of the country
+\item \code{"site_name"}: Site name or identifier
 \item \code{"lat"}: Latitude of the site
-\item \code{"long"}: Longitude of the site
-\item \code{"year"}: Year of the data entry
-\item \code{"study_start_year"}: Starting year of the study
-\item \code{"study_end_year"}: Ending year of the study
-\item \code{"variant_num"}: Numeric variable
+\item \code{"lon"}: Longitude of the site
+\item \code{"spatial_notes"}: Notes on spatial data
+\item \code{"collection_start"}: Start date of sample collection
+\item \code{"collection_end"}: End date of sample collection
+\item \code{"collection_day"}: Day of sample collection
+\item \code{"time_notes"}: Notes on time or collection period
+\item \code{"variant_string"}: Gene-mutation combination identifier
+\item \code{"variant_num"}: Numeric representation of the variant
 \item \code{"total_num"}: Sample size
+\item \code{"iso3c"}: ISO3 country code
+\item \code{"continent"}: Continent of the study site
+\item \code{"pmid"}: PubMed ID for the source
 \item \code{"prev"}: Prevalence value
 \item \code{"gene"}: Gene identifier
-\item \code{"mut"}: Mutation identifier
-\item \code{"variant_string"}: Gene-mutation combination identifier
-\item \code{"annotation"}: Annotation details
 \item \code{"database"}: Source database
-\item \code{"pmid"}: PubMed identifier for source
-\item \code{"url"}: URL for additional source information
-\item \code{"source"}: Source of the data
+\item \code{"collection_year_start"}: Starting year of the sample collection
+\item \code{"collection_year_end"}: Ending year of the sample collection
 }}
 }
 \value{
@@ -36,6 +43,7 @@ A cleaned data.frame ready for use in STAVE
 (see \url{https://github.com/mrc-ide/STAVE}).
 }
 \description{
-This function deduplicates a dataset, ensuring each entry is unique based on
-specified criteria, and returns a cleaned data frame suitable for input into STAVE.
+This function identifies potential duplicates among WHO, Pf7k, and GEOFF datasets,
+groups them by relevant variables, filters by spatial proximity, tags which to keep/remove,
+and summarizes the results.
 }

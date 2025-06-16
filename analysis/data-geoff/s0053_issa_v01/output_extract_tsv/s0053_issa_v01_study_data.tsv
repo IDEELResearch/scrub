@@ -1,0 +1,47 @@
+FIELDS	DATA
+countries_covered	Chad
+study_uid	s0053_issa
+version	v01
+date_modified	2024-09-23
+first_author_surname	Issa
+publication_year	2023
+pmid	37612601
+study_url	https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10464190/
+publication_status	peer_reviewed
+genotype_method	Amplicon
+genotype_panel	custom
+K13_min	430
+K13_max	720
+MDR1_N86Y	yes
+CRT_K76T	yes
+individual_level_avaiable	no
+haplotypes_available	CRT
+data_entry_author	IsabelaGG
+data_processing_pipeline	Hand_Entered
+site_level_overview_complete	yes
+mutation_prev_site_complete	long
+target_genome_version	
+target_regions_coverage_file	
+genotype_panel_custom_spans_bed_file	
+WGS_vcf_path	
+COI_file_path	
+IBD_file_path	
+individual_wsaf_file	
+indvidiual_prevalence_file	
+individual_genotype_file	
+individual_allele_counts_file	
+server_data_folder	
+genotype_panel_custom_name	
+genotype_panel_custom_file	
+meta_file_path (csv or tsv delimited)	
+meta_header_sample_uid	
+meta_header_site_uid	
+meta_header_iso3c	
+meta_header_site_study_type	
+meta_header_lat_n	
+meta_header_lon_e	
+meta_header_date_start	
+meta_header_date_end	
+mip_DR_analysis_dir_folder	
+mip_IBC_analysis_dir_path	
+mip_merge_fastq_dir_path	
