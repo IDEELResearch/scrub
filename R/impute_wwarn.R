@@ -31,6 +31,8 @@ extract_from_entry <- function(entry) {
   return(codons)
 }
 
+#' Add a row to dataframe with all the same info except x and mut
+#' 
 #' @details
 #' 
 #' This function adds additional rows to the dataframe. It keeps all column variables 
@@ -57,6 +59,8 @@ add_a_row <- function(df, x_new, gene_mut_new) {
   return(df)
 }
 
+#' Impute the WT in surveys -- designed for cleaning WWARN
+#' 
 #' @details
 #' 
 #' This imputes the WT in the survey.
@@ -114,6 +118,8 @@ impute_survey <- function(survey_df, impute_markers) {
 }
 
 
+#' Impute the WT in studies by applying impute_survey -- designed for cleaning WWARN
+#' 
 #' @details
 #' 
 #' This imputes the WT in the study. 
