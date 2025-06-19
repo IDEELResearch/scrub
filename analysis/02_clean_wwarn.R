@@ -71,6 +71,12 @@ studies_all_WT <- wwarn %>%
   filter(all_WT) %>%
   pull(pmid)
 
+# write a custom code that uses the PMID to identify the min and max codons and then does the same thing
+
+
+
+
+
 # based on conversations, understanding of WT is actually incorrect here
 # separate out the mutant data frame
 
