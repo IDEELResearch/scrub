@@ -1,0 +1,3 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Anie	Anie	Anie Hospital Center Préfectoral	Togo	TGO	7.74968236	1.205045718	Anie Hospital Center Préfectoral	manual	yes	TES	0.5	4.9					
+Kouve	Kouve	Hôpital Sœur La Providence Kouvé	Togo	TGO	6.65684436	1.415795399	Hôpital Sœur La Providence Kouvé	manual	yes	TES	0.5	4.9					

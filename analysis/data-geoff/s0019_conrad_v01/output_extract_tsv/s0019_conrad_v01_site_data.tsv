@@ -1,0 +1,17 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
+Agago	Agago	Patongo Health Centre III	Uganda	UGA	2.76092324	33.3124437		author_comms	yes	health_facility	0.5		both				
+Amolatar	Amolatar	Amolatar Health Centre IV	Uganda	UGA	1.6414808	32.8441294		author_comms	yes	health_facility	0.5		both				
+Arua	Arua	Opia Health Centre III	Uganda	UGA	2.82499644	30.902569		author_comms	yes	health_facility	0.5		both				
+Hoima	Hoima	Kigorobya Health Centre IV	Uganda	UGA	1.6233429	31.3124257		author_comms	yes	health_facility	0.5		both				
+Jinja	Jinja	Bugembe Health Centre IV	Uganda	UGA	0.4673058	33.2411447		author_comms	yes	health_facility	0.5		both				
+Kaabong	Kaabong	Lokolia Health Centre III	Uganda	UGA	3.59406061	34.1415261		author_comms	yes	health_facility	0.5		both				
+Rukiga	Rukiga	Kamwezi Health Centre IV	Uganda	UGA	-1.2047104	30.2044506		author_comms	yes	health_facility	0.5		both				
+Kanungu	Kanungu	Kihihi Health Centre IV	Uganda	UGA	-0.7479902	29.6974504		author_comms	yes	health_facility	0.5		both				
+Kapchorwa	Kapchorwa	Kaserem HC IV	Uganda	UGA	1.32862524	34.3373119		author_comms	yes	health_facility	0.5		both				
+Kasese	Kasese	Karambi Health Centre III	Uganda	UGA	0.09030698	29.8354398		author_comms	yes	health_facility	0.5		both				
+Katakwi	Katakwi	Toroma Health Centre IV	Uganda	UGA	1.75645441	33.984794		author_comms	yes	health_facility	0.5		both				
+Koboko	Koboko	Lobule Health Centre III	Uganda	UGA	3.38922491	31.0249978		author_comms	yes	health_facility	0.5		both				
+Kole	Kole	Aboke Health Centre IV	Uganda	UGA	2.34862739	32.6830848		author_comms	yes	health_facility	0.5		both				
+Lamwo	Lamwo	Padibe Health Centre IV	Uganda	UGA	3.48829778	32.8212319		author_comms	yes	health_facility	0.5		both				
+Mubende	Mubende	Kasambya Health Centre IV	Uganda	UGA	0.36340569	31.5871403		author_comms	yes	health_facility	0.5		both				
+Tororo	Tororo	Nagongera Health Centre IV	Uganda	UGA	0.76989594	34.0259835		author_comms	yes	health_facility	0.5		both				

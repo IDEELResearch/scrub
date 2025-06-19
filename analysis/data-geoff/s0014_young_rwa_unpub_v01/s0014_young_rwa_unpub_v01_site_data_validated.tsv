@@ -1,0 +1,15 @@
+site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	site_study_type	pretreatment_samples	study_design_age_min_years	study_design_age_max_years	study_design_sex
+tanda	tanda	tanda	Rwanda	RWA	-1.79983	30.2621			HealthFacility	Y	2	70	both
+ntarama	ntarama	ntarama	Rwanda	RWA	-2.10874	30.06554			HealthFacility	Y	2	70	both
+busanza	busanza	busanza	Rwanda	RWA	-1.98012	30.14957			HealthFacility	Y	2	70	both
+masaka	masaka	masaka	Rwanda	RWA	-2.00395	30.22853			HealthFacility	Y	2	70	both
+solace	solace	solace	Rwanda	RWA	-1.90941	30.21511			HealthFacility	Y	2	70	both
+nyacyonga	nyacyonga	nyacyonga	Rwanda	RWA	-1.86805	30.08417			HealthFacility	Y	2	70	both
+giti	giti	giti	Rwanda	RWA	-1.7889	30.21227			HealthFacility	Y	2	70	both
+nyamagabe	nyamagabe	nyamagabe	Rwanda	RWA	-2.48302	29.58403			HealthFacility	Y	2	70	both
+mushubati	mushubati	mushubati	Rwanda	RWA	-2.01275	29.39993			HealthFacility	Y	2	70	both
+jenda	jenda	jenda	Rwanda	RWA	-2.33	29.52258			HealthFacility	Y	2	70	both
+gishubi	gishubi	gishubi	Rwanda	RWA	-2.58586	29.87316			HealthFacility	Y	2	70	both
+kibingo	kibingo	kibingo	Rwanda	RWA	-2.19952	29.2612			HealthFacility	Y	2	70	both
+byahi	byahi	byahi	Rwanda	RWA	-1.66303	29.27958			HealthFacility	Y	2	70	both
+bugaragara	bugaragara	bugaragara	Rwanda	RWA	-1.29073	30.4123			HealthFacility	Y	2	70	both

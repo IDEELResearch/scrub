@@ -26,7 +26,7 @@ convert_stave <- function(data) {
     dplyr::select(study_key = .data$study_ID, .data$survey_key, .data$variant_string, .data$variant_num, .data$total_num) %>%
     dplyr::mutate(variant_num = as.integer(.data$variant_num)) %>% 
     dplyr::mutate(total_num = as.integer(.data$total_num)) %>% 
-    dplyr::distinct(.data$survey_key, .data$variant_string, .keep_all = TRUE)
+    dplyr::distinct(.data$survey_key, .data$study_key, .data$variant_string, .keep_all = TRUE)
   
   # grab our distinct surveys data frame
   surveys <- data %>%
@@ -39,11 +39,11 @@ convert_stave <- function(data) {
     dplyr::mutate(longitude = as.numeric(.data$longitude)) %>% 
     dplyr::distinct(.data$study_key, .data$survey_ID, .keep_all = TRUE) %>% 
     dplyr::rename(survey_id = survey_ID)
-
+  
   
   studies <- studies %>%
     dplyr::filter(.data$study_id %in% surveys$study_key)  
-
+  
   return(list(studies_dataframe = studies, 
               surveys_dataframe = surveys, 
               counts_dataframe = counts))
