@@ -1,6 +1,11 @@
-wwarn_data <- readRDS(here("analysis", "data-derived", 
+library(stringr)
+library(purrr)
+library(dplyr)
+library(here)
+
+wwarn_data <- readRDS(here::here("analysis", "data-derived", 
                            "wwarn_res.rds"))
-ref_als <- read.csv(here("analysis", "data-raw", 
+ref_als <- read.csv(here::here("analysis", "data-raw", 
                                  "k13_ref_protein_codon_dictionary.csv"))
 
 set.seed(1)
@@ -57,44 +62,50 @@ wwarn <- wwarn_data %>%
   dplyr::mutate(study_ID = iconv(study_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
   dplyr::mutate(study_ID =  gsub("[^a-zA-Z0-9_]", "", study_ID)) %>% 
   dplyr::mutate(continent = countrycode::countrycode(iso3c, origin = "iso3c", destination = "continent")) %>%
-  dplyr::filter(continent == "Africa")
+  dplyr::filter(continent == "Africa") |>
+  dplyr::rowwise() 
 
-# GINA: Simpler way (sort of) from pf7k script for this
+studies_all_WT <- wwarn %>%
+  group_by(pmid) %>%
+  summarise(all_WT = all(gene_mut == "k13:WT")) %>%
+  filter(all_WT) %>%
+  pull(pmid)
+
+# write a custom code that uses the PMID to identify the min and max codons and then does the same thing
+
+
+
+
+
+# based on conversations, understanding of WT is actually incorrect here
+# separate out the mutant data frame
+
 mutation_key_path <- here::here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
 mutation_key <- read.csv(mutation_key_path)
 
-# collapse per study
-library(stringr)
+validated_path <- here::here("analysis", "data-raw", "mutation_dictionary.csv")
+validated_markers <- read.csv(validated_path) |> 
+  dplyr::filter(gene == "k13") |>
+  dplyr::filter(annotation != "invalidated")
+codons <- as.numeric(gsub("[^\\d]+", "", validated_markers$mut, perl = TRUE))
+reference_validated <- mutation_key |>
+  dplyr::filter(CODON %in% codons) |>
+  dplyr::arrange(CODON) |>
+  dplyr::mutate(gene_mut = paste0(PROTEIN, ":", CODON, ":", REF))
 
-# Step 1: Extract codons from the mut column
-wwarn_with_codons <- wwarn %>%
-  mutate(codon = str_extract_all(mut, "\\d+")) %>%
-  unnest(codon) %>%
-  mutate(codon = as.numeric(codon))
+# to add the pmids that need manual investigation
+imputed <- data.frame()
+studies <- wwarn %>% split(.$pmid)
 
-# Step 2: Define survey-level columns
-group_cols <- setdiff(names(wwarn), c("x", "n", "prev", "mut", "gene_mut"))
+# update the function so it actually updates wt_only w/i the function oops
+for(i in 1:length(studies)) {
+  imputed <- rbind(imputed, impute_study(studies[[i]]))
+}
 
-# Step 3: Get codon range per survey
-codon_ranges <- wwarn_with_codons %>%
-  distinct(across(all_of(group_cols)), codon) %>%
-  group_by(across(all_of(group_cols))) %>%
-  summarise(
-    k13_range = if (n() == 1) {
-      paste0("k13:", codon[1], ":*")
-    } else {
-      paste0("k13:", min(codon, na.rm = TRUE), ":", max(codon, na.rm = TRUE))
-    },
-    .groups = "drop"
-  )
-
-# Step 4: Join back to original df
-wwarn <- wwarn %>%
-  left_join(codon_ranges, by = group_cols) |>
-  # TODO: assumed 100% WT surveys had same range as pf7k -- decide if this is valid assump.
-  dplyr::mutate(k13_range = if_else(is.na(k13_range), "k13:349:726", k13_range)) |>
-  dplyr::mutate(gene_mut = if_else(mut == "WT",
-                gsub("K13", "k13", collapse_k13_range(k13_range, mutation_key)), gene_mut))
+# this is currently missing the 28 PMIDs with only WT from that study 
+# this needs manually checking 
+wwarn <- imputed |>
+  dplyr::select(-c(siid))
 
 # GINA: In pf7k the range was "349-726" - the range noted in the original pf7k file
 # Here, for each indices_to_transform, I would find all the other rows for that study
@@ -200,6 +211,5 @@ wwarn_clean <- wwarn_edit %>%
 
 # Last extra cleans to align with STAVE
 wwarn_clean$survey_ID <- gsub("'", "", wwarn_clean$survey_ID)
-
 
 saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")
