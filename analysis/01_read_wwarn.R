@@ -30,7 +30,7 @@ pdww$iso <- countrycode::countrycode(pdww$country, "country.name.en", "iso3c")
 # map_1 <- malariaAtlas::getShp("ALL",admin_level = c("admin1")) %>% sf::st_as_sf()
 # saveRDS(map_1, file = "analysis/data-raw/alt_map.rds")
 map_1 <- readRDS("analysis/data-raw/alt_map.rds")
-k13_map <- map_1 %>% filter(iso %in% unique(k13ww$iso)) 
+k13_map <- map_1[map_1$iso %in% unique(k13ww$iso), ]
 
 # create coords
 k13coords <- sf::st_as_sf(k13ww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
@@ -57,7 +57,7 @@ k13ww$admin_1[which(k13ww$site == "Saint-Georges")] <- "Cayenne"
 ## 1.2. WWARN PD admin mapping ----
 
 # start with the map and the coords
-pd_map <- map_1 %>% filter(iso %in% unique(pdww$iso)) 
+pd_map <- map_1[map_1$iso %in% unique(pdww$iso), ]
 pdcoords <- sf::st_as_sf(pdww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
 
 # identify pd matches
@@ -656,12 +656,11 @@ k13ww_final_res_df <- k13wwdf %>%
 # TODO: update this so that it also includes the partner drug data
 saveRDS(k13ww_final_res_df, here::here("analysis/data-derived/wwarn_res.rds"))
 
-# TODO: Gina - the above is done (except for all the TODOs) - i.e. with 
-# just these TODOs then k13 is done
-
 # ---------------------------------------------------- o
 # 3. Sort PD Names ----
 # ---------------------------------------------------- o
+
+pdww <- readRDS("analysis/data-derived/pdww.rds")
 
 # sort names as wanted
 pdwwdf <- pdww %>%
@@ -694,7 +693,7 @@ pdwwdf <- pdww %>%
   mutate(rowid = seq_len(n()))
 
 # Growing List of typos in their data entry
-# these have come from troublshooting the cleans below and going back to papers
+# these have come from troubleshooting the cleans below and going back to papers
 
 # All the mdr1 typos... ----------------
 # A lot of from rounding errors from prev * n calculations
@@ -735,6 +734,8 @@ pdwwdf$n[which(pdwwdf$rowid == 5689)] <- 35
 
 # the next block of typos are where prevalence is reported using mixed infections
 # so we need to correct these
+# TODO: check with OJ if these sections are still necessary 
+# I imagine how WWARN handles mixed infections is correct for this application
 newx_freq_for_mix <- function(poswr){
   curr <- pdwwdf$x[match(poswr, pdwwdf$rowid)]
   currn <- pdwwdf$n[match(poswr, pdwwdf$rowid)][1]
