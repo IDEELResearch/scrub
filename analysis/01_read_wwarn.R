@@ -816,7 +816,8 @@ pdcrt <- pdwwspl$crt %>%
 pdcrt <- pdcrt %>%
   group_by(across(c(-x,-prev, -mut, -rowid, -mix))) %>%
   mutate(uuid = cur_group_id()) %>%
-  ungroup() 
+  ungroup() %>%
+  dplyr::distinct() # a lot of the issues with sum(x) =/= n are due to duplicate rows
 # need to figure out how they have entered the EH 72
 
 ### TYPE 1 ------------------------------
@@ -839,7 +840,7 @@ pdcrtspl1 <- pdcrt %>%
   mutate(l = n()) %>%
   filter(l > 1 | (l==1 & all(mut!="pfcrt K76"))) %>% # catch for when only one marker is reported
   summarise(x = ifelse(any(mut == "pfcrt 76T"), x[mut == "pfcrt 76T"], 0) +
-              ifelse(any(mut == "pfcrt 76K/T"), 0.5*x[mut %in% "pfcrt 76K/T"], 0),
+              ifelse(any(mut == "pfcrt 76K/T"), x[mut %in% "pfcrt 76K/T"], 0), # add the mixed and mutant to get prev
             n = unique(n),
             prev = x/n) %>%
   mutate(mut = "crt_76T") %>%
@@ -871,6 +872,7 @@ pdcrtspl2 <- pdcrt %>%
          x, n, prev, gene, mut, database, pmid, url, source)
 
 # now to focus on when sum of x does not equal n
+# checked this covers all values of pdcrt$mut
 
 mut_loc <- "pfcrt 76T"
 wt_loc <- "pfcrt K76"
@@ -897,13 +899,15 @@ pdcrtspl3 <- pdcrt %>%
   mutate(l = n()) %>%
   filter(l > 1 | (l==1 & all(mut!="pfcrt K76"))) %>% # catch for when only one marker is reported
   summarise(x = ifelse(any(mut == "pfcrt 76T"), x[mut == "pfcrt 76T"], 0) +
-              ifelse(any(mut == "pfcrt 76K/T"), 0.5*x[mut %in% "pfcrt 76K/T"], 0),
+              ifelse(any(mut == "pfcrt 76K/T"), x[mut %in% "pfcrt 76K/T"], 0), # add the mixed and mutant to get prev
             n = unique(n),
             prev = x/n) %>%
   mutate(mut = "crt_76T") %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source)
+
+# TODO: check from here on -- I think there were actually two studies with l == 1 but check
 
 # There are no examples here where l == 1 and they are pfcrt k76 so no need to switch the
 # prev around as for type 2
