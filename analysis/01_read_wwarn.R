@@ -660,7 +660,7 @@ saveRDS(k13ww_final_res_df, here::here("analysis/data-derived/wwarn_res.rds"))
 # 3. Sort PD Names ----
 # ---------------------------------------------------- o
 
-pdww <- readRDS("analysis/data-derived/pdww.rds")
+pdww <- readRDS("analysis/data-derived/pdww.rds") 
 
 # sort names as wanted
 pdwwdf <- pdww %>%
@@ -734,62 +734,10 @@ pdwwdf$n[which(pdwwdf$rowid == 5689)] <- 35
 
 # the next block of typos are where prevalence is reported using mixed infections
 # so we need to correct these
-# TODO: check with OJ if these sections are still necessary 
-# I imagine how WWARN handles mixed infections is correct for this application
-newx_freq_for_mix <- function(poswr){
-  curr <- pdwwdf$x[match(poswr, pdwwdf$rowid)]
-  currn <- pdwwdf$n[match(poswr, pdwwdf$rowid)][1]
-  return(curr - ((sum(curr) - currn)/2))
-}
-
 pdwwdf$x[which(pdwwdf$rowid == 13)] <- 42 # F is not Y so assign to N
-pdwwdf$x[match(c(6662,6663), pdwwdf$rowid)] <- newx_freq_for_mix(c(6662,6663)) # they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(6666,6667), pdwwdf$rowid)] <- newx_freq_for_mix(c(6666,6667)) # they reported mixed infections so have redistributed these out
 pdwwdf$x[which(pdwwdf$rowid == 318)] <- 44
 pdwwdf$x[which(pdwwdf$rowid == 718)] <- 114 # typo in their paper
 pdwwdf$x[which(pdwwdf$rowid == 720)] <- 103
-pdwwdf$x[match(c(1490,1491), pdwwdf$rowid)] <- newx_freq_for_mix(c(1490,1491)) # they reported mixed infections so have redistributed these out
-
-# they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(5156,5157), pdwwdf$rowid)] <- newx_freq_for_mix(c(5156,5157))
-pdwwdf$x[match(c(5152,5153), pdwwdf$rowid)] <- newx_freq_for_mix(c(5152,5153))
-pdwwdf$x[match(c(5148,5149), pdwwdf$rowid)] <- newx_freq_for_mix(c(5148,5149))
-pdwwdf$x[match(c(5144,5145), pdwwdf$rowid)] <- newx_freq_for_mix(c(5144,5145))
-pdwwdf$x[match(c(5160,5161), pdwwdf$rowid)] <- newx_freq_for_mix(c(5160,5161))
-
-# they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(1811,1812), pdwwdf$rowid)] <- newx_freq_for_mix(c(1811,1812))
-pdwwdf$x[match(c(1791,1792), pdwwdf$rowid)] <- newx_freq_for_mix(c(1791,1792))
-pdwwdf$x[match(c(1799,1800), pdwwdf$rowid)] <- newx_freq_for_mix(c(1799,1800))
-pdwwdf$x[match(c(1795,1796), pdwwdf$rowid)] <- newx_freq_for_mix(c(1795,1796))
-pdwwdf$x[match(c(1787,1788), pdwwdf$rowid)] <- newx_freq_for_mix(c(1787,1788))
-
-
-# they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(1712,1713), pdwwdf$rowid)] <- newx_freq_for_mix(c(1712,1713))
-pdwwdf$x[match(c(1710,1711), pdwwdf$rowid)] <- newx_freq_for_mix(c(1710,1711))
-pdwwdf$x[match(c(1717,1718), pdwwdf$rowid)] <- newx_freq_for_mix(c(1717,1718))
-pdwwdf$x[match(c(1722,1723), pdwwdf$rowid)] <- newx_freq_for_mix(c(1722,1723))
-pdwwdf$x[match(c(1727,1728), pdwwdf$rowid)] <- newx_freq_for_mix(c(1727,1728))
-pdwwdf$x[match(c(1732,1733), pdwwdf$rowid)] <- newx_freq_for_mix(c(1732,1733))
-pdwwdf$x[match(c(1737,1738), pdwwdf$rowid)] <- newx_freq_for_mix(c(1737,1738))
-pdwwdf$x[match(c(1744,1745), pdwwdf$rowid)] <- newx_freq_for_mix(c(1744,1745))
-pdwwdf$x[match(c(1742,1743), pdwwdf$rowid)] <- newx_freq_for_mix(c(1742,1743))
-pdwwdf$x[match(c(1750,1751), pdwwdf$rowid)] <- newx_freq_for_mix(c(1750,1751))
-pdwwdf$x[match(c(1752,1753), pdwwdf$rowid)] <- newx_freq_for_mix(c(1752,1753))
-pdwwdf$x[match(c(1759,1760), pdwwdf$rowid)] <- newx_freq_for_mix(c(1759,1760))
-pdwwdf$x[match(c(1757,1758), pdwwdf$rowid)] <- newx_freq_for_mix(c(1757,1758))
-
-# they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(1764,1765), pdwwdf$rowid)] <- newx_freq_for_mix(c(1764,1765))
-
-# they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(1686,1687), pdwwdf$rowid)] <- newx_freq_for_mix(c(1686,1687))
-pdwwdf$x[match(c(1683,1685), pdwwdf$rowid)] <- newx_freq_for_mix(c(1683,1685))
-
-# they reported mixed infections so have redistributed these out
-pdwwdf$x[match(c(1701,1702), pdwwdf$rowid)] <- newx_freq_for_mix(c(1701,1702))
-pdwwdf$x[match(c(3138,3139), pdwwdf$rowid)] <- newx_freq_for_mix(c(3138,3139))
 
 # typos again
 pdwwdf$x[which(pdwwdf$rowid == 2475)] <- 5
@@ -799,8 +747,6 @@ pdwwdf$x[which(pdwwdf$rowid == 7714)] <- 42
 pdwwdf$x[which(pdwwdf$rowid == 7737)] <- 47
 pdwwdf$n[match(c(8283,8286), pdwwdf$rowid)] <- 119
 pdwwdf$x[match(c(8283,8286), pdwwdf$rowid)] <- c(7,112)
-
-pdwwdf$x[match(c(4339,4340), pdwwdf$rowid)] <- newx_freq_for_mix(c(4339,4340))
 pdwwdf$x[which(pdwwdf$rowid == 4451)] <- 14 # F is not Y so assign to N
 
 # duplicate studies
@@ -815,41 +761,6 @@ pdwwdf <- pdwwdf %>% filter(rowid != 308) # duplicate error
 pdwwdf$x[which(pdwwdf$rowid == 7015)] <- 0.5 # mixed sample and swapping to mut type here
 pdwwdf$x[which(pdwwdf$rowid == 5763)] <- 0 # mixed sample double accounted for
 pdwwdf$mut[which(pdwwdf$rowid == 7015)] <- "pfcrt 76T" # mixed sample and swapping to mut type here
-
-# mixed samples need to be allocated out
-pdwwdf$x[match(c(97,98,99,100), pdwwdf$rowid)] <- c(72,29,72,29)
-pdwwdf$x[match(c(1461:1464), pdwwdf$rowid)] <- c(19.5,3.5,19.5,3.5)
-pdwwdf$x[match(c(6278:6281), pdwwdf$rowid)] <- c(21.5,11.5,21.5,11.5)
-pdwwdf$x[match(c(6345:6348), pdwwdf$rowid)] <- c(61,14,61,14)
-pdwwdf$x[match(c(6307:6310), pdwwdf$rowid)] <- c(2.5,1.5,2.5,1.5)
-pdwwdf$x[match(c(6558:6562), pdwwdf$rowid)] <- c(41,32,1,42,32)
-pdwwdf$x[match(c(6318:6321), pdwwdf$rowid)] <- c(10,15,10,15)
-pdwwdf$x[match(c(6549:6552), pdwwdf$rowid)] <- c(6.5,3.5,6.5,3.5)
-
-# mixed samples need to be allocated out
-pdwwdf$x[match(c(42,43), pdwwdf$rowid)] <- c(24.5,5.5)
-pdwwdf$x[match(c(143,144), pdwwdf$rowid)] <- c(5,3)
-pdwwdf$x[match(c(692,  693), pdwwdf$rowid)] <- c(33,7)
-pdwwdf$x[match(c(830,  831), pdwwdf$rowid)] <- c(3.5,0.5)
-pdwwdf$x[match(c(1057, 1058), pdwwdf$rowid)] <- c(14,7)
-pdwwdf$x[match(c(1080, 1081), pdwwdf$rowid)] <- c(39.5,10.5)
-pdwwdf$x[match(c(1324, 1325), pdwwdf$rowid)] <- c(3,8)
-pdwwdf$x[match(c(3147, 3148), pdwwdf$rowid)] <- c(1.5,3.5)
-pdwwdf$x[match(c(3297, 3298), pdwwdf$rowid)] <- c(2.5,0.5)
-pdwwdf$x[match(c(3523, 3524), pdwwdf$rowid)] <- c(77.5,40.5)
-pdwwdf$x[match(c(5347, 5348), pdwwdf$rowid)] <- c(10.5,0.5)
-pdwwdf$x[match(c(6365, 6366), pdwwdf$rowid)] <- c(1.5,1.5)
-
-# mixed samples to be subtracted out
-pdwwdf$x[match(c(1708,1709), pdwwdf$rowid)] <- c(248,70)
-pdwwdf$x[match(c(1715,1716), pdwwdf$rowid)] <- c(116.5,34.5)
-pdwwdf$x[match(c(1720,1721), pdwwdf$rowid)] <- c(133,36)
-pdwwdf$x[match(c(1725,1726), pdwwdf$rowid)] <- c(71,17)
-pdwwdf$x[match(c(1730,1731), pdwwdf$rowid)] <- c(31,9)
-pdwwdf$x[match(c(1735,1736), pdwwdf$rowid)] <- c(93.5,40.5)
-pdwwdf$x[match(c(1740,1741), pdwwdf$rowid)] <- c(174,122)
-pdwwdf$x[match(c(1748,1749), pdwwdf$rowid)] <- c(187,158)
-pdwwdf$x[match(c(1755,1756), pdwwdf$rowid)] <- c(83,38)
 
 # one study's fixes
 pdwwdf$x[match(c(1695,1696,1697,1698,1699,1700,2622,2623,2624,2625,2626,5650,5651,5652,5653,5654), pdwwdf$rowid)] <-
@@ -918,9 +829,9 @@ pdcrtspl1 <- pdcrt %>%
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
   filter(xn) %>%
-  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>%
-  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>%
-  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
   group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
   summarise(x = sum(x), n = unique(n)) %>%
   ungroup() %>%
