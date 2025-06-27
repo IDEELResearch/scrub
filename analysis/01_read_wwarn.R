@@ -907,8 +907,6 @@ pdcrtspl3 <- pdcrt %>%
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source)
 
-# TODO: check from here on -- I think there were actually two studies with l == 1 but check
-
 # There are no examples here where l == 1 and they are pfcrt k76 so no need to switch the
 # prev around as for type 2
 
@@ -958,7 +956,9 @@ pdcrtspl5 <- pdcrt %>%
 # then the remaining weird ones
 # simple cases of just two mutations being off.
 # These are mixed infections being reallocated
-# TODO: Check these manually later that this is the case for these
+# TODO: Convert this code to be prevalence instead of frequency and check the 
+# specific studies to ensure this is correct
+# TODO: I think I actually need to go back to the studies themselves and fix this one
 pdcrtspl6 <- rbind(
   pdcrt %>%
     filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid))) %>%
@@ -1001,7 +1001,7 @@ pdcrtspl7 <-
       mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxK", "pfcrt K76")) %>%
       filter(mut %in% c(mut_loc, wt_loc)) %>%
       filter(sum(x) < n[1]) %>%
-      mutate(x = x + (n[1] - sum(x))/2),
+      mutate(x = x + (n[1] - sum(x))/2), # TODO: convert to prev
     pdcrt %>%
       filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid, pdcrtspl6$uuid))) %>%
       group_by(uuid) %>%
@@ -1011,7 +1011,7 @@ pdcrtspl7 <-
       mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxK", "pfcrt K76")) %>%
       filter(mut %in% c(mut_loc, wt_loc)) %>%
       filter(sum(x) > n[1]) %>%
-      mutate(x = x - (sum(x) - n[1])/2)
+      mutate(x = x - (sum(x) - n[1])/2) # TODO: convert to prev
   ) %>%
   filter(mut == "pfcrt 76T") %>%
   group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
@@ -1038,7 +1038,7 @@ pdcrtspl8 <- rbind(
     filter(mut %in% c(mut_loc, wt_loc)) %>%
     filter(n() == 2) %>%
     filter(sum(x) < n[1]) %>%
-    mutate(x = x + (n[1] - sum(x))/2),
+    mutate(x = x + (n[1] - sum(x))/2), # TODO: convert to prev
   pdcrt %>%
     filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid,
                          pdcrtspl5$uuid, pdcrtspl6$uuid, pdcrtspl7$uuid))) %>%
@@ -1046,7 +1046,7 @@ pdcrtspl8 <- rbind(
     filter(mut %in% c(mut_loc, wt_loc)) %>%
     filter(n() == 2) %>%
     filter(sum(x) > n[1]) %>%
-    mutate(x = x - (sum(x) - n[1])/2)
+    mutate(x = x - (sum(x) - n[1])/2) # TODO: convert to prev
 ) %>%
   mutate(mut = replace(mut, mut == "pfcrt 72-76 SxxxT", "pfcrt 76T")) %>%
   mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
