@@ -965,13 +965,13 @@ pdcrtspl6 <- rbind(
     group_by(uuid) %>%
     filter(n() == 2) %>%
     filter(sum(x) < n[1]) %>%
-    mutate(x = x + (n[1] - sum(x))/2),
+    mutate(x = x + (n[1] - sum(x))/2), # TODO: convert to prev
   pdcrt %>%
     filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid))) %>%
     group_by(uuid) %>%
     filter(n() == 2) %>%
     filter(sum(x) > n[1]) %>%
-    mutate(x = x - (sum(x) - n[1])/2)
+    mutate(x = x - (sum(x) - n[1])/2) # TODO: convert to prev
 ) %>%
   mutate(mut = replace(mut, mut == "pfcrt 72-76 SxxxT", "pfcrt 76T")) %>%
   mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
