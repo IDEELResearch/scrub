@@ -13,6 +13,7 @@ pmid <- data.frame(pmid = wwarn_pmid, wwarn = 1) |>
   dplyr::filter(is.na(pmid) == FALSE) |>
   dplyr::filter((pmid %in% c(500000000, 99999999, 80002535, 80002424, 80002356, 80000390, 80000305)) == FALSE) |>
   dplyr::distinct()
+wwarn <- pmid |> pull(pmid)
 
 # medline
 lines <- readLines("analysis/covidence/medline.txt")
@@ -24,5 +25,20 @@ uid_label_rows <- grep("^Unique Identifier\\s*$", lines)
 pmid_lines <- lines[uid_label_idx + 1]
 
 # Trim leading/trailing whitespace
-pmids <- trimws(pmid_lines)
+medline <- trimws(pmid_lines)
 
+medline_pmids <- medline[medline %in% wwarn == FALSE]
+write.csv(medline_pmids, file = "analysis/covidence/medline_pmids.csv")
+
+# pubmed
+# Read the nbib file
+pubmed <- readLines("analysis/covidence/pubmed-hackathon-july.nbib")
+
+# Extract lines that start with PMID
+pubmed <- grep("^PMID- ", pubmed, value = TRUE)
+
+# Get the numeric PMIDs
+pubmed <- sub("^PMID- ", "", pubmed)
+
+pubmed_pmids <- pubmed[pubmed %in% wwarn == FALSE]
+write.csv(pubmed_pmids, file = "analysis/covidence/pubmed_pmids.csv")
