@@ -133,12 +133,13 @@ data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
   )
 
 # Convert into a STAVE object
+start <- Sys.time()
 stave$append_data(
   studies_dataframe = data_stave$studies_dataframe,
   surveys_dataframe = data_stave$surveys_dataframe,
   counts_dataframe = counts_df
 )
-
+Sys.time() - start
 # Save the output in data-out ready for downstream analysis
 dir.create("analysis/data-out", showWarnings = FALSE)
 saveRDS(stave, "analysis/data-out/stave_final_data.rds")
