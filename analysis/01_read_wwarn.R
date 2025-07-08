@@ -129,11 +129,12 @@ k13wwdf <- bind_rows(
 # before doing manual cleaning - one study corresponds to many of the issues
 # fails for Gina so commenting out for now
 # TODO: make sure this is in the PR
+# TODO: this file link is no longer valid
 # tf <- tempfile()
-# download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/jid/223/6/10.1093_infdis_jiaa687/1/jiaa687_suppl_supplementary_table_s3.xlsx?Expires=1748452824&Signature=PjWn-A7qw1OTfQo4hrvOee1909kD~hyO-lT9jA2dQIhZmS8Jmcp8-HjqydW9iI3GuNx3sLPFz2GmT-Hm7i-58NoOSff~g84yASXtA3HcAJOy6maFSWXMNu3PtZibzklibTLZdXFqzh1n0aQCFsrzs8YEN70NE6hQZE9skxgQnrG6ipfqQWGICNkkzdCea-AcoP4Clgcma159BE3Mlac4R1RGtuzbTCYgEk-End4tck-Zk0ApCnjhnLcM7zA4DSLEyJ98rka29DEwKG8raNDj~MXR5yh1i6~6MScgAQpM6JIVB7UM~~euH4Qsc3XJlrR63kuVUUwzk12aLXrcuO6S7A__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA", tf)
+# download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/jid/223/6/10.1093_infdis_jiaa687/1/jiaa687_suppl_supplementary_table_s3.xlsx?Expires=1754388885&Signature=i-ki9C7vUcYnDdPkAlDSIOVJX11um~Pxsz2OCQzaVJEq0cdW6tJN~QPLUOtQLs1aKX5Briv~xeZGvJ5QqKch08Ax5pNhO--K27-cp~XuXQYqMtSLLsgQN3bYKI75-HQWIIqQHRpCYxwjB8QcbRYt9BR~IbdW3f4fyi-56FiYjno0CA-Qim3k9FCwqZ3UAm8VLgngVNhJl5AfQPxcUFj0B0gMpIy6isT6Gjh0PxhQQytmIvlBu94ClDiBlWkQURw2y2K3N4nJHT9hbwTafJPy2O4E2yb0p7~93QCq7hx~0AT7G~7QSPOxBLXGORapXmkyDweBR3-YUBc-fSnFevQ1eQ__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA", tf)
 # 
 # # clean up and create our correct table
-# df <- readxl::read_excel(tf) %>% janitor::clean_names()
+# df <- readxl::read_excel("analysis/data-raw/asua.xlsx") %>% janitor::clean_names()
 df <- df %>% filter(gene_name == "k13") %>% filter(!(grepl("fs", mutation_name))) # remove frame shift
 df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique()
 aa_lookup <- setNames(
@@ -763,7 +764,8 @@ pdwwdf$x[which(pdwwdf$rowid == 5763)] <- 0 # mixed sample double accounted for
 pdwwdf$mut[which(pdwwdf$rowid == 7015)] <- "pfcrt 76T" # mixed sample and swapping to mut type here
 
 # one study's fixes
-pdwwdf$x[match(c(1695,1696,1697,1698,1699,1700,2622,2623,2624,2625,2626,5650,5651,5652,5653,5654), pdwwdf$rowid)] <-
+pdwwdf$x[match(c(1695,1696,1697,1698,1699,1700,2622,2623,2624,2625,2626,5650,5651,5652,5653,5654), 
+               pdwwdf$rowid)] <-
   c(35, 15, 35, 15, 0, 0, 1.5, 48.5, 1.5, 0, 48.5, 0.5, 37.5, 0.5, 0, 37.5)
 
 # one study's fixes
@@ -820,12 +822,11 @@ pdcrt <- pdcrt %>%
   dplyr::distinct() # a lot of the issues with sum(x) =/= n are due to duplicate rows
 # need to figure out how they have entered the EH 72
 
-### TYPE 1 ------------------------------
-# there is a group of entries where all x sum to n
-# so for these convert the EHs down by grouping by mutation
-# marker after converting the 72 muts to common type
+# TODO: plan out the cleaning for pd considering that scrub can handle haplotypes, 
+# mixed infections and we are no longer concerned about the conversion to frequency
 
-# type 1 when there are multiple markers reported so we sum mutant and mixed
+# TYPE 1 - sum(x) = n -- clean names and reformat
+# TODO: just clean up mutation names and remove any inference of mixed mutants
 pdcrtspl1 <- pdcrt %>%
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
@@ -847,6 +848,60 @@ pdcrtspl1 <- pdcrt %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source)
+
+
+
+
+# TYPE 2 - wildtype only -- clean names and reformat
+
+
+
+# TYPE 3 - sum(x) = n if EH are filtered out -- change EH names, clean and reformat
+
+
+
+# TYPE 4 - sum(x) = n if non-EH are filtered out -- change EH names, clean and reformat
+
+
+
+
+# TYPE 5 - only one marker reported -- clean names and reformat
+
+
+
+# TYPE 6 - any additional ones 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### TYPE 1 ------------------------------
+# there is a group of entries where all x sum to n
+# so for these convert the EHs down by grouping by mutation
+# marker after converting the 72 muts to common type
+
+# type 1 when there are multiple markers reported so we sum mutant and mixed
+
 
 ### TYPE 2 ------------------------------
 # and type 2 is the catch for when it is only WT
@@ -899,7 +954,7 @@ pdcrtspl3 <- pdcrt %>%
   mutate(l = n()) %>%
   filter(l > 1 | (l==1 & all(mut!="pfcrt K76"))) %>% # catch for when only one marker is reported
   summarise(x = ifelse(any(mut == "pfcrt 76T"), x[mut == "pfcrt 76T"], 0) +
-              ifelse(any(mut == "pfcrt 76K/T"), x[mut %in% "pfcrt 76K/T"], 0), # add the mixed and mutant to get prev
+              ifelse(any(mut == "pfcrt 76K/T"), 0.5*x[mut %in% "pfcrt 76K/T"], 0),
             n = unique(n),
             prev = x/n) %>%
   mutate(mut = "crt_76T") %>%
@@ -909,6 +964,7 @@ pdcrtspl3 <- pdcrt %>%
 
 # There are no examples here where l == 1 and they are pfcrt k76 so no need to switch the
 # prev around as for type 2
+
 
 
 ### TYPE 4 ------------------------------
