@@ -1,11 +1,11 @@
 # load stave  
-#devtools::install_github("mrc-ide/STAVE")
+# devtools::install_github("mrc-ide/STAVE")
 library(STAVE)
 library(tidyverse)
 
 # read in data from databases
-data <- readRDS("analysis/data-derived/wwarn_clean.rds")
-#data <- readRDS("analysis/data-derived/final_data.rds")
+# data <- readRDS("analysis/data-derived/wwarn_clean.rds")
+data <- readRDS("analysis/data-derived/final_data.rds")
 
 # make an empty stave object
 stave <- STAVE::STAVE_object$new()
@@ -128,21 +128,17 @@ data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
     survey_id = survey_id %>%
       str_replace_all("[^A-Za-z0-9_]", "_") %>%
       str_replace_all("^[_0-9]+", "X"),
-    collection_start = ymd(collection_start),
-    collection_end   = ymd(collection_end)
+    collection_start = collection_start,
+    collection_end   = collection_end
   )
 
+# Convert into a STAVE object
 stave$append_data(
   studies_dataframe = data_stave$studies_dataframe,
   surveys_dataframe = data_stave$surveys_dataframe,
   counts_dataframe = counts_df
 )
 
-# Convert into a STAVE object
-stave$append_data(studies_dataframe = data_stave$studies_dataframe,
-                  surveys_dataframe = data_stave$surveys_dataframe,
-                  counts_dataframe = counts_df) 
-
 # Save the output in data-out ready for downstream analysis
 dir.create("analysis/data-out", showWarnings = FALSE)
-saveRDS(stave, "analysis/data-out/stave_wwarn_data.rds")
+saveRDS(stave, "analysis/data-out/stave_final_data.rds")
