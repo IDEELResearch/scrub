@@ -820,13 +820,8 @@ pdcrt <- pdcrt %>%
   mutate(uuid = cur_group_id()) %>%
   ungroup() %>%
   dplyr::distinct() # a lot of the issues with sum(x) =/= n are due to duplicate rows
-# need to figure out how they have entered the EH 72
-
-# TODO: plan out the cleaning for pd considering that scrub can handle haplotypes, 
-# mixed infections and we are no longer concerned about the conversion to frequency
 
 # TYPE 1 - sum(x) = n -- clean names and reformat
-# TODO: just clean up mutation names and remove any inference of mixed mutants
 pdcrtspl1 <- pdcrt %>%
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
@@ -837,209 +832,119 @@ pdcrtspl1 <- pdcrt %>%
   group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
   summarise(x = sum(x), n = unique(n)) %>%
   ungroup() %>%
-  group_by(across(c(-x, -n, -mut))) %>%
-  mutate(l = n()) %>%
-  filter(l > 1 | (l==1 & all(mut!="pfcrt K76"))) %>% # catch for when only one marker is reported
-  summarise(x = ifelse(any(mut == "pfcrt 76T"), x[mut == "pfcrt 76T"], 0) +
-              ifelse(any(mut == "pfcrt 76K/T"), x[mut %in% "pfcrt 76K/T"], 0), # add the mixed and mutant to get prev
-            n = unique(n),
-            prev = x/n) %>%
-  mutate(mut = "crt_76T") %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
 
-
-
-
-# TYPE 2 - wildtype only -- clean names and reformat
-
-
-
-# TYPE 3 - sum(x) = n if EH are filtered out -- change EH names, clean and reformat
-
-
-
-# TYPE 4 - sum(x) = n if non-EH are filtered out -- change EH names, clean and reformat
-
-
-
-
-# TYPE 5 - only one marker reported -- clean names and reformat
-
-
-
-# TYPE 6 - any additional ones 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-### TYPE 1 ------------------------------
-# there is a group of entries where all x sum to n
-# so for these convert the EHs down by grouping by mutation
-# marker after converting the 72 muts to common type
-
-# type 1 when there are multiple markers reported so we sum mutant and mixed
-
-
-### TYPE 2 ------------------------------
-# and type 2 is the catch for when it is only WT
-pdcrtspl2 <- pdcrt %>%
-  group_by(uuid) %>%
-  mutate(xn = all(sum(x) == n[1])) %>%
-  filter(xn) %>%
-  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>%
-  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>%
-  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>%
-  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
-  summarise(x = sum(x), n = unique(n)) %>%
-  ungroup() %>%
-  group_by(across(c(-x, -n, -mut))) %>%
-  mutate(l = n()) %>%
-  filter(l==1 & all(mut=="pfcrt K76")) %>% # catch for when only one marker and its WT is reported
-  summarise(x = n - x,
-            n = unique(n),
-            prev = x/n) %>%
-  mutate(mut = "crt_76T") %>%
-  select(iso3c, admin_0, admin_1, site, lat, long,
-         year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
+# TYPE 2 - wildtype only -- clean names and reformat (now covered in type 1)
 
 # now to focus on when sum of x does not equal n
-# checked this covers all values of pdcrt$mut
-
 mut_loc <- "pfcrt 76T"
 wt_loc <- "pfcrt K76"
 mix_loc <- "pfcrt 76K/T"
 
 other_loc <- c("pfcrt 72-76 CxxxK", "pfcrt 72-76 CxxxT", "pfcrt 72-76 SxxxT")
 
-### TYPE 3 ------------------------------
+# TYPE 3 - sum(x) = n if non-EH are filtered out -- change EH names, clean and reformat
+# NOTE: EH = extended haplotypes 
 # The EH mutations for a number of samples are just extra information
 # determined by filtering these out and rechecking if sum of x equals n
 # These for these groups it is the same as above
 pdcrtspl3 <- pdcrt %>%
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
-  filter(!xn) %>%
-  filter((mut %in% c(mut_loc,wt_loc,mix_loc))) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter((mut %in% c(mut_loc,wt_loc,mix_loc))) %>% # EH only
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
-  filter(xn) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
   group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
   summarise(x = sum(x), n = unique(n)) %>%
   ungroup() %>%
-  group_by(across(c(-x, -n, -mut))) %>%
-  mutate(l = n()) %>%
-  filter(l > 1 | (l==1 & all(mut!="pfcrt K76"))) %>% # catch for when only one marker is reported
-  summarise(x = ifelse(any(mut == "pfcrt 76T"), x[mut == "pfcrt 76T"], 0) +
-              ifelse(any(mut == "pfcrt 76K/T"), 0.5*x[mut %in% "pfcrt 76K/T"], 0),
-            n = unique(n),
-            prev = x/n) %>%
-  mutate(mut = "crt_76T") %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
 
-# There are no examples here where l == 1 and they are pfcrt k76 so no need to switch the
-# prev around as for type 2
-
-
-
-### TYPE 4 ------------------------------
-# And conversely the same as above but filtering by the EH types and checking
-# for sum of x equal to n
-# However, these are all the same uuids as TYPE 4 so ignore
-pdcrt %>%
+# TYPE 4 - sum(x) = n if EH are filtered out -- change EH names, clean and reformat
+pdcrtspl4 <- pdcrt %>%
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
-  filter(!xn) %>%
-  filter(!(mut %in% c(mut_loc,wt_loc,mix_loc))) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter(!(mut %in% c(mut_loc,wt_loc,mix_loc))) %>% # non-EH only
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
-  filter(xn) %>%
-  filter(!(uuid %in% pdcrtspl3$uuid))
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
 
-# We have the vast majority now based on uuid capture
-rbind(pdcrtspl1,pdcrtspl2,pdcrtspl3) %>%
-  group_by(uuid)
-
-# the remaining ones do not have x sum equal to n at all, so
-# likely are mixed infections reported differently, they only report
-# one locus or they are typos...
-
-
-### TYPE 5 ------------------------------
+# TYPE 5 - only one marker reported -- clean names and reformat
 # these are single record uuids so WWARN only captured one marker
 pdcrtspl5 <- pdcrt %>%
-  filter(!(uuid %in% c(pdcrtspl1$uuid,pdcrtspl2$uuid,pdcrtspl3$uuid))) %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid,pdcrtspl3$uuid,pdcrtspl4$uuid))) %>%
   group_by(uuid) %>%
   filter(n()==1) %>%
   mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
   group_by(uuid) %>%
-  mutate(prev = x/n) %>%
   select(names(pdcrtspl3)) %>%
-  mutate(mut = "crt_76T") %>%
-  select(iso3c, admin_0, admin_1, site, lat, long,
-         year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
-
-
-### TYPE 6 ------------------------------
-# the others...
-
-# then the remaining weird ones
-# simple cases of just two mutations being off.
-# These are mixed infections being reallocated
-# TODO: Convert this code to be prevalence instead of frequency and check the 
-# specific studies to ensure this is correct
-# TODO: I think I actually need to go back to the studies themselves and fix this one
-pdcrtspl6 <- rbind(
-  pdcrt %>%
-    filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid))) %>%
-    group_by(uuid) %>%
-    filter(n() == 2) %>%
-    filter(sum(x) < n[1]) %>%
-    mutate(x = x + (n[1] - sum(x))/2), # TODO: convert to prev
-  pdcrt %>%
-    filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid))) %>%
-    group_by(uuid) %>%
-    filter(n() == 2) %>%
-    filter(sum(x) > n[1]) %>%
-    mutate(x = x - (sum(x) - n[1])/2) # TODO: convert to prev
-) %>%
-  mutate(mut = replace(mut, mut == "pfcrt 72-76 SxxxT", "pfcrt 76T")) %>%
-  mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
-  mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxK", "pfcrt K76")) %>%
-  filter(mut == "pfcrt 76T") %>%
-  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
-  summarise(x = sum(x), n = unique(n)) %>%
   mutate(prev = x/n) %>%
-  group_by(uuid) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+t6pmid <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% 
+  pull(pmid) %>% unique()
+
+# TYPE 6 - sum(x) < n - check that these are missing mixed mutants and add these
+pdcrtspl6 <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% 
+  split(.$pmid)
+
+# examine each pmid and fix
+pdcrtspl6$`11926004`$x[3] <- 5
+# 
+pdcrtspl6$`12474488`$mut <- c("pfcrt 76T","pfcrt K76","pfcrt 76K/T")
+pdcrtspl6$`12474488`$x <- c(1, 28, 14) # fixed this by ensuring that the ratios were correct -- error in the paper itself
+# 15322628 - 100% had 76T - paper reported EHs but omit these
+pdcrtspl6$`15322628` <- pdcrtspl6$`15322628`[1,]
+pdcrtspl6$`15322628`$x <- pdcrtspl6$`15322628`$n
+pdcrtspl6$`15322628`$mut <- "pfcrt 76T"
+pdcrtspl6$`15322628`$prev <- pdcrtspl6$`15322628`$x / pdcrtspl6$`15322628`$n
+
+# this is an usual haplotype CVMNN
+pdcrtspl6$`18840753`[3,] <- pdcrtspl6$`18840753`[2,] 
+pdcrtspl6$`18840753`$x[3] <- 1
+pdcrtspl6$`18840753`$mut[3] <- "pfcrt 76N"
+pdcrtspl6$`18840753`$prev <- pdcrtspl6$`18840753`$x/pdcrtspl6$`18840753`$n
+
+# 19398039 -- this data is actually frequency not prevalence 
+# I think the whole pmid needs fixing in reality
+pdcrtspl6$`19398039`
+
+
+
 
 ### TYPE 7 ------------------------------
 
