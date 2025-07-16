@@ -141,21 +141,39 @@ check_values_in_column(master_table_clean, "site_study_type", allowed_site_types
 # Some go the other way. Plus many data entry issues here on review. 
 # Leaving for now and will pass back to data entry
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
-master_table_clean$gene_mutation[indices_to_transform] <- sapply(
-  master_table_clean$gene_mutation[indices_to_transform],
-  collapse_k13_range, 
-  mutation_key = mutation_key
+# Define the 24 codon positions of interest
+mutation_positions <- as.numeric(gsub("[^0-9]", "", k13_mutations$mut))
+indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
+# Split into individual rows
+rows_to_expand <- master_table_clean[indices_to_transform, ]
+# Expand each using mapply (to pass both gene_mutation and full row)
+expanded_rows <- mapply(
+  expand_k13_range_to_rows,
+  gene_mutation = rows_to_expand$gene_mutation,
+  row_data = split(rows_to_expand, seq_len(nrow(rows_to_expand))),
+  MoreArgs = list(mutation_key = mutation_key, mutation_positions = mutation_positions),
+  SIMPLIFY = FALSE
+)
+# Combine all into one data frame
+expanded_rows_df <- dplyr::bind_rows(expanded_rows)
+
+# Create final master table by removing collapsed ones and adding expanded
+master_table_clean <- dplyr::bind_rows(
+  master_table_clean[-indices_to_transform, ],
+  expanded_rows_df
 )
 
-# For an individual asterisk with no mutants, we simply flip to ref and set all to total
-indices_to_transform <- which(grepl("^k13:[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)) &
+# For an individual position with an asterisk(indicating ref), we simply insert the ref allele and set variant_num to the total (really variant num should have been named carrier num)
+single_ref_indices_to_transform <- which(grepl("^k13:[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)) &
                                 master_table_clean$mutant_num == 0)
-master_table_clean$gene_mutation[indices_to_transform] <- as.character(sapply(
-  master_table_clean$gene_mutation[indices_to_transform],
+
+master_table_clean$gene_mutation[single_ref_indices_to_transform] <- as.character(sapply(
+  master_table_clean$gene_mutation[single_ref_indices_to_transform],
   convert_k13_asterisk, 
   mutation_key = mutation_key
 ))
-master_table_clean$mutant_num[indices_to_transform] <- master_table_clean$total_num[indices_to_transform]
+
+master_table_clean$mutant_num[single_ref_indices_to_transform] <- master_table_clean$total_num[single_ref_indices_to_transform]
 
 # OJ: This last one had a STOP codon based on the paper
 # https://journals.plos.org/plosone/article/figure?id=10.1371/journal.pone.0235401.t006
