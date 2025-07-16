@@ -9,7 +9,7 @@ Authors@R:
              comment = c(ORCID = "0000-0003-2374-0741")),
       person(given = "George",
              family = "Tollefson",
-             role = c("aut", "cre"),
+             role = c("aut"),
              email = "george_tollefson@brown.edu",
              comment = c(ORCID = "0000-0002-7924-7844")))
 Description: scrub is an R package set up as a research compendium, which is
