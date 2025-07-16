@@ -939,12 +939,200 @@ pdcrtspl6$`18840753`$x[3] <- 1
 pdcrtspl6$`18840753`$mut[3] <- "pfcrt 76N"
 pdcrtspl6$`18840753`$prev <- pdcrtspl6$`18840753`$x/pdcrtspl6$`18840753`$n
 
-# 19398039 -- this data is actually frequency not prevalence 
-# I think the whole pmid needs fixing in reality
-pdcrtspl6$`19398039`
+# 19398039 -- this data is actually frequency not prevalence but don't think we can convert this back
+# data is extracted correctly, but just need to recalculate prevalence so they add to 1
+pdcrtspl6$`19398039`$prev <- pdcrtspl6$`19398039`$x/pdcrtspl6$`19398039`$n
+
+# 19704124 - convert percentages to raw numbers. error in n also
+pdcrtspl6$`19704124`$n <- 269
+pdcrtspl6$`19704124`$mut <- c("pfcrt K76", "pfcrt 76T")
+pdcrtspl6$`19704124`$x <- c(153,116)
+pdcrtspl6$`19704124`$prev <- pdcrtspl6$`19704124`$x/pdcrtspl6$`19704124`$n
+
+# 22839209 is just extracted wrong
+pdcrtspl6$`22839209`$n <- 106
+pdcrtspl6$`22839209`$mut <- c("pfcrt K76", "pfcrt 76T")
+pdcrtspl6$`22839209`$x <- c(5,101)
+pdcrtspl6$`22839209`$prev <- pdcrtspl6$`22839209`$x/pdcrtspl6$`22839209`$n
+
+# 24727053 - typo in the paper itself
 
 
 
+# 26392510 missing mixed infections
+pdcrtspl6$`26392510`[3,] <- pdcrtspl6$`26392510`[2,] # add a row
+pdcrtspl6$`26392510`$prev <- c(9.8/100, 76.5/100, 13.7/100)
+pdcrtspl6$`26392510`$x <- c(20,155,28)
+pdcrtspl6$`26392510`$prev <- pdcrtspl6$`26392510`$x/pdcrtspl6$`26392510`$n
+pdcrtspl6$`26392510`$mut <- c("pfcrt 76T", "pfcrt K76", "pfcrt 76K/T")
+
+# 1 mixed, the rest are K76
+pdcrtspl6$`27089479`$x[2] <- 1
+pdcrtspl6$`27089479`$mut <- c("pfcrt K76", "pfcrt 76K/T")
+pdcrtspl6$`27089479`$prev <- pdcrtspl6$`27089479`$x/pdcrtspl6$`27089479`$n
+
+# typo from text -- missed a haplotype
+pdcrtspl6$`27222806`$x[3] <- 2
+
+# clean this one up
+pdcrtspl6$`27222806` <- pdcrtspl6$`27222806` %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(mut) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# this study has extracted the two arms separately - combine them and recalculate
+pdcrtspl6$`27565897` <- pdcrtspl6$`27565897` %>%
+  group_by(mut) %>%
+  mutate(x = sum(x), n = 205, prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# need to add a row for mixed infections
+pdcrtspl6$`28347314`[3,] <- pdcrtspl6$`28347314`[2,]
+pdcrtspl6$`28347314`$x <- c(87,46,31)
+pdcrtspl6$`28347314`$prev <- pdcrtspl6$`28347314`$x/pdcrtspl6$`28347314`$n
+pdcrtspl6$`28347314`$mut <- c("pfcrt 76T", "pfcrt K76", "pfcrt 76K/T")
+
+# add in the mixed which were missing
+pdcrtspl6$`28916443`[3,] <- pdcrtspl6$`28916443`[2,]
+pdcrtspl6$`28916443`$x <- c(29,26,11)
+pdcrtspl6$`28916443`$prev <- pdcrtspl6$`28916443`$x/pdcrtspl6$`28916443`$n
+pdcrtspl6$`28916443`$mut <- c("pfcrt 76T", "pfcrt K76", "pfcrt 76K/T")
+
+# typo in the table -- assuming the percentage is correct and the value in the text
+pdcrtspl6$`29854394`$x[2] <- 86
+
+# 30404640 is correct because the remaining un-extracted values are other haplotypes. impossible to extract at site level
+
+# missing mixed infections
+pdcrtspl6$`31358591`[3,] <- pdcrtspl6$`31358591`[2,]
+pdcrtspl6$`31358591`$x[3] <- 6
+pdcrtspl6$`31358591`$mut <- "pfcrt 76K/T"
+pdcrtspl6$`31358591`$prev <- pdcrtspl6$`31358591`$x/pdcrtspl6$`31358591`$n
+
+
+# based on percentages in table 1 I think there's a typo -- 77/84 WT
+pdcrtspl6$`31932374`$x[1] <- 77
+pdcrtspl6$`31932374`$mut <- c("pfcrt K76", "pfcrt 76T")
+pdcrtspl6$`31932374`$prev <- pdcrtspl6$`31932374`$x/pdcrtspl6$`31932374`$n
+
+# mixed missing -- n - x_wt - x_mut
+pdcrtspl6$`32019571` <- pdcrtspl6$`32019571` %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(mut, admin_1) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+add_a_row <- function(df, x_new, mut_new) {
+  rows <- nrow(df) 
+  df <- df %>%
+    bind_rows(df[1, ])
+  df$x[rows+1] <- x_new
+  df$mut[rows+1] <- mut_new
+  df$prev <- df$x/df$n
+  if(sum(df$x) != df$n[1]) {
+    print("x does not sum to n still")
+  }
+  return(df)
+}
+
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl6$`32019571`)/2)) {
+  df <- pdcrtspl6$`32019571`[c(2*i-1,2*i),]
+  
+  mixed <- unique(df$n) - sum(df$x)
+  
+  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+fixed %>% 
+  dplyr::group_by(iso3c) %>%
+  dplyr::reframe(sum(x) == unique(n))
+
+pdcrtspl6$`32019571` <- fixed
+
+# error in WT
+pdcrtspl6$`35135546`$x[2] <- 87-62
+pdcrtspl6$`35135546`$prev <- pdcrtspl6$`35135546`$x/pdcrtspl6$`35135546`$n
+sum(pdcrtspl6$`35135546`$x) == unique(pdcrtspl6$`35135546`$n)
+
+# combine all together
+fixed_pmid6 <- c(11926004, 12474488, 15322628, 18840753, 19398039, 19704124, 
+                 22839209, 26392510, 27089479, 27222806, 27565897, 28347314, 
+                 28916443, 29854394, 31358591, 31932374, 32019571, 35135546)
+
+setdiff(fixed_pmid6, t6pmid)  # meaning all of them are now fixed
+
+# join back together
+pdcrtspl6 <- do.call(rbind, pdcrtspl6)
+pdcrtspl6$prev <- pdcrtspl6$x/pdcrtspl6$n
+
+# check that sum(x) == n
+## manually checked that all of those that fail are as accurate as possible and therefore all okay
+pdcrtspl6 %>%
+  group_by(pmid, lat, long, admin_1, study_start_year, study_end_year) %>%
+  dplyr::reframe(equal = ( sum(x) == unique(n))) %>%
+  dplyr::filter(equal == FALSE)
+
+# TODO: FIX TYPE 7 - sum(x) > n
+
+pdcrtspl7 <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid, pdcrtspl6$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) > n[1]) %>% 
+  split(.$pmid)
+
+# fix these
+
+# "15238686" - EH gives correct values
+pdcrtspl7$`15238686` <- pdcrtspl7$`15238686` %>%
+  dplyr::filter(mut %in% other_loc) %>% 
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  dplyr::group_by(mut) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# 15814601 - denominator is wrong -- this is the control group. assuming x is correct from figure
+pdcrtspl7$`15814601`$n <- 49
+pdcrtspl7$`15814601`$prev <- pdcrtspl7$`15814601`$x/pdcrtspl7$`15814601`$n
+
+# 16516311 correct from table 6 combining haplotypes
+pdcrtspl7$`16516311` <- pdcrtspl7$`16516311`[1:3,]
+pdcrtspl7$`16516311`$x <- c(21, 7, 20)
+pdcrtspl7$`16516311`$n <- 48
+pdcrtspl7$`16516311` <- pdcrtspl7$`16516311` %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  dplyr::group_by(mut) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+
+# 17158810
+pdcrtspl7$`17158810` %>% View()
+
+
+
+
+
+
+
+
+
+
+
+fixed_pmid7 <- c(15238686, 15814601, 16516311)
 
 ### TYPE 7 ------------------------------
 
