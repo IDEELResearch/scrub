@@ -10,6 +10,7 @@
 #' 
 #' @return A data.frame with expanded rows, or NULL if no matching codons
 #' 
+#' @export
 expand_k13_range_to_rows <- function(gene_mutation, row_data, mutation_key, mutation_positions) {
   gene_mutation <- tolower(gene_mutation)
   
