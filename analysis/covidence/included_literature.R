@@ -22,7 +22,7 @@ lines <- readLines("analysis/covidence/medline.txt")
 uid_label_rows <- grep("^Unique Identifier\\s*$", lines)
 
 # The actual PMIDs are the next line after each label
-pmid_lines <- lines[uid_label_idx + 1]
+pmid_lines <- lines[uid_label_rows + 1]
 
 # Trim leading/trailing whitespace
 medline <- trimws(pmid_lines)
