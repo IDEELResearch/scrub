@@ -13,7 +13,12 @@
 #' @examples
 #' # Example usage (not run):
 #' # process_survey("S0001")
-#' 
+#'
+#' @importFrom dplyr filter pull anti_join mutate select
+#' @importFrom stringr str_detect str_extract
+#' @importFrom purrr map_dfr
+#' @importFrom utils setTxtProgressBar
+#' @importFrom rlang .data
 #' @export
 process_survey <- function(each_survey) {
   # Update the progress bar (external objects: pb, unique_surveys assumed)

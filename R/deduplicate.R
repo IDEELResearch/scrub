@@ -36,6 +36,12 @@
 #' @return A cleaned data.frame ready for use in STAVE 
 #'   (see \url{https://github.com/mrc-ide/STAVE}).
 #'
+#' @importFrom dplyr filter group_by group_split mutate select anti_join bind_rows row_number distinct
+#' @importFrom purrr map_dfr
+#' @importFrom tidyr unite
+#' @importFrom stringr str_detect str_extract
+#' @importFrom rlang .data
+#' @importFrom stats setNames
 #' @export
 deduplicate <- function(df) {
   ### Scenario 1: Identify potential duplicates reported across different study_IDs
