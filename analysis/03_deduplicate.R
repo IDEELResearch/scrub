@@ -22,7 +22,12 @@ safe_read <- function(path) {
 }
 
 # Read in each cleaned file
-clean_geoff <- safe_read(here("analysis", "data-derived", "geoff_clean.rds"))
+# Delet this code once GT fixed geoff clean script
+clean_geoff <- readRDS("analysis/data-derived/geoff_clean.rds")
+clean_geoff <- clean_geoff %>% 
+  filter(!study_ID == "geoff_S0010KaramokoMgemUnpub")
+
+# clean_geoff <- safe_read(here("analysis", "data-derived", "geoff_clean.rds"))
 clean_wwarn <- safe_read(here("analysis", "data-derived", "wwarn_clean.rds"))
 clean_pf7k <- safe_read(here("analysis", "data-derived", "pf7k_clean.rds"))
 clean_who <- safe_read(here("analysis", "data-derived", "who_clean.rds"))
@@ -39,13 +44,6 @@ africa_iso3 <- c(
 
 # Combine all cleaned df into on dataframe
 column_names <- get_column_names_for_clean()
-# full_bind <- rbind(
-#   clean_geoff %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
-#   clean_wwarn %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-#   clean_pf7k %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-#   clean_who %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
-# )
-
 full_bind <- rbind(
   clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
   clean_wwarn %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
@@ -70,7 +68,7 @@ filtered_pmid_df <- duplicate_pmid_df %>%
 removed_pmid_df <- duplicate_pmid_df %>%
   filter(keep_row == "remove")
 
-# ---- Remove duplicates based on data ----
+# ---- remove duplicates based on data ----
 # Identify studies that may be duplicates
 dedup_output = deduplicate(filtered_pmid_df)
 # Final dataframe with added column indicating if a row should be keeped or removed
@@ -88,15 +86,15 @@ saveRDS(dedup_df_overall, here("analysis/data-derived/final_data.rds"))
 
 ##### SUMMARY STATS
 create_summary <- function(duplicate_list) {
-  # Step 1: Tag each list item with its database_signature
+  # Tag each list item with its database_signature
   database_signatures <- sapply(duplicate_list, function(df) {
     paste(sort(unique(df$database)), collapse = "|")
   })
   
-  # Step 2: Get all unique combinations
+  # Get all unique combinations
   unique_combinations <- unique(database_signatures)
   
-  # Step 3: For each combination, bind relevant list entries and count unique values
+  # For each combination, bind relevant list entries and count unique values
   combo_summary <- do.call(rbind, lapply(unique_combinations, function(combination) {
     # Get indices of list entries with this combination
     matching_indices <- which(database_signatures == combination)
@@ -125,7 +123,7 @@ create_summary <- function(duplicate_list) {
     )
   }))
   
-  # Optional: arrange
+  # Arrange
   combo_summary <- combo_summary %>%
     arrange(desc(total_unique_studies))
   
@@ -134,14 +132,17 @@ create_summary <- function(duplicate_list) {
 
 # PubMed ID
 pmid_summary_df <- create_summary(duplicate_pmid_list)
+write.csv(pmid_summary_df, "analysis/data-out/deduplication_summary/deduplication_pmid_summary.csv")
 
 # Different Studies
 diff_study_summary_df <- create_summary(duplicate_diff_list)
+write.csv(diff_study_summary_df, "analysis/data-out/deduplication_summary/deduplication_diff_study_summary.csv")
 
 # Same studies
 same_study_summary_df <- create_summary(duplicate_same_list)
+write.csv(same_study_summary_df, "analysis/data-out/deduplication_summary/deduplication_same_study_summary.csv")
 
 geoff_entries <- duplicate_pmid_list[
   sapply(duplicate_pmid_list, function(df) any(df$database == "GEOFF"))
 ]
-
+write_rds(geoff_entries, "analysis/data-out/deduplication_summary/deduplication_geoff.rds")

@@ -1,0 +1,8 @@
+"","database_signature","total_unique_studies","total_keep_studies","total_remove_studies","total_unique_surveys","total_keep_surveys","total_remove_surveys","total_rows","total_kept_rows","total_remove_rows","n_list_entries"
+"1","WHO",8,4,4,8,4,4,32,16,16,15
+"2","GEOFF|WHO",8,4,4,9,5,4,176,161,15,7
+"3","GEOFF|Pf7k",4,2,2,6,3,3,184,57,127,18
+"4","GEOFF",4,2,2,20,10,10,60,30,30,30
+"5","Pf7k",3,2,1,4,2,2,6,3,3,3
+"6","GEOFF|Pf7k|WWARN",3,1,2,3,1,2,44,24,20,1
+"7","WWARN",2,1,1,2,1,1,6,3,3,3
