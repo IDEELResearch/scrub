@@ -1118,21 +1118,34 @@ pdcrtspl7$`16516311` <- pdcrtspl7$`16516311` %>%
   mutate(x = sum(x), n = unique(n), prev = x/n) %>%
   distinct(mut, .keep_all = TRUE)
 
+# 17158810 - only gives prevalence of 76T
+pdcrtspl7$`17158810` <- pdcrtspl7$`17158810`[1,] 
+pdcrtspl7$`17158810`$mut <- "pfcrt 76T"
+pdcrtspl7$`17158810`$x <- 104
+pdcrtspl7$`17158810`$n <- 130
+pdcrtspl7$`17158810`$prev <- pdcrtspl7$`17158810`$x / pdcrtspl7$`17158810`$n
 
-# 17158810
-pdcrtspl7$`17158810` %>% View()
-
-
-
-
-
-
-
-
-
+# correct but WT # is incorrect - typo
+pdcrtspl7$`17224049`$x[3] <- pdcrtspl7$`17224049`$n[1] - pdcrtspl7$`17224049`$x[1] - pdcrtspl7$`17224049`$x[2]
+pdcrtspl7$`17224049`$prev <- pdcrtspl7$`17224049`$x / pdcrtspl7$`17224049`$n
 
 
-fixed_pmid7 <- c(15238686, 15814601, 16516311)
+pdcrtspl7$`17376240`$mut <- c("pfcrt 72-76 CxxxK", "pfcrt 72-76 SxxxT",
+                              "pfcrt 72-76 CxxxT", "pfcrt 76T",
+                              "pfcrt 76K/T", "pfcrt 76T") # all distinct haplotypes
+
+pdcrtspl7$`17376240`$prev <- c(0.097, 0.791, 0.013, 
+                               0.086, 0.002, 0.012)
+# TODO: try and get these to sum correctly
+pdcrtspl7$`17376240`$x <- round(pdcrtspl7$`17376240`$n * pdcrtspl7$`17376240`$prev, digits = 0)
+sum(pdcrtspl7$`17376240`$x) == pdcrtspl7$`17376240`$n[1]
+
+
+
+
+
+
+fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049)
 
 ### TYPE 7 ------------------------------
 
