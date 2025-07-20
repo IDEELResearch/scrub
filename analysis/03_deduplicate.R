@@ -26,6 +26,18 @@ safe_read <- function(path) {
 clean_geoff <- readRDS("analysis/data-derived/geoff_clean.rds")
 clean_geoff <- clean_geoff %>% 
   filter(!study_ID == "geoff_S0010KaramokoMgemUnpub")
+clean_geoff <- clean_geoff %>%
+  mutate(study_type = if_else(
+    study_ID %in% c("geoff_S0006WrairKenreadKen", 
+                    "geoff_S0011JacquesMariGmmsUnpub", 
+                    "geoff_S0014YoungRwaUnpub"),
+    "preprint",
+    study_type
+  )) 
+clean_geoff$url[is.na(clean_geoff$url)] <- "TBD"
+clean_geoff <- clean_geoff[!is.na(clean_geoff$collection_day), ]
+clean_geoff <- clean_geoff[!is.na(clean_geoff$variant_num), ]
+clean_geoff <- clean_geoff[!is.na(clean_geoff$total_num), ]
 
 # clean_geoff <- safe_read(here("analysis", "data-derived", "geoff_clean.rds"))
 clean_wwarn <- safe_read(here("analysis", "data-derived", "wwarn_clean.rds"))
@@ -132,17 +144,18 @@ create_summary <- function(duplicate_list) {
 
 # PubMed ID
 pmid_summary_df <- create_summary(duplicate_pmid_list)
-write.csv(pmid_summary_df, "analysis/data-out/deduplication_summary/deduplication_pmid_summary.csv")
+write.csv(pmid_summary_df, "analysis/data-deduplication/deduplication_pmid_summary.csv")
 
 # Different Studies
 diff_study_summary_df <- create_summary(duplicate_diff_list)
-write.csv(diff_study_summary_df, "analysis/data-out/deduplication_summary/deduplication_diff_study_summary.csv")
+write.csv(diff_study_summary_df, "analysis/data-deduplication/deduplication_diff_study_summary.csv")
 
 # Same studies
 same_study_summary_df <- create_summary(duplicate_same_list)
-write.csv(same_study_summary_df, "analysis/data-out/deduplication_summary/deduplication_same_study_summary.csv")
+write.csv(same_study_summary_df, "analysis/data-deduplication/deduplication_same_study_summary.csv")
 
 geoff_entries <- duplicate_pmid_list[
   sapply(duplicate_pmid_list, function(df) any(df$database == "GEOFF"))
 ]
-write_rds(geoff_entries, "analysis/data-out/deduplication_summary/deduplication_geoff.rds")
+write_rds(geoff_entries, "analysis/data-deduplication/deduplication_geoff.rds")
+
