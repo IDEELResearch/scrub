@@ -13,6 +13,9 @@ stave <- STAVE::STAVE_object$new()
 # append data
 data_stave <- convert_stave(data)
 
+# To-do: Delete
+data_stave$counts_dataframe <- data_stave$counts_dataframe[-3749, ]
+
 # STAVE errors related to Geoff that we can fix now: ------------------------
 
 # Error 1 - Fixed Below: Not so much an error but a clean that should probably go into convert_stave
