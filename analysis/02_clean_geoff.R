@@ -489,14 +489,32 @@ cat("The following study_IDs are present in master_table_formatted but missing f
 print(unexpected_study_ids) #Add commentMore actions
 
 # 11. Step 11 - Final checks for required input to stave
+na_variant_num <- master_table_formatted %>%
+  filter(is.na(variant_num)) %>%
+  distinct(survey_ID) %>%
+  mutate(problem_column = "variant_num")
 
+na_total_num <- master_table_formatted %>%
+  filter(is.na(total_num)) %>%
+  distinct(survey_ID) %>%
+  mutate(problem_column = "total_num")
 
-problem_surveys_detailed <- master_table_formatted %>%
-  select(survey_ID, variant_num, total_num, url) %>%
-  pivot_longer(cols = c(variant_num, total_num, url), names_to = "column", values_to = "value") %>%
-  filter(is.na(value)) %>%
-  distinct(survey_ID, column) %>%
-  arrange(survey_ID, column)
+na_url <- master_table_formatted %>%
+  filter(is.na(url)) %>%
+  distinct(survey_ID) %>%
+  mutate(problem_column = "url")
+
+# Combine all NA findings
+problem_surveys <- bind_rows(na_variant_num, na_total_num, na_url) %>%
+  arrange(survey_ID, problem_column)
+
+if (nrow(problem_surveys) > 0) {
+  message("Surveys with missing values:")
+  print(problem_surveys)
+} else {
+  message("No NAs found in variant_num, total_num, or url.")
+}
+
 
 # 12. Step 12 - Save Formatted Data ---------
 
