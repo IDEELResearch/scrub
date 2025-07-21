@@ -140,12 +140,23 @@ check_values_in_column(master_table_clean, "site_study_type", allowed_site_types
 # TODO: These are inconcistently entered. Some use mutant_num to refer to REF ranges
 # Some go the other way. Plus many data entry issues here on review. 
 # Leaving for now and will pass back to data entry
+
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
+
 # Define the 24 codon positions of interest
+# Extract K13 mutations from the mutation dictionary
+k13_mutations <- read_csv(here("analysis", "data-raw", "mutation_dictionary.csv")) %>%
+  filter(gene == "k13") %>%
+  mutate(mut = sub("^[A-Z]", "", mut)) %>%  # Remove the ref(first) codon letter (e.g., P553L → 553L)
+  select(mut)
+
 mutation_positions <- as.numeric(gsub("[^0-9]", "", k13_mutations$mut))
+
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
+
 # Split into individual rows
 rows_to_expand <- master_table_clean[indices_to_transform, ]
+
 # Expand each using mapply (to pass both gene_mutation and full row)
 expanded_rows <- mapply(
   expand_k13_range_to_rows,
@@ -154,6 +165,7 @@ expanded_rows <- mapply(
   MoreArgs = list(mutation_key = mutation_key, mutation_positions = mutation_positions),
   SIMPLIFY = FALSE
 )
+
 # Combine all into one data frame
 expanded_rows_df <- dplyr::bind_rows(expanded_rows)
 
@@ -309,14 +321,7 @@ master_table_formatted <- master_table_clean %>%
                 database = "database"
   )
 
-
 # 6. Step 6 - Impute k13 reference survey records not explicitly entered in data entry # ------------
-
-# Extract K13 mutations from the mutation dictionary
-k13_mutations <- read_csv(here("analysis", "data-raw", "mutation_dictionary.csv")) %>%
-  filter(gene == "k13") %>%
-  mutate(mut = sub("^[A-Z]", "", mut)) %>%  # Remove the ref(first) codon letter (e.g., P553L → 553L)
-  select(mut)
 
 # Define K13 reference range
 k13_range <- 1:726
@@ -483,7 +488,17 @@ unexpected_study_ids <- master_table_simplified %>%
 cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
 print(unexpected_study_ids) #Add commentMore actions
 
-# 11. Step 11 - Save Formatted Data ---------
+# 11. Step 11 - Final checks for required input to stave
+
+
+problem_surveys_detailed <- master_table_formatted %>%
+  select(survey_ID, variant_num, total_num, url) %>%
+  pivot_longer(cols = c(variant_num, total_num, url), names_to = "column", values_to = "value") %>%
+  filter(is.na(value)) %>%
+  distinct(survey_ID, column) %>%
+  arrange(survey_ID, column)
+
+# 12. Step 12 - Save Formatted Data ---------
 
 # Save the final merged_df as an RDS file
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
