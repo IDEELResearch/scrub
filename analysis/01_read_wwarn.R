@@ -1241,25 +1241,50 @@ pdcrtspl7$`21645634`$n <- 43
 pdcrtspl7$`21645634`$prev <- pdcrtspl7$`21645634`$x/pdcrtspl7$`21645634`$n
 
 
+# issues with mixed and numbers in text
+pdcrtspl7$`22004584`$x <- c(3, 140)
+pdcrtspl7$`22004584` <- add_a_row(pdcrtspl7$`22004584`, 1, "pfcrt 76K/T")
+pdcrtspl7$`22004584`$prev <- pdcrtspl7$`22004584`$x / pdcrtspl7$`22004584`$n
 
+# TODO: fix this study who knows what's happening here -- circle back but needs fixing because prev > 1
+pdcrtspl7$`22208458` %>% View()
+pdcrt %>% filter(pmid == 22208458) %>% arrange(iso3c) %>% View()
 
+### issues with this whole pmid tbh
+pdcrtspl7$`22453078` %>% View()
+pdcrt %>% filter(pmid == 22453078) %>% View()
 
+pmid22453078 <- pdcrt %>% 
+  filter(pmid == 22453078) %>% 
+  split(.$iso3c)
 
+pmid22453078$BGD <- pmid22453078$BGD[3:4,]
+pmid22453078$BGD$prev <- pmid22453078$BGD$x / pmid22453078$BGD$n
 
+pmid22453078$GHA$x <- c(22,3)
+pmid22453078$GHA$n <- c(25, 25)
+pmid22453078$GHA$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pmid22453078$GHA$prev <- pmid22453078$GHA$x / pmid22453078$GHA$n
 
+pmid22453078$KHM <- pmid22453078$KHM[1:2,]
+pmid22453078$KHM$x <- c(32,1)
+pmid22453078$KHM$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pmid22453078$KHM$prev <- pmid22453078$KHM$x / pmid22453078$KHM$n
 
+pmid22453078$LAO <- pmid22453078$LAO[4:5,]
+pmid22453078$LAO$prev <- pmid22453078$LAO$x / pmid22453078$LAO$n
 
+pmid22453078$PHL <- pmid22453078$PHL[4:5,]
+pmid22453078$PHL$prev <- pmid22453078$PHL$x / pmid22453078$PHL$n
 
+pmid22453078$PNG <- pmid22453078$PNG[3:4,]
+pmid22453078$PNG$prev <- pmid22453078$PNG$x / pmid22453078$PNG$n
 
+pmid22453078$THA <- pmid22453078$THA[2,]
+pmid22453078$VUT <- pmid22453078$VUT[2,]
 
-
-
-
-
-
-
-
-
+pdcrtspl7$`22453078` <- do.call(rbind, pmid22453078)
+pdcrt <- pdcrt %>% filter(!(pmid == 22453078))
 
 
 
@@ -1271,7 +1296,8 @@ pdcrtspl7$`21645634`$prev <- pdcrtspl7$`21645634`$x/pdcrtspl7$`21645634`$n
 
 
 fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
-                 17488902, 18008244, 19346369, 19718439, 21457533, 21645634)
+                 17488902, 18008244, 19346369, 19718439, 21457533, 21645634,
+                 22004584, 2453078)
 
 ### TYPE 7 ------------------------------
 
