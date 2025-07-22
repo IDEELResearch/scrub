@@ -1136,16 +1136,83 @@ pdcrtspl7$`17376240`$mut <- c("pfcrt 72-76 CxxxK", "pfcrt 72-76 SxxxT",
 
 pdcrtspl7$`17376240`$prev <- c(0.097, 0.791, 0.013, 
                                0.086, 0.002, 0.012)
-# TODO: try and get these to sum correctly
+
+# TODO: try and get these to sum correctly -- when you convert and sum you get sum(x) = 596
 pdcrtspl7$`17376240`$x <- round(pdcrtspl7$`17376240`$n * pdcrtspl7$`17376240`$prev, digits = 0)
 sum(pdcrtspl7$`17376240`$x) == pdcrtspl7$`17376240`$n[1]
+# fix mutation names
+pdcrtspl7$`17376240`$mut <- c("pfcrt K76", "pfcrt 76T",
+                              "pfcrt 76T", "pfcrt 76K/T",
+                              "pfcrt 76K/T", "pfcrt 76T") 
+pdcrtspl7$`17376240` <-
+  pdcrtspl7$`17376240` %>%
+    dplyr::group_by(mut) %>%
+    mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+    distinct(mut, .keep_all = TRUE)
+
+## https://d1wqtxts1xzle7.cloudfront.net/79635048/0760844-libre.pdf?1643531950=&response-content-disposition=inline%3B+filename%3DPlasmodium_falciparum_genotypes_associat.pdf&Expires=1753198742&Signature=GOBGCSa8gVB8FGdw-AM59OJqqdvnYil3lr1t7oPEX9qHGPwXCefTLp3u~woQzl3WX5key~bukoLgQzz7Aoe29J9CLb6z-U3mQDNQ979JRxQTlswGAXDeFLCXRHKuuU8e9vQk~nIdZNWYymsPc0Tvl6BRbydzRT2bAWMSsSMypvn7WfrGDXE7KtSqQWXED8IE8wT7rIxxc-B6JduNvbW8LQrh1hqi0vDU~YprB6OPcCdp9AL~PLBLM468UVTjyYtEPpf6adZKQBnd82OvWOw1J6Gbtuau~W2F6eh2uZh43k0aq9W7L1c29vzKk~nLEx8HyY-ty3PDhCJ4R67viM0j6w__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA
+# double count mixed in the text
+pdcrtspl7$`17488902`$x <- c(93, 368)
+pdcrtspl7$`17488902` <- add_a_row(df = pdcrtspl7$`17488902`, 17, "pfcrt 76K/T")
+pdcrtspl7$`17488902`$prev <- pdcrtspl7$`17488902`$x/pdcrtspl7$`17488902`$n
+
+# Mixed infections contribute equally to the prevalence estimates for both alleles.
+pdcrtspl7$`18008244` %>% View()
+
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl7$`18008244`)/2)) {
+  df <- pdcrtspl7$`18008244`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+fixed %>% 
+  dplyr::group_by(year) %>%
+  dplyr::reframe(sum(x) == unique(n))
+
+pdcrtspl7$`18008244` <- fixed
+
+# issue seems to be with all of this study -- for some reason, only one in this pdcrt list
+pdcrtspl7$`19346369` %>% View()
 
 
 
 
 
 
-fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
+                 17488902, 18008244)
 
 ### TYPE 7 ------------------------------
 
