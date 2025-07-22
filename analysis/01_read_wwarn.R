@@ -1286,6 +1286,42 @@ pmid22453078$VUT <- pmid22453078$VUT[2,]
 pdcrtspl7$`22453078` <- do.call(rbind, pmid22453078)
 pdcrt <- pdcrt %>% filter(!(pmid == 22453078))
 
+# remove those that weren't amplified and combine haplotypes - table 2
+pdcrtspl7$`22641431` <- pdcrtspl7$`22641431` %>% 
+  dplyr::filter(!(mut %in% other_loc)) %>%
+  arrange(year, mut)
+pdcrtspl7$`22641431`$x <- c(16, 49,            # 1999
+                            8, 32, 32)         # 2008 
+pdcrtspl7$`22641431`$n <- c(65, 65,            # 1999
+                            72, 72, 72)        # 2008 
+
+pdcrtspl7$`22641431`$prev <- pdcrtspl7$`22641431`$x / pdcrtspl7$`22641431`$n
+
+# so many errors... table 4
+pdcrtspl7$`22904636` <- pdcrtspl7$`22904636`[4:5,] 
+pdcrtspl7$`22904636`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`22904636`$x <- c(40,1)
+pdcrtspl7$`22904636`$n <- c(42, 42)
+pdcrtspl7$`22904636` <- add_a_row(pdcrtspl7$`22904636`, 1, "pfcrt K76")
+pdcrtspl7$`22904636`$prev <- pdcrtspl7$`22904636`$x / pdcrtspl7$`22904636`$n
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1297,7 +1333,7 @@ pdcrt <- pdcrt %>% filter(!(pmid == 22453078))
 
 fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
                  17488902, 18008244, 19346369, 19718439, 21457533, 21645634,
-                 22004584, 2453078)
+                 22004584, 2453078, 22641431)
 
 ### TYPE 7 ------------------------------
 
