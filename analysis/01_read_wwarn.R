@@ -1181,7 +1181,66 @@ fixed %>%
 pdcrtspl7$`18008244` <- fixed
 
 # issue seems to be with all of this study -- for some reason, only one in this pdcrt list
-pdcrtspl7$`19346369` %>% View()
+pdcrt %>% dplyr::filter(pmid==19346369) %>% 
+  group_by(year) %>%
+  reframe(sum(x), n = n) %>%
+  distinct()
+
+# fix and add to pdcrtspl7 and then remove from pdcrt so that they aren't counted twice
+
+pmid19346369 <- pdcrt %>% dplyr::filter(pmid==19346369) %>%
+  dplyr::arrange(year, mut) %>%
+  dplyr::filter(!(mut %in% other_loc))
+
+
+pmid19346369$x <- c(42,4,109,
+                    55,103,5,
+                    21,51,2,
+                    24,36,13) 
+pmid19346369$n <- c(rep(155,3),
+                    rep(163,3),
+                    rep(74,3),
+                    rep(73,3))
+pmid19346369$prev <- pmid19346369$x/pmid19346369$n
+
+pdcrtspl7$`19346369` <- pmid19346369
+
+# remove from the rest so that we only keep the fixed data
+pdcrt <- pdcrt %>%
+  filter(pmid != 19346369)
+
+# # If both alleles were identified at one locus both were included as numerators but only counted as one in the denominator.
+# i.e. mixed are double counted
+pdcrtspl7$`19718439` %>% View()
+
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl7$`19718439`)/2)) {
+  df <- pdcrtspl7$`19718439`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+pdcrtspl7$`19718439` <- fixed
+
+# double counted EH
+pdcrtspl7$`21457533` <- pdcrtspl7$`21457533`[4:6,]
+pdcrtspl7$`21457533`$x <- c(28,1,2)
+pdcrtspl7$`21457533`$n <- 31
+pdcrtspl7$`21457533`$prev <- pdcrtspl7$`21457533`$x/pdcrtspl7$`21457533`$n
+
+# 21645634 - fixing this being extracted wrong. reclassifying day 0 mixed that was classified as WT in table
+pdcrtspl7$`21645634` <- pdcrtspl7$`21645634`[3:5,]
+pdcrtspl7$`21645634`$x <- c(4,32,7)
+pdcrtspl7$`21645634`$n <- 43
+pdcrtspl7$`21645634`$prev <- pdcrtspl7$`21645634`$x/pdcrtspl7$`21645634`$n
+
+
 
 
 
@@ -1212,7 +1271,7 @@ pdcrtspl7$`19346369` %>% View()
 
 
 fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
-                 17488902, 18008244)
+                 17488902, 18008244, 19346369, 19718439, 21457533, 21645634)
 
 ### TYPE 7 ------------------------------
 
