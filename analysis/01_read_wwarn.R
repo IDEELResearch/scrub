@@ -1157,7 +1157,7 @@ pdcrtspl7$`17488902` <- add_a_row(df = pdcrtspl7$`17488902`, 17, "pfcrt 76K/T")
 pdcrtspl7$`17488902`$prev <- pdcrtspl7$`17488902`$x/pdcrtspl7$`17488902`$n
 
 # Mixed infections contribute equally to the prevalence estimates for both alleles.
-pdcrtspl7$`18008244` %>% View()
+pdcrtspl7$`18008244` 
 
 fixed <- NULL
 for(i in 1:(nrow(pdcrtspl7$`18008244`)/2)) {
@@ -1211,7 +1211,7 @@ pdcrt <- pdcrt %>%
 
 # # If both alleles were identified at one locus both were included as numerators but only counted as one in the denominator.
 # i.e. mixed are double counted
-pdcrtspl7$`19718439` %>% View()
+# pdcrtspl7$`19718439` %>% View()
 
 fixed <- NULL
 for(i in 1:(nrow(pdcrtspl7$`19718439`)/2)) {
@@ -1247,12 +1247,12 @@ pdcrtspl7$`22004584` <- add_a_row(pdcrtspl7$`22004584`, 1, "pfcrt 76K/T")
 pdcrtspl7$`22004584`$prev <- pdcrtspl7$`22004584`$x / pdcrtspl7$`22004584`$n
 
 # TODO: fix this study who knows what's happening here -- circle back but needs fixing because prev > 1
-pdcrtspl7$`22208458` %>% View()
-pdcrt %>% filter(pmid == 22208458) %>% arrange(iso3c) %>% View()
+# pdcrtspl7$`22208458` %>% View()
+# pdcrt %>% filter(pmid == 22208458) %>% arrange(iso3c) %>% View()
 
 ### issues with this whole pmid tbh
-pdcrtspl7$`22453078` %>% View()
-pdcrt %>% filter(pmid == 22453078) %>% View()
+# pdcrtspl7$`22453078` %>% View()
+# pdcrt %>% filter(pmid == 22453078) %>% View()
 
 pmid22453078 <- pdcrt %>% 
   filter(pmid == 22453078) %>% 
@@ -1305,14 +1305,50 @@ pdcrtspl7$`22904636`$n <- c(42, 42)
 pdcrtspl7$`22904636` <- add_a_row(pdcrtspl7$`22904636`, 1, "pfcrt K76")
 pdcrtspl7$`22904636`$prev <- pdcrtspl7$`22904636`$x / pdcrtspl7$`22904636`$n
 
-##
+## correct numbers for extraction
 pdcrtspl7$`23537170`$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
 pdcrtspl7$`23537170`$x <- c(25, 65, 23)
 pdcrtspl7$`23537170`$n <- rep(113, 3)
 pdcrtspl7$`23537170`$prev <- pdcrtspl7$`23537170`$x / pdcrtspl7$`23537170`$n
 
+# typo in paper itself -- the percentages total to 110%
+# assume the value in the text is correct and therefore subtract from CVIET
+pdcrtspl7$`23870667` <- pdcrtspl7$`23870667`[1:3,]
+pdcrtspl7$`23870667`$x <- c(19,41,3)
+pdcrtspl7$`23870667`$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`23870667`$prev <- pdcrtspl7$`23870667`$x / pdcrtspl7$`23870667`$n
 
+# duplicate EH and non EH
+pdcrtspl7$`24359280` <- pdcrtspl7$`24359280` %>%
+  dplyr::filter(mut == "pfcrt 76T") %>%
+  dplyr::mutate(n = 198, prev = x/n)
+pdcrtspl7$`24359280` <- add_a_row(pdcrtspl7$`24359280`, x_new = 198 - 145, mut_new = "pfcrt K76")
 
+# this is the entire study -- mixed infections counted twice
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl7$`25421474`)/2)) {
+  df <- pdcrtspl7$`25421474`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+fixed %>% 
+  dplyr::group_by(year) %>%
+  dplyr::reframe(sum(x) == unique(n))
+
+pdcrtspl7$`25421474` <- fixed
+
+# 33 or 100 rows of this study but have a look at the whole thing
+pdcrtspl7$`27160572`  %>% View()
+pdcrt %>% filter(pmid == 27160572) %>% View()
 
 
 
@@ -1334,7 +1370,8 @@ pdcrtspl7$`23537170`$prev <- pdcrtspl7$`23537170`$x / pdcrtspl7$`23537170`$n
 
 fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
                  17488902, 18008244, 19346369, 19718439, 21457533, 21645634,
-                 22004584, 2453078, 22641431, 22904636, 23537170)
+                 22004584, 2453078, 22641431, 22904636, 23537170, 23870667,
+                 24359280, 25421474)
 
 ### TYPE 7 ------------------------------
 
