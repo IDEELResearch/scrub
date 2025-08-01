@@ -1247,9 +1247,12 @@ pdcrtspl7$`22004584`$x <- c(3, 140)
 pdcrtspl7$`22004584` <- add_a_row(pdcrtspl7$`22004584`, 1, "pfcrt 76K/T")
 pdcrtspl7$`22004584`$prev <- pdcrtspl7$`22004584`$x / pdcrtspl7$`22004584`$n
 
-# TODO: fix this study who knows what's happening here -- circle back but needs fixing because prev > 1
-# pdcrtspl7$`22208458` %>% View()
-# pdcrt %>% filter(pmid == 22208458) %>% arrange(iso3c) %>% View()
+# two mixed
+pdcrtspl7$`22208458` <- pdcrtspl7$`22208458`[1:2,]
+pdcrtspl7$`22208458`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`22208458`$x <- c(3, 2)
+pdcrtspl7$`22208458`$n <- c(5, 5)
+pdcrtspl7$`22208458`$prev <- pdcrtspl7$`22208458`$x / pdcrtspl7$`22208458`$n
 
 ### issues with this whole pmid but these are rectified in other pdcrtspl lists
 pdcrtspl7$`22453078`$x <- c(22,3)
@@ -1406,127 +1409,39 @@ pdcrtspl7$`32310062` <- pdcrtspl7$`32310062` %>%
   dplyr::filter(mut %in% c(mix_loc, mut_loc, wt_loc)) %>%
   dplyr::mutate(n = 211, prev = x/n)
 
+# typo - table 4
+pdcrtspl7$`34906159`$x[2] <- pdcrtspl7$`34906159`$n[2] - pdcrtspl7$`34906159`$x[1] 
+pdcrtspl7$`34906159`$prev <- pdcrtspl7$`34906159`$x / pdcrtspl7$`34906159`$n
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+pdcrtspl7$`35413937`$x[1] <- pdcrtspl7$`35413937`$n[1]
+pdcrtspl7$`35413937`$prev <- pdcrtspl7$`35413937`$x/pdcrtspl7$`35413937`$n
 
 fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
                  17488902, 18008244, 19346369, 19718439, 21457533, 21645634,
                  22004584, 22453078, 22641431, 22904636, 23537170, 23870667,
                  24359280, 25421474, 27160572, 28004634, 28039354, 28546554,
-                 31932374, 32310062)
+                 31932374, 32310062, 34906159, 35413937, 22208458)
+# check they're all fixed
+length(which(!(names(pdcrtspl7) %in% fixed_pmid7))) == 0
 
-### TYPE 7 ------------------------------
-
-# as before but by getting rid of the mixed to then give 2 and adjust
-# These are mixed infections being reallocated
-# TODO: Check these manually later that this is the case for these
-pdcrtspl7 <-
-  rbind(
-    pdcrt %>%
-      filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid, pdcrtspl6$uuid))) %>%
-      group_by(uuid) %>%
-      filter(n() == 3) %>%
-      mutate(mut = replace(mut, mut == "pfcrt 72-76 SxxxT", "pfcrt 76T")) %>%
-      mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
-      mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxK", "pfcrt K76")) %>%
-      filter(mut %in% c(mut_loc, wt_loc)) %>%
-      filter(sum(x) < n[1]) %>%
-      mutate(x = x + (n[1] - sum(x))/2), # TODO: convert to prev
-    pdcrt %>%
-      filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid, pdcrtspl5$uuid, pdcrtspl6$uuid))) %>%
-      group_by(uuid) %>%
-      filter(n() == 3) %>%
-      mutate(mut = replace(mut, mut == "pfcrt 72-76 SxxxT", "pfcrt 76T")) %>%
-      mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
-      mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxK", "pfcrt K76")) %>%
-      filter(mut %in% c(mut_loc, wt_loc)) %>%
-      filter(sum(x) > n[1]) %>%
-      mutate(x = x - (sum(x) - n[1])/2) # TODO: convert to prev
-  ) %>%
-  filter(mut == "pfcrt 76T") %>%
-  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
-  summarise(x = sum(x), n = unique(n)) %>%
-  mutate(prev = x/n) %>%
-  group_by(uuid) %>%
-  select(iso3c, admin_0, admin_1, site, lat, long,
-         year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
+pdcrtspl7 <- do.call(rbind, pdcrtspl7)
+pdcrtspl7$prev <- pdcrtspl7$x/pdcrtspl7$n
 
 
 ### TYPE 8 ------------------------------
 # the others...
+# only one uuid left -- 1067
+# pdcrtspl8 <- pdcrt %>%
+#   filter(!(uuid %in% c(pdcrtspl1$uuid,pdcrtspl3$uuid, pdcrtspl4$uuid,
+#                        pdcrtspl5$uuid, pdcrtspl6$uuid, pdcrtspl7$uuid)))
 
-# then the remaining weird ones
-# remove the EH haplotypes and then these collapse into
-# 2 as above
-# TODO: Check these manually later that this is the case for these
-pdcrtspl8 <- rbind(
-  pdcrt %>%
-    filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid,
-                         pdcrtspl5$uuid, pdcrtspl6$uuid, pdcrtspl7$uuid))) %>%
-    group_by(uuid) %>%
-    filter(mut %in% c(mut_loc, wt_loc)) %>%
-    filter(n() == 2) %>%
-    filter(sum(x) < n[1]) %>%
-    mutate(x = x + (n[1] - sum(x))/2), # TODO: convert to prev
-  pdcrt %>%
-    filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl2$uuid, pdcrtspl3$uuid,
-                         pdcrtspl5$uuid, pdcrtspl6$uuid, pdcrtspl7$uuid))) %>%
-    group_by(uuid) %>%
-    filter(mut %in% c(mut_loc, wt_loc)) %>%
-    filter(n() == 2) %>%
-    filter(sum(x) > n[1]) %>%
-    mutate(x = x - (sum(x) - n[1])/2) # TODO: convert to prev
-) %>%
-  mutate(mut = replace(mut, mut == "pfcrt 72-76 SxxxT", "pfcrt 76T")) %>%
-  mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
-  mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxK", "pfcrt K76")) %>%
-  filter(mut == "pfcrt 76T") %>%
-  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
-  summarise(x = sum(x), n = unique(n)) %>%
-  mutate(prev = x/n) %>%
-  group_by(uuid) %>%
-  select(iso3c, admin_0, admin_1, site, lat, long,
-         year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source)
+## this pmid is already fixed within pdcrtspl6 so don't add
 
 ## Complete. Bring all together again-------------------
-
+# TODO: fix this here so it doesn't error
 crtww_final_res_df <-
-  list(pdcrtspl1,pdcrtspl2,pdcrtspl3,pdcrtspl5, pdcrtspl6, pdcrtspl7, pdcrtspl8) %>%
+  list(pdcrtspl1, pdcrtspl3, pdcrtspl4, pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
   lapply(function(x){
     x %>% ungroup %>% select(iso3c, admin_0, admin_1, site, lat, long,
                              year, study_start_year, study_end_year,
