@@ -21,7 +21,8 @@ pdww <- readxl::read_xls("analysis/data-raw/WWARN_partnerdrug_database_04-12-202
 
 # add iso
 k13ww$iso <- countrycode::countrycode(k13ww$country, "country.name.en", "iso3c")
-pdww$iso <- countrycode::countrycode(pdww$country, "country.name.en", "iso3c")
+pdww$iso <- countrycode::countrycode(pdww$country, "country.name.en", "iso3c") 
+# go to line # 665 for pd cleaning
 
 ## 1.1. WWARN K13 admin mapping ----
 
@@ -1250,41 +1251,11 @@ pdcrtspl7$`22004584`$prev <- pdcrtspl7$`22004584`$x / pdcrtspl7$`22004584`$n
 # pdcrtspl7$`22208458` %>% View()
 # pdcrt %>% filter(pmid == 22208458) %>% arrange(iso3c) %>% View()
 
-### issues with this whole pmid tbh
-# pdcrtspl7$`22453078` %>% View()
-# pdcrt %>% filter(pmid == 22453078) %>% View()
-
-pmid22453078 <- pdcrt %>% 
-  filter(pmid == 22453078) %>% 
-  split(.$iso3c)
-
-pmid22453078$BGD <- pmid22453078$BGD[3:4,]
-pmid22453078$BGD$prev <- pmid22453078$BGD$x / pmid22453078$BGD$n
-
-pmid22453078$GHA$x <- c(22,3)
-pmid22453078$GHA$n <- c(25, 25)
-pmid22453078$GHA$mut <- c("pfcrt 76T", "pfcrt 76K/T")
-pmid22453078$GHA$prev <- pmid22453078$GHA$x / pmid22453078$GHA$n
-
-pmid22453078$KHM <- pmid22453078$KHM[1:2,]
-pmid22453078$KHM$x <- c(32,1)
-pmid22453078$KHM$mut <- c("pfcrt 76T", "pfcrt 76K/T")
-pmid22453078$KHM$prev <- pmid22453078$KHM$x / pmid22453078$KHM$n
-
-pmid22453078$LAO <- pmid22453078$LAO[4:5,]
-pmid22453078$LAO$prev <- pmid22453078$LAO$x / pmid22453078$LAO$n
-
-pmid22453078$PHL <- pmid22453078$PHL[4:5,]
-pmid22453078$PHL$prev <- pmid22453078$PHL$x / pmid22453078$PHL$n
-
-pmid22453078$PNG <- pmid22453078$PNG[3:4,]
-pmid22453078$PNG$prev <- pmid22453078$PNG$x / pmid22453078$PNG$n
-
-pmid22453078$THA <- pmid22453078$THA[2,]
-pmid22453078$VUT <- pmid22453078$VUT[2,]
-
-pdcrtspl7$`22453078` <- do.call(rbind, pmid22453078)
-pdcrt <- pdcrt %>% filter(!(pmid == 22453078))
+### issues with this whole pmid but these are rectified in other pdcrtspl lists
+pdcrtspl7$`22453078`$x <- c(22,3)
+pdcrtspl7$`22453078`$n <- c(25, 25)
+pdcrtspl7$`22453078`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`22453078`$prev <- pdcrtspl7$`22453078`$x / pdcrtspl7$`22453078`$n
 
 # remove those that weren't amplified and combine haplotypes - table 2
 pdcrtspl7$`22641431` <- pdcrtspl7$`22641431` %>% 
@@ -1347,8 +1318,111 @@ fixed %>%
 pdcrtspl7$`25421474` <- fixed
 
 # 33 or 100 rows of this study but have a look at the whole thing
-pdcrtspl7$`27160572`  %>% View()
-pdcrt %>% filter(pmid == 27160572) %>% View()
+# other uuids are in the other pdcrtspl lists so fix only the ones here
+crt27160572 <- pdcrtspl7$`27160572` %>% 
+  split(.$iso3c)
+  
+# Angola
+crt27160572$AGO <- crt27160572$AGO[1:3,]
+crt27160572$AGO$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$AGO$x <- c(69, 26, 6)
+crt27160572$AGO$prev <- crt27160572$AGO$x / crt27160572$AGO$n
+
+# Ghana
+crt27160572$GHA <- crt27160572$GHA[1:3,]
+crt27160572$GHA$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$GHA$x <- c(19, 3, 1)
+crt27160572$GHA$prev <- crt27160572$GHA$x / crt27160572$GHA$n
+# sum(crt27160572$GHA$x) == crt27160572$GHA$n[1]
+
+# Guinea
+crt27160572$GIN <- crt27160572$GIN[1:3,]
+crt27160572$GIN$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$GIN$x <- c(21, 11, 1)
+crt27160572$GIN$prev <- crt27160572$GIN$x / crt27160572$GIN$n
+# sum(crt27160572$GIN$x) == crt27160572$GIN$n[1]
+
+# Equatorial Guinea 
+crt27160572$GNQ <- crt27160572$GNQ[1:3,]
+crt27160572$GNQ$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$GNQ$x <- c(58, 11, 6)
+crt27160572$GNQ$prev <- crt27160572$GNQ$x / crt27160572$GNQ$n
+# sum(crt27160572$GNQ$x) == crt27160572$GNQ$n[1]
+
+# Mali
+crt27160572$MLI <- crt27160572$MLI[1:3,]
+crt27160572$MLI$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$MLI$x <- c(2, 1, 1)
+crt27160572$MLI$prev <- crt27160572$MLI$x / crt27160572$MLI$n
+# sum(crt27160572$MLI$x) == crt27160572$MLI$n[1]
+
+# Nigeria
+crt27160572$NGA <- crt27160572$NGA[1:3,]
+crt27160572$NGA$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$NGA$x <- c(41, 31, 2)
+crt27160572$NGA$n <- 74
+crt27160572$NGA$prev <- crt27160572$NGA$x / crt27160572$NGA$n
+sum(crt27160572$NGA$x) == crt27160572$NGA$n[1]
+
+# Sierra Leone
+crt27160572$SLE <- crt27160572$SLE[1:3,]
+crt27160572$SLE$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$SLE$x <- c(9, 14, 2)
+crt27160572$SLE$prev <- crt27160572$SLE$x / crt27160572$SLE$n
+sum(crt27160572$SLE$x) == crt27160572$SLE$n[1]
+
+# Tanzania
+crt27160572$TZA <- crt27160572$TZA[1:3,]
+crt27160572$TZA$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$TZA$x <- c(6, 3, 1)
+crt27160572$TZA$prev <- crt27160572$TZA$x / crt27160572$TZA$n
+sum(crt27160572$TZA$x) == crt27160572$TZA$n[1]
+
+pdcrtspl7$`27160572` <- do.call(rbind, crt27160572)
+
+# typo -- no mixed reported
+pdcrtspl7$`28004634`$x[2] <- pdcrtspl7$`28004634`$n[1] - pdcrtspl7$`28004634`$x[1]
+pdcrtspl7$`28004634`$prev <- pdcrtspl7$`28004634`$x / pdcrtspl7$`28004634`$n
+
+# redigitised the bar chart and converted
+pdcrtspl7$`28039354`$x <- c(283, 48, 11)
+# sum(pdcrtspl7$`28039354`$x) == pdcrtspl7$`28039354`$n[1]
+
+# from figure 4 in paper
+pdcrtspl7$`28546554`$n <- c(278, 278)
+pdcrtspl7$`28546554`$x <- c(133, 145)
+pdcrtspl7$`28546554`$prev <- pdcrtspl7$`28546554`$x / pdcrtspl7$`28546554`$n
+
+
+# 76T = 25/94 - mixed = 11% 10/94 -- the rest is WT (using Table S3 and S4)
+pdcrtspl7$`31932374` <- pdcrtspl7$`31932374`[c(1,1,1),]
+pdcrtspl7$`31932374`$mut <- c("pfcrt 76T", "pfcrt 76K/T", "pfcrt K76")
+pdcrtspl7$`31932374`$x <- c(25, 10, 94-25-10)
+pdcrtspl7$`31932374`$n <- rep(94, 3)
+pdcrtspl7$`31932374`$prev <- pdcrtspl7$`31932374`$x/pdcrtspl7$`31932374`$n
+
+# checked that 100% prev is correct
+pdcrtspl7$`32310062` <- pdcrtspl7$`32310062` %>%
+  dplyr::filter(mut %in% c(mix_loc, mut_loc, wt_loc)) %>%
+  dplyr::mutate(n = 211, prev = x/n)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1370,8 +1444,9 @@ pdcrt %>% filter(pmid == 27160572) %>% View()
 
 fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
                  17488902, 18008244, 19346369, 19718439, 21457533, 21645634,
-                 22004584, 2453078, 22641431, 22904636, 23537170, 23870667,
-                 24359280, 25421474)
+                 22004584, 22453078, 22641431, 22904636, 23537170, 23870667,
+                 24359280, 25421474, 27160572, 28004634, 28039354, 28546554,
+                 31932374, 32310062)
 
 ### TYPE 7 ------------------------------
 
