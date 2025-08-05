@@ -1463,39 +1463,29 @@ pdmdr1 <- pdmdr1 %>%
 ## STEP 1: Work out how to sort out the markers ------------------------------
 # mdr1 cleaning is restricted to codon 86
 
+pdmdr1 %>% pull(mut) %>% unique()
 
-# Viewed through example splits like this to determine that we can filter out some more markers
-# pdmdr1 %>% ungroup %>%
-#   filter(stuid %in%
-#            (pdmdr1 %>% filter(mut == "pfmdr1 YYY") %>% pull(stuid) %>% unique())) %>%
-#   split(.$stuid)
-
-#  [1,] "pfmdr1 86Y"
+#  [1,] "pfmdr1 86Y" # KEEP
 #  [2,] "pfmdr1 184F"
 #  [3,] "pfmdr1 copy number >1"
-#  [4,] "pfmdr1 NxxxD" : the same as"pfmdr1 N86" : Just EH info so remove
-#  [5,] "pfmdr1 N86"
-#  [6,] "pfmdr1 86N/Y"
+#  [4,] "pfmdr1 NxxxD" : the same as"pfmdr1 N86" # KEEP but ensure no duplicates with N86
+#  [5,] "pfmdr1 N86" # KEEP
+#  [6,] "pfmdr1 86N/Y" # KEEP
 #  [7,] "pfmdr1 Y184"
 #  [8,] "pfmdr1 184Y/F"
 #  [9,] "pfmdr1 YYXXY" : These are just giving EH info but in all studies prevalence can be identified from the other markers : remove
 #  [10,] "pfmdr1 YYY" : Likewise with YYY and NFD
 #  [11,] "pfmdr1 NFD"
 
-# filter out unneeded EH info and now can easily assign locus groups
+# filter out those that do not report codon 86
 pdmdr1 <- pdmdr1 %>%
-  filter(grepl("184|86|copy", mut)) %>%
-  mutate(locus = NA) %>%
-  mutate(locus = replace(locus, grepl("86", mut), "86")) %>%
-  mutate(locus = replace(locus, grepl("184", mut), "184")) %>%
-  mutate(locus = replace(locus, grepl("copy", mut), "CNV"))
+  filter(grepl("N|Y|86", mut))
 
-res_loc <- c("pfmdr1 184F", "pfmdr1 86Y", "pfmdr1 copy number >1")
-mix_loc <- c("pfmdr1 184Y/F", "pfmdr1 86N/Y")
-wt_loc <- c("pfmdr1 N86", "pfmdr1 Y184")
+res_loc <- "pfmdr1 86Y"
+wt_loc <- "pfmdr1 N86"
+mix_loc <- "pfmdr1 86N/Y"
 
-# have they all been grouped - Yes
-pdmdr1$locus %>% table(useNA = "a")
+other_loc <- c("pfmdr1 YYXXY", "pfmdr1 YYY", "pfmdr1 NFD")
 
 ## STEP 2: Figure out how mixed infections work ------------------------------
 
