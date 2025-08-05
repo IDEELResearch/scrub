@@ -908,7 +908,19 @@ pdcrtspl5 <- pdcrt %>%
   mutate(mut = gsub(" ","_", mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# assuming that this is correct and omitting mixed
+complement <- NULL
+for(i in 1:nrow(pdcrtspl5)) {
+  df <- pdcrtspl5[i,]
+  df$x <- df$n - df$x
+  df$mut <- if_else(df$mut == "crt_76T", "crt_K76", "crt_76T")
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdcrtspl5 <- rbind(pdcrtspl5, complement) %>% arrange(pmid, uuid)
+
 
 t6pmid <- pdcrt %>%
   filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid))) %>% 
@@ -1452,13 +1464,13 @@ crtww_final_res_df <-
 
 # grab and fitler to just important SNPs
 pdmdr1 <- pdwwspl$mdr1 %>%
-  filter(grepl("184|86|copy|NFD|NxxxD|YYXXY|YYY", mut))
+  filter(grepl("86|NFD|NxxxD|YYXXY|YYY", mut))
 
 # first put into study time lat points for looking at
 pdmdr1 <- pdmdr1 %>%
   group_by(across(c(-x,-prev, -mut, -rowid, -mix))) %>%
   mutate(uuid = cur_group_id()) %>%
-  ungroup()
+  ungroup() 
 
 ## STEP 1: Work out how to sort out the markers ------------------------------
 # mdr1 cleaning is restricted to codon 86
@@ -1479,13 +1491,292 @@ pdmdr1 %>% pull(mut) %>% unique()
 
 # filter out those that do not report codon 86
 pdmdr1 <- pdmdr1 %>%
-  filter(grepl("N|Y|86", mut))
+  filter(grepl("N|Y|86", mut)) %>%
+  filter(!(grepl("184", mut)))
 
 res_loc <- "pfmdr1 86Y"
 wt_loc <- "pfmdr1 N86"
 mix_loc <- "pfmdr1 86N/Y"
 
-other_loc <- c("pfmdr1 YYXXY", "pfmdr1 YYY", "pfmdr1 NFD")
+other_loc <- c("pfmdr1 YYXXY", "pfmdr1 YYY", "pfmdr1 NFD", "pfmdr1 NxxxD")
+
+# TYPE 1: sum(x) == n
+
+pdmdr1spl1 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>%
+  mutate(mut = replace(mut, grepl("YYXXY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("YYY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NFD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NxxxD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+# TYPE 2: only WT -- clean names and reformat
+pdmdr1spl2 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(categorise = if_else(mut %in% c("N86", "NFD", "NxxxD"), "WT", "mut")) %>%
+  mutate(xn = length(unique(categorise))) %>%
+  filter(xn == 1) %>% 
+  filter(categorise == "WT") 
+# none reporting only WT
+
+
+# TYPE 3 - sum(x) = n if EH are filtered out -- change EH names, clean and reformat
+# NOTE: EH = extended haplotypes 
+# The EH mutations for a number of samples are just extra information
+# determined by filtering these out and rechecking if sum of x equals n
+# These for these groups it is the same as above
+pdmdr1spl3 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter((mut %in% c(res_loc,wt_loc,mix_loc))) %>% # non-EH only
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+
+# TYPE 4 - sum(x) = n if non-EH are filtered out -- change EH names, clean and reformat
+pdmdr1spl4 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter(!(mut %in% c(mut_loc,wt_loc,mix_loc))) %>% # EH only
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  mutate(mut = replace(mut, grepl("YYXXY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("YYY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NFD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NxxxD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# TYPE 5 - only one marker reported -- clean names and reformat
+# these are single record uuids so WWARN only captured one marker
+pdmdr1spl5 <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid,pdmdr1spl3$uuid,pdmdr1spl4$uuid))) %>%
+  group_by(uuid) %>%
+  filter(n()==1) %>%
+  mutate(mut = replace(mut, grepl("YYXXY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("YYY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NFD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NxxxD", mut), "pfmdr1 N86")) %>% # convert haplotypes  group_by(uuid) %>%
+  select(names(pdmdr1spl3)) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# assuming that this is correct and omitting mixed
+complement <- NULL
+for(i in 1:nrow(pdmdr1spl5)) {
+  df <- pdmdr1spl5[i,]
+  df$x <- df$n - df$x
+  df$mut <- if_else(df$mut == "mdr1_N86", "mdr1_86Y", "mdr1_N86")
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdmdr1spl5 <- rbind(pdmdr1spl5, complement) %>% arrange(pmid, uuid)
+
+# 
+# 
+# t6pmid <- pdmdr1 %>%
+#   filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
+#   group_by(uuid) %>%
+#   filter(sum(x) < n[1]) %>% 
+#   pull(pmid) %>% unique()
+
+# TYPE 6 - sum(x) < n - check that these are missing mixed mutants and add these
+pdmdr1spl6 <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% 
+  split(.$pmid)
+
+# based on table 2
+pdmdr1spl6$`19704124`$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+pdmdr1spl6$`19704124`$x <- c(7,264) # convert from haplotypes %
+pdmdr1spl6$`19704124`$prev <- pdmdr1spl6$`19704124`$x / pdmdr1spl6$`19704124`$n
+# sum(pdmdr1spl6$`19704124`$x) == pdmdr1spl6$`19704124`$n # CHECK
+
+# EHs -- the codon prev are correct and extracted -- different ns hence not picked up earlier
+pdmdr1spl6$`20199676` <- NULL
+pdmdr1spl6$`21996622` <- NULL
+pdmdr1spl6$`25007802` <- NULL
+pdmdr1spl6$`25917493` <- NULL
+pdmdr1spl6$`27596849` <- NULL
+
+
+
+# from table 3 - N86 = 49; 86Y = 77
+pdmdr1spl6$`25070111`$x <- c(49,77)
+pdmdr1spl6$`25070111`$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+pdmdr1spl6$`25070111`$prev <- pdmdr1spl6$`25070111`$x / pdmdr1spl6$`25070111`$n
+
+# table 1 - Mitsoudje center hospital
+pdmdr1spl6$`27527604`$x <- c(45,70)
+pdmdr1spl6$`27527604`$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+pdmdr1spl6$`27527604`$prev <- pdmdr1spl6$`27527604`$x / pdmdr1spl6$`27527604`$n
+
+pdmdr1spl6$`27538948` <- NULL # retracted article
+pdmdr1 <- pdmdr1 %>% filter(pmid != 27538948)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pdmdr1 %>% filter(pmid == 27596849)
+
+
+
+
+
+
+
+
+
+
+
+pdmdr1spl6$`27538948` %>% pull(mut) %>% unique()
+pdmdr1 %>% filter(pmid == 27538948) %>% 
+  filter(!(mut %in% other_loc)) %>%
+  group_by(site, year, n) %>%
+  reframe(xn = (sum(x) == unique(n)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## STEP 2: Figure out how mixed infections work ------------------------------
 
