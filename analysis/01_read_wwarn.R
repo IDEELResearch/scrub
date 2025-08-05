@@ -1444,7 +1444,9 @@ crtww_final_res_df <-
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::rowwise() %>%
   dplyr::mutate(gene_mut = clean_mutations(gene_mut)) %>%
-  dplyr::relocate(names(k13ww_final_res_df))
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
 
 # and the sanity check
 # TODO: investigate this error but confident the above file is correct
@@ -1526,7 +1528,10 @@ pdmdr1spl2 <- pdmdr1 %>%
   mutate(categorise = if_else(mut %in% c("N86", "NFD", "NxxxD"), "WT", "mut")) %>%
   mutate(xn = length(unique(categorise))) %>%
   filter(xn == 1) %>% 
-  filter(categorise == "WT") 
+  filter(categorise == "WT") %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
 # none reporting only WT
 
 
@@ -1663,7 +1668,14 @@ pdmdr1spl6$`27527604`$prev <- pdmdr1spl6$`27527604`$x / pdmdr1spl6$`27527604`$n
 pdmdr1spl6$`27538948` <- NULL # retracted article
 pdmdr1 <- pdmdr1 %>% filter(pmid != 27538948)
 
-pdmdr1spl6 <- do.call(rbind, pdmdr1spl6)
+pdmdr1spl6 <- do.call(rbind, pdmdr1spl6) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+  
 
 # TYPE 7 - sum(x) > n - investigate
 pdmdr1spl7 <- pdmdr1 %>%
@@ -1779,7 +1791,13 @@ pdmdr1spl7$`29582732`$x <- pdmdr1spl7$`29582732`$x - 5
 pdmdr1spl7$`29582732` <- add_a_row(pdmdr1spl7$`29582732`, 5, "pfmdr1 86N/Y")
 pdmdr1spl7$`29582732`$prev <- pdmdr1spl7$`29582732`$x / pdmdr1spl7$`29582732`$n
 
-pdmdr1spl7 <- do.call(rbind, pdmdr1spl7)
+pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
 
 ## TYPE 8 -- anything else -- all addressed
 (pdmdr1spl8 <- pdmdr1 %>%
@@ -1790,112 +1808,22 @@ pdmdr1spl7 <- do.call(rbind, pdmdr1spl7)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # and group by to record prevalence of each mdr1 marker type
-mdr1ww_final_res_df <- rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrsplit5) %>%
+mdr1ww_final_res_df <- rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
+                             pdmdr1spl5, pdmdr1spl6, pdmdr1spl7) %>%
   ungroup %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source) %>%
   ungroup %>%
   mutate(mut = replace(mut, mut == "pfmdr1 86Y", "mdr1_86Y")) %>%
-  mutate(mut = replace(mut, mut == "pfmdr1 184F", "mdr1_184F")) %>%
-  mutate(mut = replace(mut, mut == "pfmdr1 copy number >1", "mdr1_CNV")) %>%
   dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::rowwise() %>%
   dplyr::mutate(gene_mut = clean_mutations(gene_mut)) %>%
-  dplyr::relocate(names(k13ww_final_res_df))
-
-# and the sanity check
-(rbind(mdrsplit1, mdrsplit2, mdrsplit3, mdrsplit4, mdrsplit5) %>%
-    pull(uuid) %>% length()) ==
-  (pdmdr1$newid %>% unique() %>% length())
-
-# ---------------------------------------------------- o
-# 6. Sort PFPM23 ----
-# ---------------------------------------------------- o
-
-# because this is true we can ignore mix
-all(pdwwspl$pfpm23$mix == pdwwspl$pfpm23$x)
-
-pfpm23res <- pdwwspl$pfpm23 %>%
-  select(-mix) %>%
-  mutate(prev = x/n) %>%
-  mutate(mut = replace(mut, mut == "pfpm2 copy number=1", "WT")) %>%
-  mutate(mut = replace(mut, mut == "pfpm2 copy number >1", "pm23_CNV"))
-
-# however because these aren't equal we now that the database has not been
-# reporting prevalence
-pfpm23res$mut %>% table
-
-# add in the prev catch
-pfpm23res <- pfpm23res %>%
-  group_by(across(c(-x,-prev, -mut, -rowid))) %>%
-  mutate(uuid = cur_group_id()) %>%
-  ungroup() %>%
-  group_by(uuid) %>%
-  mutate(p = sum(prev))
-
-# okay so all the non p == 1 appear to just have one row
-pfpm23res %>% filter(p != 1) %>%
-  split(.$uuid) %>% lapply(nrow) %>% unlist %>% table
-
-# As a result it's actually easy as we can just filter to the CNV
-# entries. WWARN has for some records reported just the CNV and for others
-# has repoted both the CNV and the WT. But because the WT and CNV entries
-# all sum to 1 then we can just filter to CNV
-pfpm23ww_final_res_df <- pfpm23res %>% filter(mut == "pm23_CNV") %>%
-  ungroup %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
-         x, n, prev, gene, mut, database, pmid, url, source) %>%
-  ungroup
-
-# ---------------------------------- o
-# LAST -----------------------------
-# ---------------------------------- o
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
 
 # bring it all back together
 wwarn_res_df <- rbind(crtww_final_res_df, mdr1ww_final_res_df, k13ww_final_res_df)
