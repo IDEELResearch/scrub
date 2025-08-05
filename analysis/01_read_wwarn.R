@@ -1628,6 +1628,19 @@ pdmdr1spl6$`19704124`$prev <- pdmdr1spl6$`19704124`$x / pdmdr1spl6$`19704124`$n
 # sum(pdmdr1spl6$`19704124`$x) == pdmdr1spl6$`19704124`$n # CHECK
 
 # EHs -- the codon prev are correct and extracted -- different ns hence not picked up earlier
+# add uuids to a vector first
+fixed_uuids <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% filter(pmid %in% c(20199676,
+                                               21996622,
+                                               25007802,
+                                               25917493,
+                                               27596849,
+                                               31932374,
+                                               34732201)) %>% pull(uuid) %>% unique()
+
+
 pdmdr1spl6$`20199676` <- NULL
 pdmdr1spl6$`21996622` <- NULL
 pdmdr1spl6$`25007802` <- NULL
@@ -1768,16 +1781,12 @@ pdmdr1spl7$`29582732`$prev <- pdmdr1spl7$`29582732`$x / pdmdr1spl7$`29582732`$n
 
 pdmdr1spl7 <- do.call(rbind, pdmdr1spl7)
 
-## TYPE 8 -- anything else
-pdmdr1spl8 <- pdmdr1 %>%
+## TYPE 8 -- anything else -- all addressed
+(pdmdr1spl8 <- pdmdr1 %>%
   filter(!(uuid %in% c(pdmdr1spl1$uuid,pdmdr1spl3$uuid, pdmdr1spl4$uuid,
                        pdmdr1spl5$uuid, pdmdr1spl6$uuid, pdmdr1spl7$uuid))) %>%
-  split(.$pmid)
-
-# # all pmids have been addressed but check one at a time
-# pdmdr1spl8 %>% filter(!(pmid %in% c(pdmdr1spl1$pmid,pdmdr1spl3$pmid, pdmdr1spl4$pmid,
-#                                          pdmdr1spl5$pmid, pdmdr1spl6$pmid, pdmdr1spl7$pmid)))
-
+  filter(!(uuid %in% fixed_uuids)) %>%
+  nrow()) == 0
 
 
 
