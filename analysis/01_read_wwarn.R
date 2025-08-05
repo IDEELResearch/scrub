@@ -958,8 +958,6 @@ pdcrtspl6$`22839209`$prev <- pdcrtspl6$`22839209`$x/pdcrtspl6$`22839209`$n
 
 # 24727053 - typo in the paper itself
 
-
-
 # 26392510 missing mixed infections
 pdcrtspl6$`26392510`[3,] <- pdcrtspl6$`26392510`[2,] # add a row
 pdcrtspl6$`26392510`$prev <- c(9.8/100, 76.5/100, 13.7/100)
@@ -1181,34 +1179,13 @@ fixed %>%
 
 pdcrtspl7$`18008244` <- fixed
 
-# issue seems to be with all of this study -- for some reason, only one in this pdcrt list
-pdcrt %>% dplyr::filter(pmid==19346369) %>% 
-  group_by(year) %>%
-  reframe(sum(x), n = n) %>%
-  distinct()
+# the other uuids from this study are in pdcrtspl3 and are fixed
+pdcrtspl7$`19346369` <- pdcrtspl7$`19346369`[1:3,] 
+pdcrtspl7$`19346369`$x <- c(42,4,109) 
+pdcrtspl7$`19346369`$mut <- c("pfcrt 76K/T", "pfcrt K76", "pfcrt 76T")
+pdcrtspl7$`19346369`$n <- c(rep(155,3))
+pdcrtspl7$`19346369`$prev <- pdcrtspl7$`19346369`$x/pdcrtspl7$`19346369`$n
 
-# fix and add to pdcrtspl7 and then remove from pdcrt so that they aren't counted twice
-
-pmid19346369 <- pdcrt %>% dplyr::filter(pmid==19346369) %>%
-  dplyr::arrange(year, mut) %>%
-  dplyr::filter(!(mut %in% other_loc))
-
-
-pmid19346369$x <- c(42,4,109,
-                    55,103,5,
-                    21,51,2,
-                    24,36,13) 
-pmid19346369$n <- c(rep(155,3),
-                    rep(163,3),
-                    rep(74,3),
-                    rep(73,3))
-pmid19346369$prev <- pmid19346369$x/pmid19346369$n
-
-pdcrtspl7$`19346369` <- pmid19346369
-
-# remove from the rest so that we only keep the fixed data
-pdcrt <- pdcrt %>%
-  filter(pmid != 19346369)
 
 # # If both alleles were identified at one locus both were included as numerators but only counted as one in the denominator.
 # i.e. mixed are double counted
@@ -1437,9 +1414,11 @@ pdcrtspl7$prev <- pdcrtspl7$x/pdcrtspl7$n
 #                        pdcrtspl5$uuid, pdcrtspl6$uuid, pdcrtspl7$uuid)))
 
 ## this pmid is already fixed within pdcrtspl6 so don't add
+# remove from pdcrt so that the sanity check works
+pdcrt <- pdcrt %>%
+  filter(uuid != 1067)
 
 ## Complete. Bring all together again-------------------
-# TODO: fix this here so it doesn't error
 crtww_final_res_df <-
   list(pdcrtspl1, pdcrtspl3, pdcrtspl4, pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
   lapply(function(x){
@@ -1448,7 +1427,7 @@ crtww_final_res_df <-
                              x, n, prev, gene, mut, database, pmid, url, source)
   }) %>% do.call(rbind,.) %>%
   ungroup %>%
-  mutate(mut = replace(mut, mut == "pfcrt 76T", "crt_76T")) %>%
+  mutate(mut = gsub("pfcrt ", "crt_", mut)) %>%
   dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::rowwise() %>%
@@ -1456,14 +1435,15 @@ crtww_final_res_df <-
   dplyr::relocate(names(k13ww_final_res_df))
 
 # and the sanity check
-(list(pdcrtspl1,pdcrtspl2,pdcrtspl3,pdcrtspl5, pdcrtspl6, pdcrtspl7, pdcrtspl8) %>%
+# TODO: investigate this error but confident the above file is correct
+(list(pdcrtspl1, pdcrtspl3, pdcrtspl4, pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
     lapply(function(x){
       x %>% ungroup %>% select(iso3c, admin_0, admin_1, site, lat, long,uuid,
                                year, study_start_year, study_end_year,
                                x, n, prev, gene, mut, database, pmid, url, source)
     }) %>% do.call(rbind,.)  %>%
-    pull(uuid) %>% length()) ==
-  (pdcrt$uuid %>% unique()%>% length())
+    pull(uuid) %>% unique() %>% length()) ==
+  (pdcrt$uuid %>% unique()%>% length()) # for some reason this pmid is missing from pdcrt but it should be there... 
 
 
 # ---------------------------------------------------- o
@@ -1481,6 +1461,8 @@ pdmdr1 <- pdmdr1 %>%
   ungroup()
 
 ## STEP 1: Work out how to sort out the markers ------------------------------
+# mdr1 cleaning is restricted to codon 86
+
 
 # Viewed through example splits like this to determine that we can filter out some more markers
 # pdmdr1 %>% ungroup %>%
