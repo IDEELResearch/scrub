@@ -3,6 +3,7 @@ library(purrr)
 library(dplyr)
 library(here)
 
+# k13 mdr1 and crt mutants
 wwarn_data <- readRDS(here::here("analysis", "data-derived", 
                            "wwarn_res.rds"))
 ref_als <- read.csv(here::here("analysis", "data-raw", 
@@ -71,13 +72,6 @@ studies_all_WT <- wwarn %>%
   filter(all_WT) %>%
   pull(pmid)
 
-# write a custom code that uses the PMID to identify the min and max codons and then does the same thing
-
-
-
-
-
-# based on conversations, understanding of WT is actually incorrect here
 # separate out the mutant data frame
 
 mutation_key_path <- here::here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")

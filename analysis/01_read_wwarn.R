@@ -1083,7 +1083,9 @@ fixed_pmid6 <- c(11926004, 12474488, 15322628, 18840753, 19398039, 19704124,
 setdiff(fixed_pmid6, t6pmid)  # meaning all of them are now fixed
 
 # join back together
-pdcrtspl6 <- do.call(rbind, pdcrtspl6)
+pdcrtspl6 <- do.call(rbind, pdcrtspl6) %>% 
+  dplyr::select(names(pdcrtspl1)) %>%
+  dplyr::filter(mut != "pfcrt 76N")
 pdcrtspl6$prev <- pdcrtspl6$x/pdcrtspl6$n
 
 # check that sum(x) == n
@@ -1253,6 +1255,7 @@ pdcrtspl7$`22453078`$prev <- pdcrtspl7$`22453078`$x / pdcrtspl7$`22453078`$n
 pdcrtspl7$`22641431` <- pdcrtspl7$`22641431` %>% 
   dplyr::filter(!(mut %in% other_loc)) %>%
   arrange(year, mut)
+
 pdcrtspl7$`22641431`$x <- c(16, 49,            # 1999
                             8, 32, 32)         # 2008 
 pdcrtspl7$`22641431`$n <- c(65, 65,            # 1999
@@ -1414,7 +1417,7 @@ fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
 # check they're all fixed
 length(which(!(names(pdcrtspl7) %in% fixed_pmid7))) == 0
 
-pdcrtspl7 <- do.call(rbind, pdcrtspl7)
+pdcrtspl7 <- do.call(rbind, pdcrtspl7) %>% dplyr::select(names(pdcrtspl1))
 pdcrtspl7$prev <- pdcrtspl7$x/pdcrtspl7$n
 
 
@@ -1432,24 +1435,23 @@ pdcrt <- pdcrt %>%
 
 ## Complete. Bring all together again-------------------
 crtww_final_res_df <-
-  list(pdcrtspl1, pdcrtspl3, pdcrtspl4, pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
-  lapply(function(x){
-    x %>% ungroup %>% select(iso3c, admin_0, admin_1, site, lat, long,
-                             year, study_start_year, study_end_year,
-                             x, n, prev, gene, mut, database, pmid, url, source)
-  }) %>% do.call(rbind,.) %>%
+  rbind(pdcrtspl1, pdcrtspl3, pdcrtspl4, 
+        pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
   ungroup %>%
-  mutate(mut = gsub("pfcrt ", "crt_", mut)) %>%
-  dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source) %>%
+  ungroup %>%
+  dplyr::mutate(mut = if_else(grepl("K76", mut), "WT", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("76T", mut), "76T", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("76K/T", mut), "76K/T", mut)) %>% 
+  dplyr::mutate(gene_mut = wwarn_format_crt_for_stave(mut)) %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(gene_mut = clean_mutations(gene_mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
 
-# and the sanity check
-# TODO: investigate this error but confident the above file is correct
+
 (list(pdcrtspl1, pdcrtspl3, pdcrtspl4, pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
     lapply(function(x){
       x %>% ungroup %>% select(iso3c, admin_0, admin_1, site, lat, long,uuid,
@@ -1810,20 +1812,20 @@ pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
 
 # and group by to record prevalence of each mdr1 marker type
 # TODO: figure out why there is crt mutations here
-mdr1ww_final_res_df <- rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
-                             pdmdr1spl5, pdmdr1spl6, pdmdr1spl7) %>%
+# need mutant of the form WT; 86N/Y; 86Y
+mdr1ww_final_res_df <-
+  rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
+        pdmdr1spl5, pdmdr1spl6, pdmdr1spl7) %>%
   ungroup %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source) %>%
   ungroup %>%
-  # TODO: fix this 
-  mutate(mut = replace(mut, mut == "pfmdr1_86Y", "mdr1_86Y")) %>%
-  mutate(mut = replace(mut, mut == "pfmdr1 N86", "mdr1_86Y")) %>%
-  dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
+  dplyr::mutate(mut = if_else(grepl("N86", mut), "WT", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("86Y", mut), "86Y", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("86N/Y", mut), "86N/Y", mut)) %>% 
+  dplyr::mutate(gene_mut = wwarn_format_mdr1_for_stave(mut)) %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(gene_mut = clean_mutations(gene_mut)) %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, gene_mut, database, pmid, url, source)

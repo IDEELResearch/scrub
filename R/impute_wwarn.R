@@ -37,7 +37,7 @@ extract_from_entry <- function(entry) {
 #' 
 #' This function adds additional rows to the dataframe. It keeps all column variables 
 #' the same except for x and mut.
-#' @name add_a_row
+#' @name add_a_row_k13
 #' @export
 #' 
 #' @param df WWARN dataframe that you want to add a row to. 
@@ -46,7 +46,7 @@ extract_from_entry <- function(entry) {
 #' @param gene_mut_new The value of mut in the new row. For imputing wild type, these are the 
 #' WT encodings for codons not detected in the survey
 
-add_a_row <- function(df, x_new, gene_mut_new) {
+add_a_row_k13 <- function(df, x_new, gene_mut_new) {
   rows <- nrow(df) 
   df <- df %>%
     bind_rows(df[1, ])
@@ -91,7 +91,7 @@ impute_survey <- function(survey_df, impute_markers) {
       unique()
     if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
-        survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+        survey_df <- add_a_row_k13(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
       }
     }
   } else {
@@ -105,7 +105,7 @@ impute_survey <- function(survey_df, impute_markers) {
       unique()
     if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
-        survey_df <- add_a_row(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+        survey_df <- add_a_row_k13(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
       }
     }
   }
