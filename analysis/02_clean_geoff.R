@@ -199,7 +199,7 @@ master_table_clean <- master_table_clean[-indices_to_transform,]
 # However, all entires had 0 observations of this, so we cannot simply remove as that removes
 # the denominator for this locus. So set to wildtype and mutant_num to total_num
 master_table_clean$mutant_num[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- 
-  master_table_clean$total_num[master_table_clean$gene_mutation == "MDR1:1034:FC"]
+master_table_clean$total_num[master_table_clean$gene_mutation == "MDR1:1034:FC"]
 master_table_clean$gene_mutation[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- "MDR1:1034:S"
 
 # OJ: They entered insertions, which are not SNPs so we will remove these 
@@ -515,6 +515,31 @@ if (nrow(problem_surveys) > 0) {
   message("No NAs found in variant_num, total_num, or url.")
 }
 
+# Step 11.5 - Make variety of data entry fixes that should be implemented directly in hand entered sheets eventually (more efficient to do one pass once we have all fixes here so don't go through revalidation/repull many times)
+# geoff_S0002AyelawEth2023 - https://pubmed.ncbi.nlm.nih.gov/40666313/
+# geoff_S0006WrairKenreadKen - https://www.medrxiv.org/content/10.1101/2025.07.15.25331603v1
+# geoff_S0007Connelly2024Zim - 
+# geoff_S0008AMsmtTza22 - 
+# geoff_S0008BMsmtTza23 - 
+# geoff_S0014YoungRwaUnpub - https://academic.oup.com/jid/article/231/1/269/7811784
+
+library(dplyr)
+
+# Define mapping of study_id to new URLs
+url_updates <- c(
+  "geoff_S0002AyelawEth2023"   = "https://pubmed.ncbi.nlm.nih.gov/40666313/",
+  "geoff_S0006WrairKenreadKen" = "https://www.medrxiv.org/content/10.1101/2025.07.15.25331603v1",
+  "geoff_S0014YoungRwaUnpub"   = "https://academic.oup.com/jid/article/231/1/269/7811784",
+  "geoff_S0007Connelly2024Zim" = "https://www.medrxiv.org/content/10.1101/2025.03.22.25323829v1"
+)
+
+# Update the master_table_formatted object
+master_table_formatted <- master_table_formatted %>%
+  mutate(url = if_else(
+    study_ID %in% names(url_updates),
+    url_updates[study_ID],
+    url
+  ))
 
 # 12. Step 12 - Save Formatted Data ---------
 
