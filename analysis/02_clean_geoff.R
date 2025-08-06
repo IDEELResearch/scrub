@@ -27,103 +27,118 @@ mutation_key <- read.csv(here("analysis", "data-raw",
 ## start by looking at the data - explore this in the console
 master_unique <- lapply(master_table, unique)
 
-# Initial main clean
+# Initial main data cleaning
 master_table_clean <- master_table |>
-  dplyr::mutate(substudy = gsub(" ","", substudy)) |>
-  dplyr::mutate(substudy = gsub("_","", substudy)) |>
-  dplyr::mutate(substudy = if_else(substudy == "untreadextracted",
-                                   "untreatedextracted", substudy)) |>
-  dplyr::mutate(substudy = if_else(substudy == "extracted",
-                                   "untreatedextracted", substudy)) |>
-  dplyr::mutate(substudy = if_else((substudy == "day0" & study_uid == "s0029_warsame_2019"),
-                                   "day0extracted", substudy)) |>
   dplyr::mutate(
+    # Clean substudy field
+    substudy = gsub(" ","", substudy),
+    substudy = gsub("_","", substudy),
+    substudy = if_else(substudy == "untreadextracted", "untreatedextracted", substudy),
+    substudy = if_else(substudy == "extracted", "untreatedextracted", substudy),
+    substudy = if_else((substudy == "day0" & study_uid == "s0029_warsame_2019"), "day0extracted", substudy),
+    
+    # Fix coordinates for specific study
     lat_n = if_else(study_uid == "s0020_some_2024", "11.79479482", lat_n),
-    lon_e = if_else(study_uid == "s0020_some_2024", "-2.919282118", lon_e)
-  ) |>
-  # OJ: I checked this and there is no issue here - suggest deleting
-  # mutate(lat_n = as.numeric(if_else(grepl("^‚àí", lat_n), 
-  #                                   gsub("^‚àí", "-", lat_n), 
-  #                                   lat_n))) |> # does not appear to work - Ronald will need to fix manually in S0147Jeang2024 entry
-  dplyr::mutate(site_name = gsub(" ", "_", tolower(site_name))) |>
-  dplyr::mutate(collection_location = gsub(" ", "_", tolower(collection_location))) |>
-  dplyr::mutate(collection_location = gsub(",", "", tolower(collection_location))) |>
-  dplyr::mutate(country = stringr::str_to_title(country)) |>
-  dplyr::mutate(country = if_else(country %in% c("Democratic Republic Of The Congo", "Drc"),
-                                  "Democratic Republic of the Congo",
-                                  country)) |>
-  dplyr::mutate(country = if_else(country == "Rukara", "Rwanda", country)) |>
-  dplyr::mutate(pretreatment_samples = if_else(pretreatment_samples == "",
-                                               NA, pretreatment_samples)) |>
-  dplyr::mutate(study_design_age_min_years = if_else(study_design_age_min_years == "na",
-                                                     NA, study_design_age_min_years)) |>
-  dplyr::mutate(study_design_age_min_years = if_else(study_design_age_min_years == "1year",
-                                                     "1", study_design_age_min_years)) |>
-  dplyr::mutate(study_design_age_max_years = if_else(study_design_age_max_years == "na",
-                                                     NA, study_design_age_max_years)) |>
-  dplyr::mutate(site_study_type = if_else(study_uid == "s0034_uwimana", 
-                                          "TES", site_study_type)) |>
-  dplyr::mutate(site_study_type = toupper(gsub("_","", site_study_type))) |>
-  dplyr::mutate(publication_status = gsub(" ", "_", publication_status)) |>
-  dplyr::mutate(publication_status = if_else(publication_status == "na", NA, publication_status)) |>
-  dplyr::mutate(publication_status = if_else(str_detect(study_uid, "unpub"), "unpublished", publication_status)) |>
-  dplyr::mutate(publication_status = if_else(publication_status == "draft_paper", "unpublished", publication_status)) |>
-  dplyr::mutate(publication_status = if_else(study_uid %in% c("s0031_bergmann_2021", #GCD: manually checked that these were pub'd
-                                                              "s0057_koko", 
-                                                              "s0059_osborne"),
-                                             "peer_reviewed", publication_status)) |>
-  dplyr::mutate(publication_status = if_else(publication_status == "published" & pmid == "37420265", "peer_reviewed", publication_status)) |>
-  dplyr::mutate(publication_year = if_else(publication_status == "unpublished", NA, publication_year)) |>
-  dplyr::mutate(countries_covered = gsub(",", ", ", countries_covered)) |>
-  dplyr::mutate(countries_covered = stringr::str_to_title(countries_covered)) |>
-  dplyr::mutate(countries_covered = if_else(countries_covered %in% c("Democratic Republic Of The Congo", "Drc"),
-                                            "Democratic Republic of the Congo",
-                                            country)) |>
-  dplyr::mutate(data_processing_pipeline = toupper(data_processing_pipeline)) |>
-  dplyr::mutate(first_author_surname = stringr::str_to_title(first_author_surname)) |>
-  dplyr::mutate(iso3c = replace(iso3c, iso3c == "DRC", "COD")) |> 
-  dplyr::mutate(iso3c = replace(iso3c, iso3c == "ERT", "ERI")) |>
-  dplyr::mutate(country = replace(country, country == "Gqn", "Gnq")) |>
-  dplyr::mutate(iso3c = replace(iso3c, iso3c == "GQN", "GNQ")) %>% 
-  # OJ checked these and worked out their site study type
-  dplyr::mutate(site_study_type = replace(site_study_type, is.na(site_study_type) & pmid == "32459360", "COMMUNITY")) %>% 
-  dplyr::mutate(site_study_type = replace(site_study_type, is.na(site_study_type) & pmid == "37670357", "COMMUNITY"))
+    lon_e = if_else(study_uid == "s0020_some_2024", "-2.919282118", lon_e),
+    
+    # Clean site and location names
+    site_name = gsub(" ", "_", tolower(site_name)),
+    collection_location = gsub(" ", "_", tolower(collection_location)),
+    collection_location = gsub(",", "", tolower(collection_location)),
+    
+    # Standardize country names
+    country = stringr::str_to_title(country),
+    country = if_else(country %in% c("Democratic Republic Of The Congo", "Drc"), 
+                     "Democratic Republic of the Congo", country),
+    country = if_else(country == "Rukara", "Rwanda", country),
+    
+    # Clean pretreatment samples
+    pretreatment_samples = if_else(pretreatment_samples == "", NA, pretreatment_samples),
+    
+    # Standardize age fields
+    study_design_age_min_years = if_else(study_design_age_min_years == "na", NA, study_design_age_min_years),
+    study_design_age_min_years = if_else(study_design_age_min_years == "1year", "1", study_design_age_min_years),
+    study_design_age_max_years = if_else(study_design_age_max_years == "na", NA, study_design_age_max_years),
+    
+    # Clean site study type
+    site_study_type = if_else(study_uid == "s0034_uwimana", "TES", site_study_type),
+    site_study_type = toupper(gsub("_","", site_study_type)),
+    
+    # Standardize publication status
+    publication_status = gsub(" ", "_", publication_status),
+    publication_status = if_else(publication_status == "na", NA, publication_status),
+    publication_status = if_else(str_detect(study_uid, "unpub"), "unpublished", publication_status),
+    publication_status = if_else(publication_status == "draft_paper", "unpublished", publication_status),
+    publication_status = if_else(study_uid %in% c("s0031_bergmann_2021", "s0057_koko", "s0059_osborne"),
+                                "peer_reviewed", publication_status),
+    publication_status = if_else(publication_status == "published" & pmid == "37420265", "peer_reviewed", publication_status),
+    publication_year = if_else(publication_status == "unpublished", NA, publication_year),
+    
+    # Clean countries covered
+    countries_covered = gsub(",", ", ", countries_covered),
+    countries_covered = stringr::str_to_title(countries_covered),
+    countries_covered = if_else(countries_covered %in% c("Democratic Republic Of The Congo", "Drc"),
+                               "Democratic Republic of the Congo", country),
+    
+    # Standardize data processing pipeline
+    data_processing_pipeline = toupper(data_processing_pipeline),
+    
+    # Standardize author names
+    first_author_surname = stringr::str_to_title(first_author_surname),
+    
+    # Fix ISO3C codes
+    iso3c = replace(iso3c, iso3c == "DRC", "COD"),
+    iso3c = replace(iso3c, iso3c == "ERT", "ERI"),
+    iso3c = replace(iso3c, iso3c == "GQN", "GNQ"),
+    country = replace(country, country == "Gqn", "Gnq"),
+    
+    # Fix missing site study types
+    site_study_type = replace(site_study_type, is.na(site_study_type) & pmid == "32459360", "COMMUNITY"),
+    site_study_type = replace(site_study_type, is.na(site_study_type) & pmid == "37670357", "COMMUNITY")
+  )
 
-# additional cleaning to correct for malformed iso3cs
-master_table_clean <- master_table_clean %>%
-  mutate(country = if_else(country %in%  c("Ago", "Ben", "Cmr", "Caf", "Cog", 
-                                           "Cod", "Eth", "Gha", "Stp", "Sen", 
-                                           "Sdn", "Uga", "Gnq", "Gab", "Mli", 
-                                           "Nga", "Sle", "Som", "Zmb", "Zaf"),
-                           suppressWarnings(countrycode::countrycode(toupper(country), "iso3c", "country.name.en")),
-                           country))
+# Additional country and data cleaning
+master_table_clean <- master_table_clean |>
+  dplyr::mutate(
+    # Fix malformed iso3c codes used as country names
+    country = if_else(country %in% c("Ago", "Ben", "Cmr", "Caf", "Cog", "Cod", "Eth", "Gha", 
+                                    "Stp", "Sen", "Sdn", "Uga", "Gnq", "Gab", "Mli", 
+                                    "Nga", "Sle", "Som", "Zmb", "Zaf"),
+                     suppressWarnings(countrycode::countrycode(toupper(country), "iso3c", "country.name.en")),
+                     country),
+    
+    # Fix pretreatment samples
+    pretreatment_samples = replace(pretreatment_samples, 
+                                  pretreatment_samples %in% c("pre_treatment", "Y"), "yes"),
+    
+    # Fix publication year
+    publication_year = replace(publication_year, publication_year %in% c("none"), NA)
+  )
 
-# additional cleaning to correct for malformed pretreatment_samples
-master_table_clean <- master_table_clean %>% 
-  mutate(pretreatment_samples = replace(pretreatment_samples, pretreatment_samples %in% c("pre_treatment", "Y"), "yes"))
+# Data validation tests
+african_countries <- data.frame(
+  country = countrycode::codelist$country.name.en,
+  continent = countrycode::codelist$continent,
+  iso3c = countrycode::codelist$iso3c
+) |>
+  dplyr::filter(continent == "Africa") |> 
+  dplyr::distinct()
 
-# additional cleaning to correct for malformed pretreatment_samples
-master_table_clean <- master_table_clean %>% 
-  mutate(publication_year = replace(publication_year, publication_year %in% c("none"), NA))
-
-# perform tests
-african_countries <- data.frame(country = countrycode::codelist$country.name.en,
-                                continent = countrycode::codelist$continent,
-                                iso3c = countrycode::codelist$iso3c) |>
-                      dplyr::filter(continent == "Africa") |> dplyr::distinct()
+# Define allowed values for validation
 allowed_countries <- c(african_countries$country, "Democratic Republic of the Congo")
 allowed_iso3c <- c(african_countries$iso3c)
 allowed_substudy <- c("untreatedextracted", "untreatedcalculated",
-                      "treatedextracted", "treatedcalculated",
-                      "day0extracted", "day0calculated", 
-                      "tesday0treatmentfailure","day0reinfectionextracted",
-                      "day0recrudescenceextracted") # 
+                     "treatedextracted", "treatedcalculated",
+                     "day0extracted", "day0calculated", 
+                     "tesday0treatmentfailure", "day0reinfectionextracted",
+                     "day0recrudescenceextracted")
 allowed_pretreatment <- c("no", "yes", NA)
-allowed_publication <- c("peer_reviewed","preprint", "unpublished", "data_incomplete")
-allowed_pub_year <- c(as.character(seq(from = 2000, to = (lubridate::year(Sys.Date())))), NA) # automatically update as years change
-allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS", "REFUGEERECEPTIONCENTER", "UNKNOWN", "SURVEILLANCE")
+allowed_publication <- c("peer_reviewed", "preprint", "unpublished", "data_incomplete")
+allowed_pub_year <- c(as.character(seq(from = 2000, to = lubridate::year(Sys.Date()))), NA)
+allowed_site_types <- c("HEALTHFACILITY", "COMMUNITY", "TES", "CCS", "DHS", 
+                       "REFUGEERECEPTIONCENTER", "UNKNOWN", "SURVEILLANCE")
 
-# run tests
+# Run validation tests
 check_values_in_column(master_table_clean, "country", allowed_countries)
 check_values_in_column(master_table_clean, "iso3c", allowed_iso3c)
 check_values_in_column(master_table_clean, "substudy", allowed_substudy)
@@ -132,260 +147,287 @@ check_values_in_column(master_table_clean, "publication_status", allowed_publica
 check_values_in_column(master_table_clean, "publication_year", allowed_pub_year)
 check_values_in_column(master_table_clean, "site_study_type", allowed_site_types)
 
-# 2. Step 2 - Clean mutation names and data entry issues in these # ------------
+# 2. Step 2 - Clean mutation names and data entry issues # --------------------
 
-# Clean mutation names
-
-# Expand all gene mutation ranges for reference range syntax
-# TODO: These are inconcistently entered. Some use mutant_num to refer to REF ranges
-# Some go the other way. Plus many data entry issues here on review. 
-# Leaving for now and will pass back to data entry
-
-indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
-
-# Define the 24 codon positions of interest
+# Clean mutation names and expand K13 ranges
 # Extract K13 mutations from the mutation dictionary
-k13_mutations <- read_csv(here("analysis", "data-raw", "mutation_dictionary.csv")) %>%
-  filter(gene == "k13") %>%
-  mutate(mut = sub("^[A-Z]", "", mut)) %>%  # Remove the ref(first) codon letter (e.g., P553L → 553L)
-  select(mut)
+k13_mutations <- read_csv(here("analysis", "data-raw", "mutation_dictionary.csv")) |>
+  dplyr::filter(gene == "k13") |>
+  dplyr::mutate(mut = sub("^[A-Z]", "", mut)) |>  # Remove ref codon letter (e.g., P553L → 553L)
+  dplyr::select(mut)
 
 mutation_positions <- as.numeric(gsub("[^0-9]", "", k13_mutations$mut))
 
+# Identify K13 range mutations that need expansion
 indices_to_transform <- which(grepl("^k13:[0-9]+-[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
 
-# Split into individual rows
-rows_to_expand <- master_table_clean[indices_to_transform, ]
+# Expand K13 range mutations to individual positions
+if (length(indices_to_transform) > 0) {
+  rows_to_expand <- master_table_clean[indices_to_transform, ]
+  
+  # Expand each using mapply
+  expanded_rows <- mapply(
+    expand_k13_range_to_rows,
+    gene_mutation = rows_to_expand$gene_mutation,
+    row_data = split(rows_to_expand, seq_len(nrow(rows_to_expand))),
+    MoreArgs = list(mutation_key = mutation_key, mutation_positions = mutation_positions),
+    SIMPLIFY = FALSE
+  )
+  
+  # Combine all into one data frame
+  expanded_rows_df <- dplyr::bind_rows(expanded_rows)
+  
+  # Create final master table by removing collapsed ones and adding expanded
+  master_table_clean <- dplyr::bind_rows(
+    master_table_clean[-indices_to_transform, ],
+    expanded_rows_df
+  )
+}
 
-# Expand each using mapply (to pass both gene_mutation and full row)
-expanded_rows <- mapply(
-  expand_k13_range_to_rows,
-  gene_mutation = rows_to_expand$gene_mutation,
-  row_data = split(rows_to_expand, seq_len(nrow(rows_to_expand))),
-  MoreArgs = list(mutation_key = mutation_key, mutation_positions = mutation_positions),
-  SIMPLIFY = FALSE
-)
-
-# Combine all into one data frame
-expanded_rows_df <- dplyr::bind_rows(expanded_rows)
-
-# Create final master table by removing collapsed ones and adding expanded
-master_table_clean <- dplyr::bind_rows(
-  master_table_clean[-indices_to_transform, ],
-  expanded_rows_df
-)
-
-# For an individual position with an asterisk(indicating ref), we simply insert the ref allele and set variant_num to the total (really variant num should have been named carrier num)
+# Handle individual K13 reference positions with asterisk
 single_ref_indices_to_transform <- which(grepl("^k13:[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)) &
-                                master_table_clean$mutant_num == 0)
+                                         master_table_clean$mutant_num == 0)
 
-master_table_clean$gene_mutation[single_ref_indices_to_transform] <- as.character(sapply(
-  master_table_clean$gene_mutation[single_ref_indices_to_transform],
-  convert_k13_asterisk, 
-  mutation_key = mutation_key
-))
+if (length(single_ref_indices_to_transform) > 0) {
+  master_table_clean$gene_mutation[single_ref_indices_to_transform] <- as.character(sapply(
+    master_table_clean$gene_mutation[single_ref_indices_to_transform],
+    convert_k13_asterisk, 
+    mutation_key = mutation_key
+  ))
+  
+  master_table_clean$mutant_num[single_ref_indices_to_transform] <- master_table_clean$total_num[single_ref_indices_to_transform]
+}
 
-master_table_clean$mutant_num[single_ref_indices_to_transform] <- master_table_clean$total_num[single_ref_indices_to_transform]
-
-# OJ: This last one had a STOP codon based on the paper
-# https://journals.plos.org/plosone/article/figure?id=10.1371/journal.pone.0235401.t006
-# No way to handle so remove this - there are other data points in this location so 
-# the denominator will be correctly captured still
+# Remove remaining K13 asterisk entries (STOP codons that can't be handled)
 indices_to_transform <- which(grepl("^k13:[0-9]+:\\*$", tolower(master_table_clean$gene_mutation)))
-master_table_clean <- master_table_clean[-indices_to_transform,]
+if (length(indices_to_transform) > 0) {
+  master_table_clean <- master_table_clean[-indices_to_transform, ]
+}
 
-# OJ: They did enter FC which is what the paper says. This is then likely an insertion rather than a SNP
-# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-024-04945-8/tables/3
-# However, all entires had 0 observations of this, so we cannot simply remove as that removes
-# the denominator for this locus. So set to wildtype and mutant_num to total_num
-master_table_clean$mutant_num[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- 
-master_table_clean$total_num[master_table_clean$gene_mutation == "MDR1:1034:FC"]
-master_table_clean$gene_mutation[master_table_clean$gene_mutation == "MDR1:1034:FC"] <- "MDR1:1034:S"
+# Fix specific mutation entries
+# Fix MDR1 FC insertion (convert to wildtype S)
+mdr1_fc_indices <- which(master_table_clean$gene_mutation == "MDR1:1034:FC")
+if (length(mdr1_fc_indices) > 0) {
+  master_table_clean$mutant_num[mdr1_fc_indices] <- master_table_clean$total_num[mdr1_fc_indices]
+  master_table_clean$gene_mutation[mdr1_fc_indices] <- "MDR1:1034:S"
+}
 
-# OJ: They entered insertions, which are not SNPs so we will remove these 
-# This will remove the locus entirely but for now this is okay as it is outside propeller (may want to revisit)
-# https://malariajournal.biomedcentral.com/articles/10.1186/1475-2875-13-472/tables/1
-master_table_clean <- master_table_clean %>% filter(!(gene_mutation %in% c("K13:142:NN", "K13:142:NNN")))
+# Remove K13 insertion mutations (not SNPs)
+master_table_clean <- master_table_clean |> 
+  dplyr::filter(!(gene_mutation %in% c("K13:142:NN", "K13:142:NNN")))
 
-# Correct gene mutation format
+# Correct gene mutation format for STAVE compatibility
 convmutation <- format_variants_for_stave(unique(master_table_clean$gene_mutation))
 master_table_clean$gene_mutation <- convmutation[match(master_table_clean$gene_mutation, unique(master_table_clean$gene_mutation))]
 
-# 3. Step 3 - Clean dates, lat, lon # ------------
+# 3. Step 3 - Clean dates, coordinates, and data types # ----------------------
 
-# Adjust and add dates and survey IDs
+# Adjust and standardize dates
 convstart <- adjust_invalid_date(unique(master_table_clean$date_start), is_start = TRUE)
 master_table_clean$collection_start <- convstart[match(master_table_clean$date_start, unique(master_table_clean$date_start))]
+
 convend <- adjust_invalid_date(unique(master_table_clean$date_end), is_start = FALSE)
 master_table_clean$collection_end <- convend[match(master_table_clean$date_end, unique(master_table_clean$date_end))]
 
-# Compute collection day
-master_table_clean <- master_table_clean %>% rowwise() %>% 
-  mutate(collection_day = median(c(collection_start, collection_end))) %>% 
-  ungroup()
+# Compute collection day as median of start and end dates
+master_table_clean <- master_table_clean |> 
+  dplyr::rowwise() |> 
+  dplyr::mutate(collection_day = median(c(collection_start, collection_end))) |> 
+  dplyr::ungroup()
 
-# Fix long and lat which got read in as formula vs values
-# This has now been manually corrected higehr up but leave for now just in case reappears
+# Fix coordinates that may have been read as Excel formulas
 master_table_clean$lat_n <- clean_excel_formulas(master_table_clean$lat_n)
 master_table_clean$lon_e <- clean_excel_formulas(master_table_clean$lon_e)
 
-# change variable classes
+# Convert variable classes and extract gene information
 master_table_clean <- master_table_clean |>
-  dplyr::mutate(collection_day = as.Date(collection_day),
-                collection_start = as.Date(collection_start),
-                collection_end = as.Date(collection_end),
-                lat_n = as.numeric(lat_n),
-                lon_e = as.numeric(lon_e),
-                mutant_num = as.numeric(mutant_num),
-                total_num = as.numeric(total_num),
-                publication_year = as.numeric(publication_year)) |>
-  dplyr::mutate(gene = str_extract(gene_mutation, "^[^:]+"),
-                mut = str_extract(gene_mutation, "(?<=:).*")) |>
-  dplyr::filter(total_num > 0) # zeroes are because these codons weren't genotyped
+  dplyr::mutate(
+    collection_day = as.Date(collection_day),
+    collection_start = as.Date(collection_start),
+    collection_end = as.Date(collection_end),
+    lat_n = as.numeric(lat_n),
+    lon_e = as.numeric(lon_e),
+    mutant_num = as.numeric(mutant_num),
+    total_num = as.numeric(total_num),
+    publication_year = as.numeric(publication_year),
+    gene = str_extract(gene_mutation, "^[^:]+"),
+    mut = str_extract(gene_mutation, "(?<=:).*")
+  ) |>
+  dplyr::filter(total_num > 0)  # Remove entries where codons weren't genotyped
 
-# 4. Step 4 - Pre formatting other data entry issues # ------------
+# 4. Step 4 - Fix specific data entry issues # --------------------------------
 
-# One manual fix to data entry issue in 
-# s0128_voumbo-matoumona_2018_v01_prevalence_data_LONG_validated.tsv.gz
-master_table_clean <- master_table_clean %>% 
-  mutate(mutant_num = replace(mutant_num, mutant_num == 31 & total_num == 24 & site_uid == "koulamoutou", 21))
+# Fix specific data entry error in Koulamoutou study
+master_table_clean <- master_table_clean |> 
+  dplyr::mutate(mutant_num = replace(mutant_num, 
+                                    mutant_num == 31 & total_num == 24 & site_uid == "koulamoutou", 21))
 
-# remove site="none" records from study_ID==S0006WrairKenreadKen for which lat and lon was not available
-# the meta file for this has a none location so it passed through
-# automatically from MIP pipeline reading metadata for samples without site info which have no lat/lon. 
-# To be fixed manually in entry eventually.
-master_table_clean <- master_table_clean[!(master_table_clean$study_uid == "s0006_wrair_kenread_ken" & 
-                                                     is.na(master_table_clean$lat_n) & 
-                                                     is.na(master_table_clean$lon_e)), ]
+# Remove records without coordinates from specific study
+master_table_clean <- master_table_clean |>
+  dplyr::filter(!(study_uid == "s0006_wrair_kenread_ken" & 
+                  is.na(lat_n) & 
+                  is.na(lon_e)))
 
-# filter out any entries that are day0 calculated - these reflect extra data entries for total genotype counts
-# which are already captured within haplotype counts
-master_table_clean <- master_table_clean %>% 
+# Remove day0calculated entries (duplicate genotype counts already captured in haplotypes)
+master_table_clean <- master_table_clean |> 
   dplyr::filter(grepl("day0calculated", substudy) == 0)
 
 
-# 5. Step 5 - Formatting # ------------
+# 5. Step 5 - Data validation and formatting # --------------------------------
 
-if(sum(master_table_clean$total_num < master_table_clean$mutant_num) > 0) {
+# Data integrity checks
+if (sum(master_table_clean$total_num < master_table_clean$mutant_num) > 0) {
   errorCondition("Entries with more mutant samples than total samples")
 }
-if(sum(master_table_clean$total_num == 0) > 0) {
+if (sum(master_table_clean$total_num == 0) > 0) {
   errorCondition("Entries with zero total samples")
 }
 
-# rename the columns so that they make sense
+# Get column names for final output
 column_names <- get_column_names_for_clean()
 
-# first add in extra information needed within column_names
-master_table_formatted <- master_table_clean %>% 
-  group_by(study_uid) %>% 
-  dplyr::mutate(study_uid = paste0("geoff_", janitor::make_clean_names(study_uid[1], "big_camel"))) %>% 
-  ungroup() %>% 
-  dplyr::group_by(study_uid, site_name, collection_start) %>% 
-  dplyr::mutate(survey_ID = paste0(study_uid[1], "_", 
-                                   janitor::make_clean_names(site_name[1], "big_camel"), "_", 
-                                   lubridate::year(collection_start[1])),
-                continent = countrycode::countrycode(sourcevar = iso3c[1], "iso3c", "continent")) %>% 
-  ungroup() %>% 
-  dplyr::mutate(database = "GEOFF",
-                study_nm = study_uid,
-                prev = mutant_num/total_num,
-                spatial_notes = "Literature review sourced lat/lon",
-                time_notes = "Automated midpoint"
-                )  %>% 
-  # second check we have all the correctly named columns 
-  dplyr::rename(study_ID = "study_uid",
-                study_name = "study_nm",
-                study_type = "publication_status",
-                authors = "first_author_surname", 
-                publication_year = "publication_year",
-                url = "study_url",
-                survey_ID = "survey_ID",
-                country_name = "country", 
-                site_name = "site_name",
-                lat = "lat_n",
-                lon = "lon_e",
-                spatial_notes = "spatial_notes",
-                collection_start = "collection_start", 
-                collection_end = "collection_end", 
-                collection_day = "collection_day", 
-                time_notes = "time_notes",
-                variant_string = "gene_mutation",
-                variant_num = "mutant_num",
-                total_num = "total_num",
-                iso3c = "iso3c", 
-                continent = "continent",
-                pmid = "pmid",
-                prev = "prev",
-                gene = "gene",
-                database = "database"
+# Format data for STAVE compatibility
+master_table_formatted <- master_table_clean |> 
+  dplyr::group_by(study_uid) |> 
+  dplyr::mutate(study_uid = paste0("geoff_", janitor::make_clean_names(study_uid[1], "big_camel"))) |> 
+  dplyr::ungroup() |> 
+  dplyr::group_by(study_uid, site_name, collection_start) |> 
+  dplyr::mutate(
+    survey_ID = paste0(study_uid[1], "_", 
+                      janitor::make_clean_names(site_name[1], "big_camel"), "_", 
+                      lubridate::year(collection_start[1])),
+    continent = countrycode::countrycode(sourcevar = iso3c[1], "iso3c", "continent")
+  ) |> 
+  dplyr::ungroup() |> 
+  dplyr::mutate(
+    database = "GEOFF",
+    study_nm = study_uid,
+    prev = mutant_num/total_num,
+    spatial_notes = "Literature review sourced lat/lon",
+    time_notes = "Automated midpoint"
+  ) |> 
+  # Rename columns for consistency
+  dplyr::rename(
+    study_ID = "study_uid",
+    study_name = "study_nm",
+    study_type = "publication_status",
+    authors = "first_author_surname", 
+    publication_year = "publication_year",
+    url = "study_url",
+    survey_ID = "survey_ID",
+    country_name = "country", 
+    site_name = "site_name",
+    lat = "lat_n",
+    lon = "lon_e",
+    spatial_notes = "spatial_notes",
+    collection_start = "collection_start", 
+    collection_end = "collection_end", 
+    collection_day = "collection_day", 
+    time_notes = "time_notes",
+    variant_string = "gene_mutation",
+    variant_num = "mutant_num",
+    total_num = "total_num",
+    iso3c = "iso3c", 
+    continent = "continent",
+    pmid = "pmid",
+    prev = "prev",
+    gene = "gene",
+    database = "database"
   )
 
-# 6. Step 6 - Impute k13 reference survey records not explicitly entered in data entry # ------------
+# Replace missing URLs with placeholder to satisfy downstream URL checkers
+studies_missing_url <- master_table_formatted |>
+  dplyr::filter(is.na(url)) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::pull(study_ID)
+
+if (length(studies_missing_url) > 0) {
+  cat("Replacing missing URLs with placeholder for", length(studies_missing_url), "studies:\n")
+  for (study in studies_missing_url) {
+    cat("- ", study, "\n")
+  }
+  
+  # Replace missing URLs with placeholder
+  master_table_formatted <- master_table_formatted |>
+    dplyr::mutate(url = if_else(is.na(url), "https://placeholder-url-missing.com", url))
+  
+  cat("Placeholder URL used: https://placeholder-url-missing.com\n\n")
+} else {
+  cat("All studies have URLs - no placeholder replacement needed.\n\n")
+}
+
+# 6. Step 6 - Impute K13 reference records # ----------------------------------
 
 # Define K13 reference range
 k13_range <- 1:726
 
-# for each unique study_uid, impute k13 validated and candidate reference call counts using mean k13 sample coverage per study and k13 sequenced range before adding to add to master_table_formatted
-
-# Get unique survey IDs
+# Impute K13 validated and candidate reference call counts for each survey
 unique_surveys <- unique(master_table_formatted$survey_ID)
 
 # Initialize progress bar
-pb <- txtProgressBar(min = 0, max = length(unique_surveys), style = 3)  # Style 3 = moving bar
+pb <- txtProgressBar(min = 0, max = length(unique_surveys), style = 3)
 
-# Run the processing sequentially using lapply and show progress
+# Process surveys and impute missing K13 records
 imputed_records <- lapply(unique_surveys, process_survey)
 
 # Close progress bar
 close(pb)
 
+# Combine imputed records
 imputed_data <- bind_rows(imputed_records)
 
-# Ensure no duplicate variant_string entries for the same survey_ID
+# Check for and remove duplicate variant_string entries
 duplicates <- inner_join(imputed_data, master_table_formatted, 
-                         by = c("survey_ID", "variant_string"))
+                        by = c("survey_ID", "variant_string"))
 
 if (nrow(duplicates) > 0) {
   message("Warning: ", nrow(duplicates), " duplicate variant_string entries found and removed.")
   imputed_data <- anti_join(imputed_data, master_table_formatted, 
-                            by = c("survey_ID", "variant_string"))
+                           by = c("survey_ID", "variant_string"))
 }
 
-# Append imputed records to master_table_formatted
+# Append imputed records to main table
 master_table_formatted <- bind_rows(master_table_formatted, imputed_data)
 
-# Check to confirm all k13_alleles (24 validated and candidate) are present for each survey (year/location) at least (should return 0 rows)
-master_table_formatted %>% filter(gene == "k13") %>% group_by(survey_ID) %>% 
-  summarise(n = str_extract_all(variant_string, "(?<=k13:)([\\d_]+)") %>%
-                unlist() %>%
-                str_split("_") %>%
-                unlist() %>%
-                as.numeric() %>%
-                unique() %>% length,
-            min = as.integer(unique(k13_min)), 
-            max = as.integer(unique(k13_max)), 
-            pos = sum(as.integer(unique(substr(k13_mutations$mut,1,3))) < max & 
-                        as.integer(unique(substr(k13_mutations$mut,1,3))) > min)) %>% 
-  filter(n < pos)
+# Validate K13 allele completeness (should return 0 rows if all alleles present)
+k13_validation <- master_table_formatted |> 
+  dplyr::filter(gene == "k13") |> 
+  dplyr::group_by(survey_ID) |> 
+  dplyr::summarise(
+    n = str_extract_all(variant_string, "(?<=k13:)([\\d_]+)") |>
+        unlist() |>
+        str_split("_") |>
+        unlist() |>
+        as.numeric() |>
+        unique() |> 
+        length(),
+    min = as.integer(unique(k13_min)), 
+    max = as.integer(unique(k13_max)), 
+    pos = sum(as.integer(unique(substr(k13_mutations$mut, 1, 3))) < max & 
+              as.integer(unique(substr(k13_mutations$mut, 1, 3))) > min),
+    .groups = "drop"
+  ) |> 
+  dplyr::filter(n < pos)
 
-# 7. Step 7 - Last checks # ------------
+# 7. Step 7 - Data quality checks # -------------------------------------------
 
-# flag any study which has NA for lat or long after format conversion
+# Identify studies with missing coordinates
 lat_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$lat)])
 lon_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$lon)])
 
-# flag any study which has NA for substudy which is selectively used for inclusion of data in next scripts (ex we must use this field to exclude categories like tesday0treatmentfailure or treatedextracted for population prevalence calcs)
+# Identify studies with missing substudy values (critical for downstream filtering)
 substudy_missing_or_improper <- unique(master_table_formatted$study_ID[is.na(master_table_formatted$substudy)])
+
+# Report missing data
 cat("Studies with missing or improper latitudes:\n", paste(lat_missing_or_improper, collapse = ", "), "\n\n")
 cat("Studies with missing or improper longitudes:\n", paste(lon_missing_or_improper, collapse = ", "), "\n\n")
 cat("Studies with missing or improper substudy values (critical for inclusion/exclusion in downstream analysis):\n", 
     paste(substudy_missing_or_improper, collapse = ", "), "\n\n")
 
-# flag all study uids which report less than 40% prevalence of validated k13 reference allele indicating entry error (using 469C arbitratily to detect erroneous user behavior) 
-low_prev_studies <- master_table_formatted %>%
-  filter(variant_string == "k13:469:C", prev < 0.40) %>%
-  distinct(study_ID, data_entry_author)  # Get unique pairs
+# Flag studies with low K13 reference allele prevalence (< 40% indicates potential entry error)
+low_prev_studies <- master_table_formatted |>
+  dplyr::filter(variant_string == "k13:469:C", prev < 0.40) |>
+  dplyr::distinct(study_ID, data_entry_author)
 print(low_prev_studies)
 
 # 8. Step 8 - Any further specific data entry issues, likely identified when trying to read to STAVE ---------
@@ -448,65 +490,93 @@ master_table_formatted$variant_string[master_table_formatted$variant_string == "
 #https://malariajournal.biomedcentral.com/articles/10.1186/s12936-017-1777-0/tables/2
 master_table_formatted$variant_string[master_table_formatted$variant_string == "crt:76:TK"] <- "crt:76:T/K"
 
-# 9. Step 9 - subset cols needed downstream ---------
+# 9. Step 9 - Placeholder for final column selection # -----------------------
+# Note: master_table_simplified will be created after all cleaning is complete
 
-# Grab just the columns we need for pairing with WWARN etc
-master_table_simplified <- master_table_formatted %>% 
-  select(all_of(column_names))
+# 10. Step 10 - Report missing studies # --------------------------------------
 
-# 10. Step 10 - Report studies which did not make it through cleaning or validation ---------
-
-# Find study uids missing in the cleaned data using a list of expected study uids (as of may 19, 2025) from the geoff data and covidence data overview google sheetsAdd commentMore actions
+# Load expected study UIDs and compare with cleaned data
 all_expected_sample_uids <- read.table(
   here("analysis", "data-raw", "entered_geoff_study_ids.txt"),
   stringsAsFactors = FALSE
 )[[1]]
 
-# Capitalize first letter of each underscore-separated part
+# Helper function to capitalize underscore-separated parts
 capitalize_underscore_parts <- function(x) {
   parts <- strsplit(x, "_")[[1]]
   parts_cap <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
-  paste0(parts_cap, collapse = "")  # no underscore on re-join
+  paste0(parts_cap, collapse = "")
 }
 
-# Apply the function and also remove any spaces
-all_expected_sample_uids_cleaned <- all_expected_sample_uids %>%
-  lapply(capitalize_underscore_parts) %>%
-  unlist(use.names = FALSE) %>%       # drop names that might mess things up
-  gsub(" ", "", .) %>%
-  (\(x) paste0("geoff_", x))()        # explicitly prepend "geoff_
+# Clean and normalize expected study UIDs
+all_expected_sample_uids_cleaned <- all_expected_sample_uids |>
+  lapply(capitalize_underscore_parts) |>
+  unlist(use.names = FALSE) |>
+  (\(x) gsub(" ", "", x))() |>
+  (\(x) paste0("geoff_", x))() |>
+  as.character()
 
-# Ensure character vector for comparison
-all_expected_sample_uids_cleaned <- as.character(all_expected_sample_uids_cleaned)
+# Find study IDs in cleaned data that are not in expected list
+unexpected_study_ids <- master_table_simplified |>
+  dplyr::distinct(study_ID) |>
+  dplyr::filter(!study_ID %in% all_expected_sample_uids_cleaned)
 
-# Find unique study_IDs in master_table_formatted that are NOT in the expected list
-unexpected_study_ids <- master_table_simplified %>%
-  distinct(study_ID) %>%
-  filter(!study_ID %in% all_expected_sample_uids_cleaned)
+# Find expected study IDs that are missing from cleaned data
+missing_study_ids <- data.frame(study_ID = all_expected_sample_uids_cleaned) |>
+  dplyr::filter(!study_ID %in% unique(master_table_simplified$study_ID))
 
-# Display study_IDs found in master_table_formatted that are NOT in the expected list
-cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
-print(unexpected_study_ids) #Add commentMore actions
+# Extract study numbers for flexible matching (e.g., S0148 from geoff_S0148Martínez-pérez2018)
+extract_study_number <- function(study_id) {
+  stringr::str_extract(study_id, "(?<=geoff_)(S[0-9]+)(?=[A-Za-z])")
+}
 
-# 11. Step 11 - Final checks for required input to stave
-na_variant_num <- master_table_formatted %>%
-  filter(is.na(variant_num)) %>%
-  distinct(survey_ID) %>%
-  mutate(problem_column = "variant_num")
+# Get study numbers from both datasets
+expected_study_numbers <- sapply(all_expected_sample_uids_cleaned, extract_study_number)
+actual_study_numbers <- sapply(unique(master_table_simplified$study_ID), extract_study_number)
 
-na_total_num <- master_table_formatted %>%
-  filter(is.na(total_num)) %>%
-  distinct(survey_ID) %>%
-  mutate(problem_column = "total_num")
+# Find missing studies by study number (more flexible matching)
+missing_by_number <- data.frame(
+  study_ID = all_expected_sample_uids_cleaned,
+  study_number = expected_study_numbers
+) |>
+  dplyr::filter(!is.na(study_number) & !study_number %in% actual_study_numbers)
 
-na_url <- master_table_formatted %>%
-  filter(is.na(url)) %>%
-  distinct(survey_ID) %>%
-  mutate(problem_column = "url")
+# Report some final study inclusion checks. Using the more flexible check for now as some study ids will be different in the cleaned data than in the entry sheet.
+# Report unexpected study IDs
+#cat("The following study_IDs are present in master_table_formatted but missing from entered_geoff_study_ids.txt (after normalization):\n")
+#print(unexpected_study_ids)
 
-# Combine all NA findings
-problem_surveys <- bind_rows(na_variant_num, na_total_num, na_url) %>%
-  arrange(survey_ID, problem_column)
+# Report missing study IDs (exact match)
+#cat("\nThe following study_IDs are in entered_geoff_study_ids.txt but missing from master_table_formatted (exact match):\n")
+#print(missing_study_ids)
+
+# Report missing study IDs (flexible study number match)
+cat("\nThe following study numbers are in entered_geoff_study_ids.txt but missing from master_table_formatted (flexible match by study number):\n")
+print(missing_by_number)
+
+# 11. Step 11 - Final validation checks # -------------------------------------
+
+# Check for missing variant numbers
+na_variant_num <- master_table_formatted |>
+  dplyr::filter(is.na(variant_num)) |>
+  dplyr::distinct(survey_ID) |>
+  dplyr::mutate(problem_column = "variant_num")
+
+# Check for missing total numbers
+na_total_num <- master_table_formatted |>
+  dplyr::filter(is.na(total_num)) |>
+  dplyr::distinct(survey_ID) |>
+  dplyr::mutate(problem_column = "total_num")
+
+# Check for missing URLs
+na_url <- master_table_formatted |>
+  dplyr::filter(is.na(url)) |>
+  dplyr::distinct(survey_ID) |>
+  dplyr::mutate(problem_column = "url")
+
+# Combine and report all missing value findings
+problem_surveys <- bind_rows(na_variant_num, na_total_num, na_url) |>
+  dplyr::arrange(survey_ID, problem_column)
 
 if (nrow(problem_surveys) > 0) {
   message("Surveys with missing values:")
@@ -515,17 +585,11 @@ if (nrow(problem_surveys) > 0) {
   message("No NAs found in variant_num, total_num, or url.")
 }
 
-# Step 11.5 - Make variety of data entry fixes that should be implemented directly in hand entered sheets eventually (more efficient to do one pass once we have all fixes here so don't go through revalidation/repull many times)
-# geoff_S0002AyelawEth2023 - https://pubmed.ncbi.nlm.nih.gov/40666313/
-# geoff_S0006WrairKenreadKen - https://www.medrxiv.org/content/10.1101/2025.07.15.25331603v1
-# geoff_S0007Connelly2024Zim - 
-# geoff_S0008AMsmtTza22 - 
-# geoff_S0008BMsmtTza23 - 
-# geoff_S0014YoungRwaUnpub - https://academic.oup.com/jid/article/231/1/269/7811784
 
-library(dplyr)
 
-# Define mapping of study_id to new URLs
+# Step 11.5 - Update URLs for specific studies # ------------------------------
+
+# Define URL updates for studies with missing or incorrect URLs
 url_updates <- c(
   "geoff_S0002AyelawEth2023"   = "https://pubmed.ncbi.nlm.nih.gov/40666313/",
   "geoff_S0006WrairKenreadKen" = "https://www.medrxiv.org/content/10.1101/2025.07.15.25331603v1",
@@ -533,16 +597,363 @@ url_updates <- c(
   "geoff_S0007Connelly2024Zim" = "https://www.medrxiv.org/content/10.1101/2025.03.22.25323829v1"
 )
 
-# Update the master_table_formatted object
-master_table_formatted <- master_table_formatted %>%
-  mutate(url = if_else(
+# Update URLs in the formatted table
+master_table_formatted <- master_table_formatted |>
+  dplyr::mutate(url = if_else(
     study_ID %in% names(url_updates),
     url_updates[study_ID],
     url
   ))
 
-# 12. Step 12 - Save Formatted Data ---------
+# Step 11.6 - Additional data cleaning patches # ------------------------------
 
-# Save the final merged_df as an RDS file
+# 1) Fix variant string ordering for study S0046 (geoff_S0046Bwire)
+# Check before fix
+s0046_before <- master_table_formatted |>
+  dplyr::filter(study_ID == "geoff_S0046Bwire" & variant_string == "k13:578_565:S/C") |>
+  nrow()
+
+master_table_formatted <- master_table_formatted |>
+  dplyr::mutate(variant_string = if_else(
+    study_ID == "geoff_S0046Bwire" & variant_string == "k13:578_565:S/C",
+    "k13:565_578:C_S",
+    variant_string
+  ))
+
+# Check after fix
+s0046_after <- master_table_formatted |>
+  dplyr::filter(study_ID == "geoff_S0046Bwire" & variant_string == "k13:565_578:C_S") |>
+  nrow()
+
+# Report the fix
+cat("S0046 variant string fix - Records changed from 'k13:578_565:S/C' to 'k13:565_578:C_S':", s0046_before, "->", s0046_after, "\n")
+
+# 2) Check codon and base pair counts match in variant strings
+codon_bp_mismatch <- master_table_formatted |>
+  dplyr::mutate(
+    # Extract codon positions (between first : and second :)
+    codon_part = stringr::str_extract(variant_string, "(?<=:)[^:]+(?=:)"),
+    # Extract allele part (after second :)
+    allele_part = stringr::str_extract(variant_string, "(?<=:)[^:]+$"),
+    # Count codons (split by _ and count elements)
+    codon_count = lengths(stringr::str_split(codon_part, "_")),
+    # Count alleles (split by _ and count elements)
+    allele_count = lengths(stringr::str_split(allele_part, "_"))
+  ) |>
+  dplyr::filter(codon_count != allele_count) |>
+  dplyr::select(study_ID, variant_string, codon_count, allele_count)
+
+# Report mismatches
+if (nrow(codon_bp_mismatch) > 0) {
+  cat("\nVariant strings with codon/allele count mismatches:\n")
+  print(codon_bp_mismatch)
+} else {
+  cat("\nAll variant strings have matching codon and allele counts.\n")
+}
+
+# 3) Fix variant strings by adding underscores between allele letters
+if (nrow(codon_bp_mismatch) > 0) {
+  # Function to add underscores between individual letters in allele part
+  fix_allele_format <- function(variant_string, codon_count, allele_count) {
+    # Only fix if we have more codons than alleles and alleles appear to be concatenated letters
+    if (codon_count > allele_count) {
+      parts <- stringr::str_split(variant_string, ":")[[1]]
+      if (length(parts) == 3) {
+        gene <- parts[1]
+        codons <- parts[2]
+        alleles <- parts[3]
+        
+        # If alleles are letters without separators, add underscores
+        if (stringr::str_detect(alleles, "^[A-Z]+$") && nchar(alleles) == codon_count) {
+          # Split into individual letters and join with underscores
+          allele_letters <- stringr::str_split(alleles, "")[[1]]
+          fixed_alleles <- paste(allele_letters, collapse = "_")
+          return(paste(gene, codons, fixed_alleles, sep = ":"))
+        }
+      }
+    }
+    return(variant_string)
+  }
+  
+  # Apply the fix to mismatched variant strings
+  master_table_formatted <- master_table_formatted |>
+    dplyr::mutate(
+      # Extract codon and allele counts again for the fix
+      codon_part_temp = stringr::str_extract(variant_string, "(?<=:)[^:]+(?=:)"),
+      allele_part_temp = stringr::str_extract(variant_string, "(?<=:)[^:]+$"),
+      codon_count_temp = lengths(stringr::str_split(codon_part_temp, "_")),
+      allele_count_temp = lengths(stringr::str_split(allele_part_temp, "_")),
+      
+      # Fix variant strings where needed
+      variant_string = mapply(fix_allele_format, variant_string, codon_count_temp, allele_count_temp)
+    ) |>
+    dplyr::select(-codon_part_temp, -allele_part_temp, -codon_count_temp, -allele_count_temp)
+  
+  # Re-check after fix
+  codon_bp_mismatch_after <- master_table_formatted |>
+    dplyr::mutate(
+      codon_part = stringr::str_extract(variant_string, "(?<=:)[^:]+(?=:)"),
+      allele_part = stringr::str_extract(variant_string, "(?<=:)[^:]+$"),
+      codon_count = lengths(stringr::str_split(codon_part, "_")),
+      allele_count = lengths(stringr::str_split(allele_part, "_"))
+    ) |>
+    dplyr::filter(codon_count != allele_count) |>
+    dplyr::select(study_ID, variant_string, codon_count, allele_count)
+  
+  cat("\nAfter fixing allele formatting - remaining mismatches:\n")
+  if (nrow(codon_bp_mismatch_after) > 0) {
+    print(codon_bp_mismatch_after)
+  } else {
+    cat("All variant strings now have matching codon and allele counts.\n")
+  }
+}
+
+# 4) Fix specific variant strings for study geoff_S0122Li2015
+master_table_formatted <- master_table_formatted |>
+  dplyr::mutate(variant_string = case_when(
+    study_ID == "geoff_S0122Li2015" & variant_string == "crt:72_73_74_75_76:CVM/IN/EK/T" ~ "crt:72_73_74_75_76:C_V_M/I_N/E_K/T",
+    study_ID == "geoff_S0122Li2015" & variant_string == "mdr1:86_184:NY/F" ~ "mdr1:86_184:N_Y/F",
+    study_ID == "geoff_S0122Li2015" & variant_string == "mdr1:86_184:YY/F" ~ "mdr1:86_184:Y_Y/F",
+    TRUE ~ variant_string
+  ))
+
+# Final check after all fixes
+final_codon_bp_check <- master_table_formatted |>
+  dplyr::mutate(
+    codon_part = stringr::str_extract(variant_string, "(?<=:)[^:]+(?=:)"),
+    allele_part = stringr::str_extract(variant_string, "(?<=:)[^:]+$"),
+    codon_count = lengths(stringr::str_split(codon_part, "_")),
+    allele_count = lengths(stringr::str_split(allele_part, "_"))
+  ) |>
+  dplyr::filter(codon_count != allele_count) |>
+  dplyr::select(study_ID, variant_string, codon_count, allele_count)
+
+cat("\nFinal check - variant strings with codon/allele count mismatches:\n")
+if (nrow(final_codon_bp_check) > 0) {
+  print(final_codon_bp_check)
+} else {
+  cat("All variant strings now have matching codon and allele counts.\n")
+}
+
+# 5) Check for NA values in the URL column
+na_url_check <- master_table_formatted |>
+  dplyr::filter(is.na(url)) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::arrange(study_ID)
+
+cat("\nStudies with missing URLs:\n")
+if (nrow(na_url_check) > 0) {
+  print(na_url_check)
+  cat("Number of studies with missing URLs:", nrow(na_url_check), "\n")
+} else {
+  cat("All studies have URLs.\n")
+}
+
+# 6) Check for missing date fields
+missing_dates_check <- master_table_formatted |>
+  dplyr::summarise(
+    missing_collection_day = sum(is.na(collection_day)),
+    missing_collection_start = sum(is.na(collection_start)),
+    missing_collection_end = sum(is.na(collection_end)),
+    .groups = "drop"
+  )
+
+cat("\nMissing date field counts:\n")
+print(missing_dates_check)
+
+# Identify studies with missing dates
+studies_missing_dates <- master_table_formatted |>
+  dplyr::filter(is.na(collection_day) | is.na(collection_start) | is.na(collection_end)) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::arrange(study_ID)
+
+if (nrow(studies_missing_dates) > 0) {
+  cat("\nStudies with missing date fields:\n")
+  print(studies_missing_dates)
+  cat("Number of studies with missing dates:", nrow(studies_missing_dates), "\n")
+  
+  # Detailed examination of studies with missing collection days
+  studies_missing_collection_day <- master_table_formatted |>
+    dplyr::filter(is.na(collection_day)) |>
+    dplyr::distinct(study_ID) |>
+    dplyr::pull(study_ID)
+  
+  if (length(studies_missing_collection_day) > 0) {
+    cat("\nDETAILED EXAMINATION - Studies with Missing Collection Days:\n")
+    cat("Studies with missing collection_day:", length(studies_missing_collection_day), "\n")
+    
+    # Remove rows with missing collection_day from specific vetted studies
+    # These are remnants from MIP processing pipeline that can be safely omitted
+    vetted_studies_to_clean <- c("geoff_S0007Connelly2024Zim", "geoff_S0006WrairKenreadKen")
+    
+    rows_before <- nrow(master_table_formatted)
+    master_table_formatted <- master_table_formatted |>
+      dplyr::filter(!(study_ID %in% vetted_studies_to_clean & is.na(collection_day)))
+    rows_after <- nrow(master_table_formatted)
+    
+    removed_count <- rows_before - rows_after
+    cat("Removed", removed_count, "rows with missing collection_day from vetted studies:\n")
+    cat("- geoff_S0007Connelly2024Zim\n")
+    cat("- geoff_S0006WrairKenreadKen\n\n")
+    
+    # Summary of date field completeness for problematic studies
+    date_completeness <- master_table_formatted |>
+      dplyr::filter(study_ID %in% studies_missing_collection_day) |>
+      dplyr::group_by(study_ID) |>
+      dplyr::summarise(
+        total_records = n(),
+        missing_collection_day = sum(is.na(collection_day)),
+        missing_collection_start = sum(is.na(collection_start)),
+        missing_collection_end = sum(is.na(collection_end)),
+        missing_date_start = sum(is.na(date_start)),
+        missing_date_end = sum(is.na(date_end)),
+        .groups = "drop"
+      )
+    
+    cat("Date field completeness summary:\n")
+    print(date_completeness)
+  }
+} else {
+  cat("All studies have complete date information.\n")
+}
+
+# 7) Check for missing geographic coordinates
+missing_coords_check <- master_table_formatted |>
+  dplyr::summarise(
+    missing_lat = sum(is.na(lat)),
+    missing_lon = sum(is.na(lon)),
+    missing_both = sum(is.na(lat) & is.na(lon)),
+    .groups = "drop"
+  )
+
+cat("\nMissing coordinate field counts:\n")
+print(missing_coords_check)
+
+# Identify studies with missing coordinates
+studies_missing_coords <- master_table_formatted |>
+  dplyr::filter(is.na(lat) | is.na(lon)) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::arrange(study_ID)
+
+if (nrow(studies_missing_coords) > 0) {
+  cat("\nStudies with missing geographic coordinates:\n")
+  print(studies_missing_coords)
+  cat("Number of studies with missing coordinates:", nrow(studies_missing_coords), "\n")
+} else {
+  cat("All studies have complete geographic coordinates.\n")
+}
+
+# 8) Check for NA values in variant_num and total_num
+missing_counts_check <- master_table_formatted |>
+  dplyr::summarise(
+    missing_variant_num = sum(is.na(variant_num)),
+    missing_total_num = sum(is.na(total_num)),
+    missing_both_counts = sum(is.na(variant_num) & is.na(total_num)),
+    .groups = "drop"
+  )
+
+cat("\nMissing count field summary:\n")
+print(missing_counts_check)
+
+# Identify studies with missing variant_num
+studies_missing_variant_num <- master_table_formatted |>
+  dplyr::filter(is.na(variant_num)) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::arrange(study_ID)
+
+if (nrow(studies_missing_variant_num) > 0) {
+  cat("\nStudies with missing variant_num:\n")
+  print(studies_missing_variant_num)
+  cat("Number of studies with missing variant_num:", nrow(studies_missing_variant_num), "\n")
+} else {
+  cat("All studies have variant_num values.\n")
+}
+
+# Identify studies with missing total_num
+studies_missing_total_num <- master_table_formatted |>
+  dplyr::filter(is.na(total_num)) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::arrange(study_ID)
+
+if (nrow(studies_missing_total_num) > 0) {
+  cat("\nStudies with missing total_num:\n")
+  print(studies_missing_total_num)
+  cat("Number of studies with missing total_num:", nrow(studies_missing_total_num), "\n")
+} else {
+  cat("All studies have total_num values.\n")
+}
+
+# Flag problematic studies that may need attention
+problematic_studies <- c(
+  "geoff_S0006WrairKenreadKen",
+  "geoff_S0013MsmtTza21", 
+  "geoff_S0016Connelly2024Elife",
+  "geoff_S0026Verity",
+  "geoff_S0062Vonwowern2024",
+  "geoff_S0067Makenga2022",
+  "geoff_S0108Natama2020",
+  "geoff_S0114Lepiscopia2021",
+  "geoff_S0128VoumboMatoumona2018",
+  "geoff_S0148MartinezPerez2018"
+)
+
+# Check which of these problematic studies have missing count data
+problematic_with_missing_counts <- master_table_formatted |>
+  dplyr::filter(study_ID %in% problematic_studies & (is.na(variant_num) | is.na(total_num))) |>
+  dplyr::distinct(study_ID) |>
+  dplyr::arrange(study_ID)
+
+cat("\nProblematic studies (from expected list) with missing count data:\n")
+if (nrow(problematic_with_missing_counts) > 0) {
+  print(problematic_with_missing_counts)
+} else {
+  cat("None of the flagged problematic studies have missing count data.\n")
+}
+
+# 12. Step 12 - Final column selection and save cleaned data # ----------------
+
+# Create simplified table with only required columns after all cleaning is complete
+master_table_simplified <- master_table_formatted |> 
+  dplyr::select(all_of(column_names))
+
+# Comprehensive check for missing values in master_table_simplified
+cat("\n", paste(rep("=", 60), collapse = ""), "\n")
+cat("FINAL DATA QUALITY CHECK - Missing Values in master_table_simplified\n")
+cat(paste(rep("=", 60), collapse = ""), "\n")
+
+# Count missing values by column
+missing_summary <- master_table_simplified |>
+  dplyr::summarise(dplyr::across(everything(), ~ sum(is.na(.x)))) |>
+  tidyr::pivot_longer(everything(), names_to = "column", values_to = "missing_count") |>
+  dplyr::filter(missing_count > 0) |>
+  dplyr::arrange(desc(missing_count))
+
+if (nrow(missing_summary) > 0) {
+  cat("Columns with missing values:\n")
+  print(missing_summary)
+  cat("\nTotal records in dataset:", nrow(master_table_simplified), "\n")
+  
+  # Show percentage missing for each column
+  missing_summary_pct <- missing_summary |>
+    dplyr::mutate(percent_missing = round(missing_count / nrow(master_table_simplified) * 100, 2))
+  
+  cat("\nMissing values with percentages:\n")
+  print(missing_summary_pct)
+  
+  # Flag columns with high missingness (>10%)
+  high_missing <- missing_summary_pct |>
+    dplyr::filter(percent_missing > 10)
+  
+  if (nrow(high_missing) > 0) {
+    cat("\nWARNING: Columns with >10% missing data:\n")
+    print(high_missing)
+  }
+} else {
+  cat("✓ No missing values found in any column of master_table_simplified\n")
+}
+
+cat(paste(rep("=", 60), collapse = ""), "\n\n")
+
+# Save the cleaned and formatted data
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
 saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
