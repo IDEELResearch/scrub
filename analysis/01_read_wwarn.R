@@ -1699,7 +1699,7 @@ for(i in 1:(nrow(pdmdr1spl7$`18008244`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
   
   fixed <- rbind(fixed, df)
   
@@ -1809,6 +1809,7 @@ pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
 
 
 # and group by to record prevalence of each mdr1 marker type
+# TODO: figure out why there is crt mutations here
 mdr1ww_final_res_df <- rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
                              pdmdr1spl5, pdmdr1spl6, pdmdr1spl7) %>%
   ungroup %>%
@@ -1816,7 +1817,9 @@ mdr1ww_final_res_df <- rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source) %>%
   ungroup %>%
-  mutate(mut = replace(mut, mut == "pfmdr1 86Y", "mdr1_86Y")) %>%
+  # TODO: fix this 
+  mutate(mut = replace(mut, mut == "pfmdr1_86Y", "mdr1_86Y")) %>%
+  mutate(mut = replace(mut, mut == "pfmdr1 N86", "mdr1_86Y")) %>%
   dplyr::mutate(gene_mut = str_replace(mut, "_","-")) %>%
   dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
   dplyr::rowwise() %>%
@@ -1828,3 +1831,4 @@ mdr1ww_final_res_df <- rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4,
 # bring it all back together
 wwarn_res_df <- rbind(crtww_final_res_df, mdr1ww_final_res_df, k13ww_final_res_df)
 saveRDS(wwarn_res_df, here::here("analysis/data-derived/wwarn_res.rds"))
+
