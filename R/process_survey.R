@@ -27,6 +27,12 @@ process_survey <- function(each_survey) {
   k13_variants_all <- master_table_each_survey %>%
     filter(str_detect(variant_string, "^k13:"))
   
+  # === STEP 2.5: If no k13 records, skip this survey entirely ===
+  if (nrow(k13_variants_all) == 0) {
+    message(sprintf("Skipping survey_ID: %s - No k13 variant records present", each_survey))
+    return(NULL)
+  }
+  
   # === STEP 3: Calculate mean total_num from ALL k13 records (valid or not) ===
   # This ensures even coverage-reported ranges/wildcards contribute to the mean
   mean_total_num <- k13_variants_all %>%
