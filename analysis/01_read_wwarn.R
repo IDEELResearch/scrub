@@ -1808,10 +1808,7 @@ pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
   filter(!(uuid %in% fixed_uuids)) %>%
   nrow()) == 0
 
-
-
 # and group by to record prevalence of each mdr1 marker type
-# TODO: figure out why there is crt mutations here
 # need mutant of the form WT; 86N/Y; 86Y
 mdr1ww_final_res_df <-
   rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
