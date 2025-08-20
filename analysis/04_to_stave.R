@@ -134,4 +134,4 @@ stave$append_data(studies_dataframe = data_stave$studies_dataframe,
 
 # Save the output in data-out ready for downstream analysis
 dir.create("analysis/data-out", showWarnings = FALSE)
-saveRDS(stave, "analysis/data-out/stave_wwarn_data.rds")
+saveRDS(stave, "analysis/data-out/stave_data.rds")
