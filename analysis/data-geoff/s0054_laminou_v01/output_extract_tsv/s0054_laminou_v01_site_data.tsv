@@ -1,4 +1,0 @@
-site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
-Gaya	Gaya	Gaya	Niger	NER	11.88518766	3.455322008	Gaya_city	manual	yes	TES	0.5	15	both				
-Tessaoua	Tessaoua	Tessaoua	Niger	NER	13.75592183	7.986830157	Tessaoua_city	manual	yes	TES	0.5	15	both				
-Agadez	Agadez	Agadez	Niger	NER	16.97429744	7.988055745	Agadez_city	manual	yes	TES	0.5	15	both				
