@@ -1,4 +1,0 @@
-site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
-Benguela	Benguela	Benguela city	Angola	AGO	-12.54543713	13.39420441	Benguela General Hospital	manual	yes	TES	0.5	12	both				
-Zaire	Zaire	M'Banza Congo Municipal Hospital	Angola	AGO	-6.265461256	14.2530007	M'Banza Congo Municipal Hospital	manual	yes	TES	0.5	5	both				
-Lunda_Sul	Lunda_Sul	Lunda Sul	Angola	AGO	-10.27506139	20.7082933	Lunda Sul Province	manual	yes	TES	0.5	5	both				

@@ -1,6 +1,0 @@
-site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
-Guluj	Guluj		Eritrea	ERT	14.74128723	36.72569248	Guluj hospital		yes	health_facility	0.5		both	Guluj			
-Shambuko	Shambuko		Eritrea	ERT	14.91909937	37.83067584	Shambeqo health center eritrea		yes	health_facility	0.5		both	Shambuko			
-Tokombia	Tokombia		Eritrea	ERT	14.7821437	37.47444188	Tokombiya		yes	health_facility	0.5		both	Lalay Gash			
-Akordat	Akordat		Eritrea	ERT	15.55417919	37.89044127	Akordat city hospital		yes	health_facility	0.5		both	Akurdet			
-Ghindae	Ghindae		Eritrea	ERT	15.45420614	39.0966294	Ghindae hospital		yes	health_facility	0.5		both	Ghindae			
