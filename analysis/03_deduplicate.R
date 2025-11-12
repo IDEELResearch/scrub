@@ -101,14 +101,29 @@ create_summary <- function(duplicate_list) {
     # Get indices of list entries with this combination
     matching_indices <- which(database_signatures == combination)
     
+    # *** FIX IS APPLIED HERE ***
+    # 1. Select the data frames to be combined
+    dfs_to_combine <- duplicate_list[matching_indices]
+    
+    # 2. Convert lat and lon to numeric in each data frame before binding
+    # This ensures consistent types for bind_rows()
+    dfs_to_combine_fixed <- lapply(dfs_to_combine, function(df) {
+      df %>%
+        mutate(
+          lat = as.numeric(lat),
+          lon = as.numeric(lon)
+        )
+    })
+    
     # Bind rows from all matching entries
-    combined_df <- bind_rows(duplicate_list[matching_indices])
+    combined_df <- bind_rows(dfs_to_combine_fixed)
+    # *** END FIX ***
     
     # Keep only rows marked as "keep"
     kept_df <- combined_df %>% filter(keep_row == "keep")
     remove_df <- combined_df %>% filter(keep_row == "remove")
     
-    # Count unique studies and surveys
+    # Count unique studies and surveys (rest of function remains the same)
     data.frame(
       database_signature = combination,
       total_unique_studies = n_distinct(combined_df$study_ID),
@@ -145,3 +160,19 @@ geoff_entries <- duplicate_pmid_list[
   sapply(duplicate_pmid_list, function(df) any(df$database == "GEOFF"))
 ]
 
+# Obtain overall deduplication numbers
+dedup_df_overall <- bind_rows(dedup_output$df %>% filter(keep_row == "remove"), removed_pmid_df)
+
+# Calculate the totals for removed items
+total_removed_results <- dedup_df_overall  %>%
+  summarise(
+    total_removed_datapoints = n(),
+    total_removed_surveys = n_distinct(survey_ID),
+    total_removed_studies = n_distinct(study_ID)
+  )
+
+print(total_removed_results)
+
+# Generate overall summary 
+total_dedup_list <- c(duplicate_pmid_list, duplicate_diff_list, duplicate_same_list)
+total_dedup_df <- create_summary(total_dedup_list)
