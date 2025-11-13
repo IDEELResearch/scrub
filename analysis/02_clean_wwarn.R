@@ -3,11 +3,16 @@ library(purrr)
 library(dplyr)
 library(here)
 
+# k13 mdr1 and crt mutants
 wwarn_data <- readRDS(here::here("analysis", "data-derived", 
                            "wwarn_res.rds"))
 ref_als <- read.csv(here::here("analysis", "data-raw", 
                                  "k13_ref_protein_codon_dictionary.csv"))
 
+# TODO: extend this so this now works for mdr1 and crt
+
+# clean all the data to fix issues in the wwarn data structure and make compatible with stave
+# TODO: check if there is anything that no longer works with pd data also included
 set.seed(1)
 wwarn <- wwarn_data %>%
   dplyr::group_by(pmid) %>%
@@ -15,33 +20,24 @@ wwarn <- wwarn_data %>%
   dplyr::ungroup() %>%
   dplyr::mutate(publication_status = "peer-reviewed", 
                 database = "wwarn",
-                publication_year = 1000) %>% # placeholder but this is so stave doesnt error
+                # TODO: figure out how to pull in the real publication years from the pmid -- non-urgent
+                publication_year = 1000) %>% # placeholder but this is so stave doesn't error
   dplyr::rowwise() %>%
   dplyr::mutate(source = str_split(source, " ")[[1]][1]) %>%
-  dplyr::mutate(site_fixed = if_else(is.na(site), 
+  dplyr::mutate(site_fixed = if_else(is.na(site), # sum(is.na(wwarn$site_fixed))
                                      gsub(" ","",admin_1), 
                                      gsub(" ", "", site)),
                 country_name = countrycode::countrycode(iso3c, # fix up top
                                                         origin = 'iso3c', 
                                                         destination = 'country.name')) %>%
-  # # manually fix the country names
-  # dplyr::mutate(country_name = if_else(country_name %in% c("Congo - Kinshasa",
-  #                                                          "Congo - Brazzaville"),
-  #                                      "Democratic Republic of the Congo", country_name)) %>%
-  # dplyr::mutate(country_name = if_else(country_name == "Côte d’Ivoire",
-  #                                      "Côte d'Ivoire", country_name)) %>%
-  # dplyr::mutate(country_name = if_else(country_name == "Myanmar (Burma)",
-  #                                      "Myanmar", country_name)) %>%
-  # dplyr::mutate(country_name = if_else(country_name == "São Tomé & Príncipe",
-  #                                      "São Tomé and Príncipe", country_name)) %>%
-  # dplyr::mutate(country_name = if_else(country_name == "Cape Verde",
-  #                                      "Cabo Verde", country_name)) %>%
   dplyr::ungroup() %>%
-  # dplyr::filter(country_name != "Eswatini") %>% 
   dplyr::mutate(study_end_year = if_else(is.na(study_end_year),
                                          as.numeric(year), study_end_year)) %>%
   dplyr::mutate(study_start_year = if_else(is.na(study_start_year),
                                          as.numeric(year), study_start_year)) %>%
+  # fix the years on this study
+  # TODO: find the correct values for the years
+  # dplyr::mutate(study_start_year = if_else(study_start_year == 1, 2001, study_start_year))
   dplyr::filter(study_end_year != 3) %>% 
   dplyr::rename(first_author_surname = source) %>%
   dplyr::mutate(authors = stringr::word(first_author_surname,1)) %>%
@@ -65,19 +61,29 @@ wwarn <- wwarn_data %>%
   dplyr::filter(continent == "Africa") |>
   dplyr::rowwise() 
 
-studies_all_WT <- wwarn %>%
+wwarn_k13 <- wwarn %>% filter(gene == "k13")
+wwarn_crt <- wwarn %>% filter(gene == "crt")
+wwarn_mdr1 <- wwarn %>% filter(gene == "mdr1")
+
+studies_all_WT_k13 <- wwarn_k13 %>%
   group_by(pmid) %>%
   summarise(all_WT = all(gene_mut == "k13:WT")) %>%
   filter(all_WT) %>%
   pull(pmid)
 
-# write a custom code that uses the PMID to identify the min and max codons and then does the same thing
+# no all WT studies for crt or mdr1 so no need to impute
+studies_all_WT_crt <- wwarn_crt %>%
+  group_by(pmid) %>%
+  summarise(all_WT = all(gene_mut == "crt:WT")) %>%
+  filter(all_WT) %>%
+  pull(pmid)
 
+studies_all_WT_mdr1 <- wwarn_mdr1 %>%
+  group_by(pmid) %>%
+  summarise(all_WT = all(gene_mut == "mdr1:WT")) %>%
+  filter(all_WT) %>%
+  pull(pmid)
 
-
-
-
-# based on conversations, understanding of WT is actually incorrect here
 # separate out the mutant data frame
 
 mutation_key_path <- here::here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")
@@ -95,96 +101,39 @@ reference_validated <- mutation_key |>
 
 # to add the pmids that need manual investigation
 imputed <- data.frame()
-studies <- wwarn %>% split(.$pmid)
+studies <- wwarn_k13 %>% split(.$pmid)
 
-# update the function so it actually updates wt_only w/i the function oops
+# TODO: update the function so it actually updates wt_only w/i the function
+
+# impute wt mutatations for k13
 for(i in 1:length(studies)) {
   imputed <- rbind(imputed, impute_study(studies[[i]]))
 }
 
 # this is currently missing the 28 PMIDs with only WT from that study 
 # this needs manually checking 
-wwarn <- imputed |>
+
+wwarn_k13 <- imputed |>
   dplyr::select(-c(siid))
 
-# GINA: In pf7k the range was "349-726" - the range noted in the original pf7k file
-# Here, for each indices_to_transform, I would find all the other rows for that study
-# extract the k13 loci, do the range of the loci, and then 
-# use collapse_k13_range for that range for each indices
-# something like 
-# TODO: use min and max range -- do we actually want unique codons?
+# TODO: manually check the 28 excluded PMIDs and fix and add these into the datasets
 
-# range_for_index <- find_range(indices_to_transform)
-# Note - range_for_index would then look like k13:349:726 or k13:442:*
-# Note - if there is only one locus then convert_k13_asterisk will work on the latter
-# for (i in seq_along(indices_to_transform)) {
-#   if(grepl("\\*", range_for_index[i])) {
-#     wwarn$gene_mut[indices_to_transform[i]] <- gsub("K13", "k13", convert_k13_asterisk(range_for_index[i], mutation_key))
-#   } else {
-#     wwarn$gene_mut[indices_to_transform[i]] <- gsub("K13", "k13", collapse_k13_range(range_for_index[i], mutation_key))
-#   }
-
-# GINA: Everything below likely not needed
-# Easiest way to check is to finish the script similar to the pf7k one so that all the required
-# column names are here. Save the clean file. And then go to script 4 and use readRDS("wwarn_clean.rds)
-# as the data object at the beginning and see if the to_stave script works - likely easiest way to find bugs
-
-# # fix the wildtype mutations
-# wt_studies <- wwarn %>%
-#   dplyr::filter(gene_mut == "k13:WT") %>%
-#   dplyr::pull(study_ID) %>% unique()
-# 
-# # for each of these studies find out what the wildtype encoding should be
-# wt_mutations <- data.frame(study_ID = wt_studies,
-#                            mutations = rep("", length = length(wt_studies)))
-# 
-# for(i in 1:length(wt_studies)) {
-#   muts <- wwarn %>%
-#     dplyr::filter(study_ID == wt_studies[i]) %>%
-#     dplyr::select(study_ID, gene_mut) %>%
-#     dplyr::filter(str_detect(gene_mut, "k13")) %>%
-#     dplyr::mutate(codons = gsub("k13:","", gene_mut)) %>%
-#     dplyr::mutate(codons = gsub("[A-Za-z]","", codons)) %>%
-#     dplyr::mutate(codons = gsub(":","", codons)) %>%
-#     dplyr::filter(codons != "") %>%
-#     dplyr::pull(codons) %>% parse_number() %>% unique() %>% sort()
-#   # TODO: figure out how to add the reference allelles here 
-#   wt_mutations$mutations[i] <- paste0("k13:",paste(muts, collapse = "_"),":*")
-#   
-# }
-# 
-# wwarn_mut <- wwarn %>% dplyr::filter((gene_mut == "k13:WT") == FALSE) %>%
-#   dplyr::filter(gene_mut != "k13:470:X") %>%
-#   dplyr::distinct(survey_id, gene_mut, .keep_all = TRUE)
-# wwarn_wt <- wwarn %>% dplyr::filter((gene_mut == "k13:WT")) %>%
-#   dplyr::left_join(wt_mutations, by = "study_ID") %>%
-#   dplyr::filter(mutations != "k13::") %>%
-#   dplyr::mutate(gene_mut = mutations) %>%
-#   dplyr::select(-mutations)
-# 
-# # TODO: figure out why these are errors but just filter out for now so I can send an .rds
-# remove <- wwarn_stave$counts_dataframe[c(1791, 1692, 1735, 1718, 1936, 1939, 1949, 1972, 1974, 1978, 1984, 1989, 1998, 2007, 2011, 2023, 2035, 2037, 1861, 1566, 1873, 1585, 1578),] %>%
-#   pull(survey_key)
-#   
-# # wwarn <- rbind(wwarn_mut, wwarn_wt) 
-# wwarn <- wwarn_mut %>% dplyr::filter((survey_id %in% remove) == FALSE)
-
-# TODO: fix column names so its stave compatible
-# editing pf7k code
+# fix column names so its stave compatible
 # rename the columns so that they make sense
 column_names <- get_column_names_for_clean()
 
+# CLEAN K13
 # first add in extra information needed within column_names
-wwarn_edit <- wwarn %>% 
-  dplyr::mutate(survey_ID = paste0(study_ID,"_WWARN_", admin_1,"_",year)) |> # make a survey ID 
+wwarn_k13_edit <- wwarn_k13 %>% 
+  dplyr::mutate(survey_ID = paste0(study_ID,"_wwarn_", admin_1,"_",year)) |> # make a survey ID 
   ungroup() %>% 
-  dplyr::mutate(database = "WWARN",
+  dplyr::mutate(database = "wwarn",
                 iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c"),
-                study_ID = paste0("wwarn_", gsub("-", "_", study_ID)),
-                survey_ID = paste0("wwarn_", gsub("-", "_", gsub(" ", "", survey_ID)))) %>% 
+                study_ID = gsub("-", "_", study_ID),
+                survey_ID = gsub("-", "_", gsub(" ", "", survey_ID))) %>% 
   dplyr::mutate(survey_ID = iconv(survey_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
   dplyr::mutate(continent = countrycode::countrycode(sourcevar = iso3c, "iso3c", "continent"),
-                spatial_notes = "lat/lon reported in WWARN",
+                spatial_notes = "lat/lon reported in wwarn_k13",
                 time_notes = "Automated midpoint") %>% 
   dplyr::rename(site_name = admin_1, 
                 lon = long,
@@ -193,23 +142,68 @@ wwarn_edit <- wwarn %>%
                 total_num = n)
 
 # sort out collecton dates
-convstart <- adjust_invalid_date(unique(wwarn_edit$year), is_start = TRUE)
-wwarn_edit$collection_start <- convstart[match(wwarn_edit$year, unique(wwarn_edit$year))]
-convend <- adjust_invalid_date(unique(wwarn_edit$year), is_start = FALSE)
-wwarn_edit$collection_end <- convend[match(wwarn_edit$year, unique(wwarn_edit$year))]
+convstart <- adjust_invalid_date(unique(wwarn_k13_edit$year), is_start = TRUE)
+wwarn_k13_edit$collection_start <- convstart[match(wwarn_k13_edit$year, unique(wwarn_k13_edit$year))]
+convend <- adjust_invalid_date(unique(wwarn_k13_edit$year), is_start = FALSE)
+wwarn_k13_edit$collection_end <- convend[match(wwarn_k13_edit$year, unique(wwarn_k13_edit$year))]
 
 # Compute collection day
-wwarn_edit <- wwarn_edit %>% rowwise() %>% 
+wwarn_k13_edit <- wwarn_k13_edit %>% rowwise() %>% 
   mutate(collection_day = median(c(collection_start, collection_end))) %>% 
   ungroup()
 
-# Grab just the columns we need for pairing with WWARN etc
-wwarn_clean <- wwarn_edit %>% 
+# Grab just the columns we need for pairing with wwarn_k13 etc
+wwarn_k13_clean <- wwarn_k13_edit %>% 
   select(all_of(column_names)) %>%
 # TODO: fix variant string k13:470:X - for now, just exclude them
   dplyr::filter(variant_string != "k13:470:X")
 
 # Last extra cleans to align with STAVE
-wwarn_clean$survey_ID <- gsub("'", "", wwarn_clean$survey_ID)
+wwarn_k13_clean$survey_ID <- gsub("'", "", wwarn_k13_clean$survey_ID)
 
+# CLEAN PD
+wwarn_pd <- rbind(wwarn_crt, wwarn_mdr1)
+names(wwarn_pd)
+
+# first add in extra information needed within column_names
+wwarn_pd_edit <- wwarn_pd %>% 
+  # dplyr::mutate(survey_ID = paste0(study_ID,"_wwarn_", admin_1,"_",year)) |> # make a survey ID 
+  ungroup() %>% 
+  dplyr::rename(survey_ID = survey_id) %>%
+  dplyr::mutate(database = "wwarn",
+                iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c"),
+                study_ID = gsub("-", "_", study_ID),
+                survey_ID = gsub("-", "_", gsub(" ", "", survey_ID))) %>%
+  dplyr::mutate(survey_ID = iconv(survey_ID, from = "UTF-8", to = "ASCII//TRANSLIT")) %>%
+  dplyr::mutate(continent = countrycode::countrycode(sourcevar = iso3c, "iso3c", "continent"),
+                spatial_notes = "lat/lon reported in wwarn_pd",
+                time_notes = "Automated midpoint") %>% 
+  dplyr::rename(site_name = admin_1, 
+                lon = long,
+                variant_string = gene_mut,
+                variant_num = x,
+                total_num = n) %>%
+  # need to rename the WT so that stave doesn't error
+  dplyr::mutate(variant_string = if_else(variant_string == "mdr1:WT", "mdr1:86:N", variant_string),
+                variant_string = if_else(variant_string == "crt:WT", "crt:76:K", variant_string))
+
+# sort out collecton dates
+convstart <- adjust_invalid_date(unique(wwarn_pd_edit$year), is_start = TRUE)
+wwarn_pd_edit$collection_start <- convstart[match(wwarn_pd_edit$year, unique(wwarn_pd_edit$year))]
+convend <- adjust_invalid_date(unique(wwarn_pd_edit$year), is_start = FALSE)
+wwarn_pd_edit$collection_end <- convend[match(wwarn_pd_edit$year, unique(wwarn_pd_edit$year))]
+
+# Compute collection day
+wwarn_pd_edit <- wwarn_pd_edit %>% rowwise() %>% 
+  mutate(collection_day = median(c(collection_start, collection_end))) %>% 
+  ungroup()
+
+# Grab just the columns we need for pairing with wwarn_pd etc
+wwarn_pd_clean <- wwarn_pd_edit %>% 
+  select(all_of(column_names)) # all variant_string and other variables look good
+
+# Last extra cleans to align with STAVE
+wwarn_pd_clean$survey_ID <- gsub("'", "", wwarn_pd_clean$survey_ID)
+
+wwarn_clean <- rbind(wwarn_k13_clean, wwarn_pd_clean)
 saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")

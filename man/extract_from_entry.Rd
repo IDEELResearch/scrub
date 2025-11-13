@@ -22,9 +22,8 @@ This is applied over all of the values in the column to determine the markers fo
 in that study
 }
 \examples{
-extract_from_entry("C580Y") = 580
-extract_from_entry("C580Y_A481G") = 580   481
-extract_from_entry("C580Y/G") = 580
+extract_from_entry("C580Y") == 580
+extract_from_entry("C580Y_A481G") == c(580, 481)
+extract_from_entry("C580Y/G") == 580
 mut <- c("C580Y", "A481G", "R622I")
-unlist(lapply(mut, extract_from_entry)) = 580 481 622
 }
