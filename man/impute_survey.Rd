@@ -13,7 +13,7 @@ impute_survey(survey_df, impute_markers)
 When there are validated markers in the study, this is all of the WT markers
 in the min-max codon range
 In the case where only non-validated markers were found, this is the WT
-study_markers == study_validated in {impute_study}}
+study_markers == study_validated in (impute_study)}
 }
 \value{
 df Returns the df of a survey with the imputed WT rows added

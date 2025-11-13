@@ -1,5 +1,5 @@
 # load stave  
-# devtools::install_github("mrc-ide/STAVE")
+#devtools::install_github("mrc-ide/STAVE")
 library(STAVE)
 library(tidyverse)
 
@@ -12,9 +12,6 @@ stave <- STAVE::STAVE_object$new()
 
 # append data
 data_stave <- convert_stave(data)
-
-# To-do: Delete
-data_stave$counts_dataframe <- data_stave$counts_dataframe[-3749, ]
 
 # STAVE errors related to Geoff that we can fix now: ------------------------
 
@@ -123,26 +120,18 @@ counts_df <- rbind(
 
 # Convert to STAVE and save-------------------
 
-## NEED TO DELETE BUT CURRENT SOLUTION SINCE STAVE WANTS THE SURVEY_ID COLUMN TO CONTAIN VALID CHARACTERS
-data_stave2 <- data_stave
-
 data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
   mutate(
     survey_id = survey_id %>%
       str_replace_all("[^A-Za-z0-9_]", "_") %>%
-      str_replace_all("^[_0-9]+", "X"),
-    collection_start = collection_start,
-    collection_end   = collection_end
+      str_replace_all("^[_0-9]+", "X")
   )
 
 # Convert into a STAVE object
-start <- Sys.time()
-stave$append_data(
-  studies_dataframe = data_stave$studies_dataframe,
-  surveys_dataframe = data_stave$surveys_dataframe,
-  counts_dataframe = counts_df
-)
-Sys.time() - start
+stave$append_data(studies_dataframe = data_stave$studies_dataframe,
+                  surveys_dataframe = data_stave$surveys_dataframe,
+                  counts_dataframe = counts_df) 
+
 # Save the output in data-out ready for downstream analysis
 dir.create("analysis/data-out", showWarnings = FALSE)
-saveRDS(stave, "analysis/data-out/stave_final_data.rds")
+saveRDS(stave, "analysis/data-out/stave_data.rds")

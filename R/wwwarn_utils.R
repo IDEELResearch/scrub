@@ -94,3 +94,126 @@ wwarn_format_k13_for_stave <- function(marker) {
   stop("Unexpected mutation")
   
 }
+
+#' Convert WWARN crt SNP formats for STAVE
+#'
+#' @details
+#'
+#' This function processes crt SNP data into a format compatible with the `STAVE` tool.
+#'
+#' NB FOR STAVE: "|" reflects phased  
+#'
+#' NB FOR STAVE: "/" reflects unphased
+#'
+#' ## Input format conventions:
+#' - `WT`: Denotes wild type.
+#' - `76T`: Single mutation (codon + amino acid).
+#' - `76K/T`: Unphased call (e.g. mixed infection at the same locus).
+#' - `-` or `NA`: Treated as missing.
+#'
+#' ## Output format:
+#' - `crt:WT`: Wild type.
+#' - `crt:76:T`: Single mutation.
+#' - `crt:76:K/T`: Mixed/unphased mutation.
+#'
+#' Convert WWARN crt SNP formats for STAVE (vectorized)
+#'
+#' @param marker Character vector. SNP calls (e.g. "76T", "76K/T", "WT", NA).
+#' @return Character vector in STAVE-compatible format.
+#' @export
+#' @examples
+#' wwarn_format_crt_for_stave("WT")        # crt:WT
+#' wwarn_format_crt_for_stave("76T")       # crt:76:T
+#' wwarn_format_crt_for_stave("76K/T")     # crt:76:K/T
+#' wwarn_format_crt_for_stave("-")         # NA
+#' wwarn_format_crt_for_stave(NA)          # NA
+wwarn_format_crt_for_stave <- function(marker) {
+  vapply(marker, function(m) {
+    if (is.na(m) || m == "-") {
+      return(NA_character_)
+    }
+    
+    m <- toupper(m)
+    
+    if (m == "WT") {
+      return("crt:WT")
+    }
+    
+    if (grepl("^\\d+[A-Z]$", m)) {
+      loc <- sub("^(\\d+)[A-Z]$", "\\1", m)
+      aa <- sub("^\\d+([A-Z])$", "\\1", m)
+      return(paste0("crt:", loc, ":", aa))
+    }
+    
+    if (grepl("^\\d+[A-Z]/[A-Z]$", m)) {
+      loc <- sub("^(\\d+)[A-Z]/[A-Z]$", "\\1", m)
+      aa <- sub("^\\d+([A-Z]/[A-Z])$", "\\1", m)
+      return(paste0("crt:", loc, ":", aa))
+    }
+    
+    stop(paste("Unexpected mutation format for crt:", m))
+  }, FUN.VALUE = character(1))
+}
+
+
+
+#' Convert WWARN mdr1 SNP formats for STAVE
+#'
+#' @details
+#'
+#' This function processes mdr1 SNP data into a format compatible with the `STAVE` tool.
+#'
+#' NB FOR STAVE: "|" reflects phased  
+#'
+#' NB FOR STAVE: "/" reflects unphased
+#'
+#' ## Input format conventions:
+#' - `WT`: Denotes wild type.
+#' - `86Y`: Single mutation (codon + amino acid).
+#' - `86N/Y`: Unphased call (e.g. mixed infection at the same locus).
+#' - `-` or `NA`: Treated as missing.
+#'
+#' ## Output format:
+#' - `mdr1:WT`: Wild type.
+#' - `mdr1:86:Y`: Single mutation.
+#' - `mdr1:86:N/Y`: Mixed/unphased mutation.
+#'
+##' Convert WWARN mdr1 SNP formats for STAVE (vectorized)
+#'
+#' @param marker Character vector. SNP calls (e.g. "86Y", "86N/Y", "WT", NA).
+#' @return Character vector in STAVE-compatible format.
+#' @export
+#' 
+#' @examples
+#' wwarn_format_mdr1_for_stave("WT")        # mdr1:WT
+#' wwarn_format_mdr1_for_stave("86Y")       # mdr1:86:Y
+#' wwarn_format_mdr1_for_stave("86N/Y")     # mdr1:86:N/Y
+#' wwarn_format_mdr1_for_stave("-")         # NA
+#' wwarn_format_mdr1_for_stave(NA)          # NA
+wwarn_format_mdr1_for_stave <- function(marker) {
+  vapply(marker, function(m) {
+    if (is.na(m) || m == "-") {
+      return(NA_character_)
+    }
+    
+    m <- toupper(m)
+    
+    if (m == "WT") {
+      return("mdr1:WT")
+    }
+    
+    if (grepl("^\\d+[A-Z]$", m)) {
+      loc <- sub("^(\\d+)[A-Z]$", "\\1", m)
+      aa <- sub("^\\d+([A-Z])$", "\\1", m)
+      return(paste0("mdr1:", loc, ":", aa))
+    }
+    
+    if (grepl("^\\d+[A-Z]/[A-Z]$", m)) {
+      loc <- sub("^(\\d+)[A-Z]/[A-Z]$", "\\1", m)
+      aa <- sub("^\\d+([A-Z]/[A-Z])$", "\\1", m)
+      return(paste0("mdr1:", loc, ":", aa))
+    }
+    
+    stop(paste("Unexpected mutation format for mdr1:", m))
+  }, FUN.VALUE = character(1))
+}
