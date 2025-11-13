@@ -487,7 +487,7 @@ master_table_formatted$variant_string[!is.na(indices)] <- fixed[indices[!is.na(i
 # "k13:578_579_580:BND" "crt:76:TK" 
 #https://malariajournal.biomedcentral.com/articles/10.1186/s12936-021-03713-2#Sec7
 master_table_formatted$variant_num[master_table_formatted$variant_string == "k13:578_579_580:BND"] <- 
-  master_table_formatted$total_num[master_table_formatted$variant_string == "k13:578_579_580:BND"]
+master_table_formatted$total_num[master_table_formatted$variant_string == "k13:578_579_580:BND"]
 master_table_formatted$variant_string[master_table_formatted$variant_string == "k13:578_579_580:BND"] <- "k13:578_579_580:A_M_C"
 #https://malariajournal.biomedcentral.com/articles/10.1186/s12936-017-1777-0/tables/2
 master_table_formatted$variant_string[master_table_formatted$variant_string == "crt:76:TK"] <- "crt:76:T/K"
@@ -519,13 +519,13 @@ all_expected_sample_uids_cleaned <- all_expected_sample_uids |>
   as.character()
 
 # Find study IDs in cleaned data that are not in expected list
-unexpected_study_ids <- master_table_simplified |>
+unexpected_study_ids <- master_table_formatted |>
   dplyr::distinct(study_ID) |>
   dplyr::filter(!study_ID %in% all_expected_sample_uids_cleaned)
 
 # Find expected study IDs that are missing from cleaned data
 missing_study_ids <- data.frame(study_ID = all_expected_sample_uids_cleaned) |>
-  dplyr::filter(!study_ID %in% unique(master_table_simplified$study_ID))
+  dplyr::filter(!study_ID %in% unique(master_table_formatted$study_ID))
 
 # Extract study numbers for flexible matching (e.g., S0148 from geoff_S0148Martínez-pérez2018)
 extract_study_number <- function(study_id) {
@@ -534,7 +534,7 @@ extract_study_number <- function(study_id) {
 
 # Get study numbers from both datasets
 expected_study_numbers <- sapply(all_expected_sample_uids_cleaned, extract_study_number)
-actual_study_numbers <- sapply(unique(master_table_simplified$study_ID), extract_study_number)
+actual_study_numbers <- sapply(unique(master_table_formatted$study_ID), extract_study_number)
 
 # Find missing studies by study number (more flexible matching)
 missing_by_number <- data.frame(

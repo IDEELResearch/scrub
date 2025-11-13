@@ -1,7 +1,0 @@
-site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
-BOLENGE	BOLENGE	BOLENGE	DRC	COD	0.0266	18.2971	Mbandaka	manual	no	health_facility	0	76	both		returning febrile patients with positive Pf RDT following completion of ACT	incomplete ACT course	
-FUNGURUME	FUNGURUME	FUNGURUME	DRC	COD	-10.6197	26.319	Fungurume	manual	no	health_facility	0	76	both		returning febrile patients with positive Pf RDT following completion of ACT	incomplete ACT course	
-KATANA	KATANA	KATANA	DRC	COD	-2.4716	28.7198	Kabare	manual	no	health_facility	0	76	both		returning febrile patients with positive Pf RDT following completion of ACT	incomplete ACT course	
-KINGASANI	KINGASANI	KINGASANI	DRC	COD	-4.3033	15.3105	Kinshasa	manual	no	health_facility	0	76	both		returning febrile patients with positive Pf RDT following completion of ACT	incomplete ACT course	
-KABONDO	KABONDO	KABONDO	DRC	COD	0.5185	25.2008	Kisangani	manual	no	health_facility	0	76	both		returning febrile patients with positive Pf RDT following completion of ACT	incomplete ACT course	
-VANGA	VANGA	VANGA	DRC	COD	-4.5457	18.5997	Bulungu	manual	no	health_facility	0	76	both		returning febrile patients with positive Pf RDT following completion of ACT	incomplete ACT course	
