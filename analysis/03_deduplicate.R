@@ -39,12 +39,12 @@ africa_iso3 <- c(
 
 # Combine all cleaned df into on dataframe
 column_names <- get_column_names_for_clean()
-# full_bind <- rbind(
-#   clean_geoff %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 
-#   clean_wwarn %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-#   clean_pf7k %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
-#   clean_who %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
-# )
+full_bind <- rbind(
+  clean_geoff %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_wwarn %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_pf7k %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)),
+  clean_who %>% filter(iso3c %in% africa_iso3) %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character))
+)
 
 full_bind <- rbind(
   clean_geoff %>% select(all_of(column_names)) %>% mutate(across(everything(), as.character)), 

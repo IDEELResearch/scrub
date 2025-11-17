@@ -120,12 +120,27 @@ counts_df <- rbind(
 
 # Convert to STAVE and save-------------------
 
+clean_id <- function(x) {
+  x %>%
+    as.character() %>%
+    stringr::str_replace_all("[^A-Za-z0-9_]", "_") %>%  # allow only letters, digits, _
+    stringr::str_replace_all("^[_0-9]+", "X")           # ensure first char is a letter
+}
+
+# Clean survey_key in surveys_dataframe
 data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
-  mutate(
-    survey_id = survey_id %>%
-      str_replace_all("[^A-Za-z0-9_]", "_") %>%
-      str_replace_all("^[_0-9]+", "X")
-  )
+  mutate(survey_id = clean_id(survey_id))
+
+# Clean survey_key in counts_df
+counts_df <- counts_df %>%
+  mutate(survey_key = clean_id(survey_key))
+
+# data_stave$surveys_dataframe <- data_stave$surveys_dataframe %>%
+#   mutate(
+#     survey_id = survey_id %>%
+#       str_replace_all("[^A-Za-z0-9_]", "_") %>%
+#       str_replace_all("^[_0-9]+", "X")
+#   )
 
 # Convert into a STAVE object
 stave$append_data(studies_dataframe = data_stave$studies_dataframe,
