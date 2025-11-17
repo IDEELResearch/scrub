@@ -198,6 +198,33 @@ wwarn_pd_edit <- wwarn_pd_edit %>% rowwise() %>%
   mutate(collection_day = median(c(collection_start, collection_end))) %>% 
   ungroup()
 
+# Add collection start and end for wwarn_72050_Ibrahim
+wwarn_pd_edit <- wwarn_pd_edit %>%
+  mutate(
+    # For this one study, override start and end as proper Date objects
+    collection_start = if_else(
+      study_ID == "wwarn_72050_Ibrahim",
+      as.Date("2003-10-01"),
+      collection_start
+    ),
+    collection_end = if_else(
+      study_ID == "wwarn_72050_Ibrahim",
+      as.Date("2006-10-31"),
+      collection_end
+    )
+  ) %>%
+  mutate(
+    # midpoint between start and end
+    midpoint = collection_start + (collection_end - collection_start) / 2,
+    # set collection_day only for this study
+    collection_day = if_else(
+      study_ID == "wwarn_72050_Ibrahim",
+      midpoint,
+      collection_day
+    )
+  ) %>%
+  select(-midpoint)
+
 # Grab just the columns we need for pairing with wwarn_pd etc
 wwarn_pd_clean <- wwarn_pd_edit %>% 
   select(all_of(column_names)) # all variant_string and other variables look good

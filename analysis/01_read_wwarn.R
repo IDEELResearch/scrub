@@ -6,6 +6,8 @@ devtools::load_all()
 # 1. WWARN database compile ----
 # ---------------------------------------------------- o
 
+sf::sf_use_s2(FALSE)
+
 # as of 2 Jan 2024 ART-R markers (valid and candidate)
 ## when we have new candidates of validated markers, simply update the csv
 validated <- read_csv("analysis/data-raw/mutation_dictionary.csv")
@@ -32,8 +34,10 @@ pdww$iso <- countrycode::countrycode(pdww$country, "country.name.en", "iso3c")
 # saveRDS(map_1, file = "analysis/data-raw/alt_map.rds")
 map_1 <- readRDS("analysis/data-raw/alt_map.rds")
 k13_map <- map_1[map_1$iso %in% unique(k13ww$iso), ]
+k13_map <- sf::st_make_valid(k13_map)
 
 # create coords
+goodmap <- 4326
 k13coords <- sf::st_as_sf(k13ww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
 
 # identify k13 matches
@@ -694,6 +698,20 @@ pdwwdf <- pdww %>%
   unique() %>%
   mutate(rowid = seq_len(n()))
 
+# Add URL for those with NA
+pdwwdf <- pdwwdf %>%
+  mutate(
+    pmid = as.character(pmid),
+    url = dplyr::case_when(
+      # keep existing non-empty URLs
+      !is.na(url) & url != "" ~ url,
+      # if URL is NA but we have a numeric PMID, build PubMed URL
+      !is.na(pmid) & grepl("^[0-9]+$", pmid) ~ paste0("https://pubmed.ncbi.nlm.nih.gov/", pmid, "/"),
+      # otherwise leave as NA
+      TRUE ~ NA_character_
+    )
+  )
+
 # Growing List of typos in their data entry
 # these have come from troubleshooting the cleans below and going back to papers
 
@@ -1292,6 +1310,7 @@ pdcrtspl7$`24359280` <- add_a_row(pdcrtspl7$`24359280`, x_new = 198 - 145, mut_n
 
 # this is the entire study -- mixed infections counted twice
 fixed <- NULL
+
 for(i in 1:(nrow(pdcrtspl7$`25421474`)/2)) {
   df <- pdcrtspl7$`25421474`[c(2*i-1,2*i),]
   
