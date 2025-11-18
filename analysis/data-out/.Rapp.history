@@ -1,0 +1,3 @@
+load("/Users/cmeiersc/Brown Dropbox/Cecile Meier-Scherling/Brown/PhD/JeffBaileyLab/Projects/HackathonV_london/scrub/analysis/data-out/stave_data.rds")
+load("/Users/cmeiersc/Brown Dropbox/Cecile Meier-Scherling/Brown/PhD/JeffBaileyLab/Projects/HackathonV_london/scrub/analysis/data-out/stave_final_data.rds")
+load("/Users/cmeiersc/Downloads/final_data.rds")
