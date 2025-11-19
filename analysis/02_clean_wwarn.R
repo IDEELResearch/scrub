@@ -9,10 +9,7 @@ wwarn_data <- readRDS(here::here("analysis", "data-derived",
 ref_als <- read.csv(here::here("analysis", "data-raw", 
                                  "k13_ref_protein_codon_dictionary.csv"))
 
-# TODO: extend this so this now works for mdr1 and crt
-
 # clean all the data to fix issues in the wwarn data structure and make compatible with stave
-# TODO: check if there is anything that no longer works with pd data also included
 set.seed(1)
 wwarn <- wwarn_data %>%
   dplyr::group_by(pmid) %>%
@@ -65,6 +62,7 @@ wwarn_k13 <- wwarn %>% filter(gene == "k13")
 wwarn_crt <- wwarn %>% filter(gene == "crt")
 wwarn_mdr1 <- wwarn %>% filter(gene == "mdr1")
 
+# identify studies where only WT is reported
 studies_all_WT_k13 <- wwarn_k13 %>%
   group_by(pmid) %>%
   summarise(all_WT = all(gene_mut == "k13:WT")) %>%
@@ -102,8 +100,6 @@ reference_validated <- mutation_key |>
 # to add the pmids that need manual investigation
 imputed <- data.frame()
 studies <- wwarn_k13 %>% split(.$pmid)
-
-# TODO: update the function so it actually updates wt_only w/i the function
 
 # impute wt mutatations for k13
 for(i in 1:length(studies)) {
