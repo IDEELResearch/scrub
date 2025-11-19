@@ -127,6 +127,8 @@ indices_to_transform <- which(res$mut == "k13:WT")
 # range <- "349-726" - this is the range noted in the original pf7k file
 res$mut[indices_to_transform] <- gsub("K13", "k13", collapse_k13_range("k13:349:726", mutation_key))
 
+# NOTE: mdr1 is copy number variation hence is not extracted here 
+
 # bring it all back together
 who_res_df <- rbind(whospl$crt, res)
 saveRDS(who_res_df, here::here("analysis/data-derived/who_res.rds"))
