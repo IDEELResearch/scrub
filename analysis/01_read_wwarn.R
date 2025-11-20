@@ -1466,6 +1466,7 @@ pdmdr1 <- pdmdr1 %>%
   mutate(uuid = cur_group_id()) %>%
   ungroup() 
 
+
 ## STEP 1: Work out how to sort out the markers ------------------------------
 # mdr1 cleaning is restricted to codon 86 as this is the focus of this work
 
@@ -1616,6 +1617,15 @@ pdmdr1spl5 <- pdmdr1 %>%
 # these pmids are already correctly extracted elsewhere. generally an EH with a different n to the rest of the study
 omit_pmids <- c("22850519", "12224572", "27538948", "19704124", "21881128", 
                 "29390014", "27562216", "35357271")
+# need to omit the uuids from the rest of the pdmdr1 data
+omit_uuids <- pdmdr1spl5 %>%
+  filter(pmid %in% omit_pmids) %>%
+  pull(uuid) %>% unique()
+
+omit_uuids <- c(omit_uuids, 726, 728) # these two causing problems but cannot figure out how they end up in final df. omit here?
+
+pdmdr1 <- pdmdr1 %>% filter(!(uuid %in% omit_uuids))
+
 fix_pmids <- c("25348116", "19187521", "17467344", "25890383", "25004442", 
                "26988711", "31358591")
 
@@ -1701,11 +1711,30 @@ pdmdr1spl6 <- pdmdr1 %>%
   filter(sum(x) < n[1]) %>% 
   split(.$pmid)
 
-# based on table 2
-pdmdr1spl6$`19704124`$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
-pdmdr1spl6$`19704124`$x <- c(7,264) # convert from haplotypes %
-pdmdr1spl6$`19704124`$prev <- pdmdr1spl6$`19704124`$x / pdmdr1spl6$`19704124`$n
-# sum(pdmdr1spl6$`19704124`$x) == pdmdr1spl6$`19704124`$n # CHECK
+# based on table 2 -- now spl6 contains whole study so fix the entire thing
+comoros <- pdmdr1spl6$`19704124` %>%
+  dplyr::filter(admin_0 == "Comoros")
+comoros$x <- c(7, 271-7)
+comoros$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+comoros$prev <- comoros$x / comoros$n
+
+madagascar <- pdmdr1spl6$`19704124` %>%
+  dplyr::filter(admin_0 != "Comoros") %>%
+  mutate(mut = "pfmdr1 N86") # all entries checked as correct
+
+# impute the mutant
+complement <- NULL
+for(i in 1:nrow(madagascar)) {
+  df <- madagascar[i,]
+  df$x <- df$n - df$x
+  df$mut <- "pfmdr1 86Y"
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdmdr1spl6$`19704124` <- rbind(comoros, madagascar, complement)
+pdmdr1spl6$`19704124` %>% group_by(uuid) %>%
+  reframe(xn = (sum(x) == unique(n))) # check
+
 
 # EHs -- the codon prev are correct and extracted -- different ns hence not picked up earlier
 # add uuids to a vector first
@@ -1866,6 +1895,15 @@ pdmdr1spl7$`29582732`$x <- pdmdr1spl7$`29582732`$x - 5
 pdmdr1spl7$`29582732` <- add_a_row_pd(pdmdr1spl7$`29582732`, 5, "pfmdr1 86N/Y")
 pdmdr1spl7$`29582732`$prev <- pdmdr1spl7$`29582732`$x / pdmdr1spl7$`29582732`$n
 
+# mixed haplotypes are double counted
+# 86Y = 89.8% ~ 80
+# N86 = 14.6 ~ 13
+# therefore, 4 mixed; 76 mutant and 9 N86
+pdmdr1spl7$`21896916` <- pdmdr1spl7$`21896916`[1:3,]
+pdmdr1spl7$`21896916`$x <- c(9, 76, 4)
+pdmdr1spl7$`21896916`$mut <- c("pfmdr1 N86", "pfmdr1 86Y", "pfmdr1 86N/Y")
+pdmdr1spl7$`21896916`$prev <- pdmdr1spl7$`21896916`$x / pdmdr1spl7$`21896916`$n
+
 pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
   mutate(prev = x/n) %>%
   mutate(mut = gsub("pf","", mut)) %>%
@@ -1883,6 +1921,18 @@ pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
 
 # and group by to record prevalence of each mdr1 marker type
 # need mutant of the form WT; 86N/Y; 86Y
+# pdmdr1spl1 %>% group_by(mut) %>% reframe(n = n())
+# pdmdr1spl3 %>% group_by(mut) %>% reframe(n = n())
+# pdmdr1spl4 %>% group_by(mut) %>% reframe(n = n()) 
+# pdmdr1spl5 %>% group_by(mut) %>% reframe(n = n())
+pdmdr1spl6 %>% group_by(mut) %>% reframe(n = n())
+# pdmdr1spl7 %>% group_by(mut) %>% reframe(n = n())
+
+# pdmdr1spl6 is the issue
+pdmdr1spl6 %>% filter(mut == "mdr1_YYY") %>% pull(pmid)
+pdmdr1spl6 %>% filter(uuid %in% c(726, 728))
+pdmdr1spl6 %>% filter(pmid == 17467344)
+
 mdr1ww_final_res_df <-
   rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
         pdmdr1spl5, pdmdr1spl6, pdmdr1spl7) %>%
