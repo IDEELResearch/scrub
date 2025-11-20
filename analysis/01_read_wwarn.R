@@ -1921,17 +1921,6 @@ pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
 
 # and group by to record prevalence of each mdr1 marker type
 # need mutant of the form WT; 86N/Y; 86Y
-# pdmdr1spl1 %>% group_by(mut) %>% reframe(n = n())
-# pdmdr1spl3 %>% group_by(mut) %>% reframe(n = n())
-# pdmdr1spl4 %>% group_by(mut) %>% reframe(n = n()) 
-# pdmdr1spl5 %>% group_by(mut) %>% reframe(n = n())
-pdmdr1spl6 %>% group_by(mut) %>% reframe(n = n())
-# pdmdr1spl7 %>% group_by(mut) %>% reframe(n = n())
-
-# pdmdr1spl6 is the issue
-pdmdr1spl6 %>% filter(mut == "mdr1_YYY") %>% pull(pmid)
-pdmdr1spl6 %>% filter(uuid %in% c(726, 728))
-pdmdr1spl6 %>% filter(pmid == 17467344)
 
 mdr1ww_final_res_df <-
   rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
