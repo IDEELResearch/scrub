@@ -1627,15 +1627,7 @@ pdmdr1spl5correct <- pdmdr1spl5 %>%
 
 
 # assuming that this is correct and omitting mixed
-complement <- NULL
-for(i in 1:nrow(pdmdr1spl5correct)) {
-  df <- pdmdr1spl5correct[i,]
-  df$x <- df$n - df$x
-  df$mut <- if_else(df$mut == "mdr1_N86", "mdr1_86Y", "mdr1_N86")
-  df$prev <- df$x / df$n
-  complement <- rbind(complement, df)
-}
-pdmdr1spl5correct <- rbind(pdmdr1spl5correct, complement) %>% arrange(pmid, uuid)
+
 
 pdmdr1spl5fix <- pdmdr1spl5 %>%
   filter(pmid %in% fix_pmids) %>%
@@ -1645,10 +1637,27 @@ pdmdr1spl5fix$`17467344` <- pdmdr1spl5fix$`17467344`[1,] # keep only kenya row a
 pdmdr1spl5fix$`17467344`$x <- 58
 pdmdr1spl5fix$`17467344`$n <- 91
 pdmdr1spl5fix$`17467344`$prev <- pdmdr1spl5fix$`17467344`$x/pdmdr1spl5fix$`17467344`$n
-pdmdr1spl5fix$`17467344` <- add_a_row_pd(pdmdr1spl5fix$`17467344`, x_new = 91-58, mut_new = "mdr1_N86")
 # sum(pdmdr1spl5fix$`17467344`$x) == unique(pdmdr1spl5fix$`17467344`$n)
 
+pdmdr1spl5fix$`19187521`$x <- 30
+pdmdr1spl5fix$`19187521`$n <- 55
+pdmdr1spl5fix$`19187521`$prev <- pdmdr1spl5fix$`19187521`$x / pdmdr1spl5fix$`19187521`$n
 
+
+
+# TODO: combine correct and fixed
+
+
+# TODO: update so that we impute all of the studies at once
+complement <- NULL
+for(i in 1:nrow(pdmdr1spl5correct)) {
+  df <- pdmdr1spl5correct[i,]
+  df$x <- df$n - df$x
+  df$mut <- if_else(df$mut == "mdr1_N86", "mdr1_86Y", "mdr1_N86")
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdmdr1spl5correct <- rbind(pdmdr1spl5correct, complement) %>% arrange(pmid, uuid)
 
 # t6pmid <- pdmdr1 %>%
 #   filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
