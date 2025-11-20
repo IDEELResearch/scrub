@@ -1610,7 +1610,7 @@ pdmdr1spl5 <- pdmdr1 %>%
 # pdmdr1spl5 %>% filter(pmid == "25890383") %>% View() # needs fixing -- missing most of the data here
 # pdmdr1spl5 %>% filter(pmid == "25004442") %>% View() # extracted NFD correct but actually 100% N -- fix
 # pdmdr1spl5 %>% filter(pmid == "26988711") %>% View() # typo -- both ns should be 37
-# pdmdr1spl5 %>% filter(pmid == "31358591") %>% View() # needs fixing - error in 2016 year and 20212-2017 for N86
+# pdmdr1spl5 %>% filter(pmid == "31358591") %>% View() # needs fixing - error in 2016 year and 2012-2017 for N86
 
 
 # these pmids are already correctly extracted elsewhere. generally an EH with a different n to the rest of the study
@@ -1625,10 +1625,7 @@ pdmdr1spl5correct <- pdmdr1spl5 %>%
 # sanity check
 # length(unique(pdmdr1spl5$pmid)) == length(pdmdr1spl5correct$pmid) + length(omit_pmids) + length(fix_pmids)
 
-
-# assuming that this is correct and omitting mixed
-
-
+# fix studies for fixing by splitting and recombine later
 pdmdr1spl5fix <- pdmdr1spl5 %>%
   filter(pmid %in% fix_pmids) %>%
   split(.$pmid)
@@ -1643,21 +1640,53 @@ pdmdr1spl5fix$`19187521`$x <- 30
 pdmdr1spl5fix$`19187521`$n <- 55
 pdmdr1spl5fix$`19187521`$prev <- pdmdr1spl5fix$`19187521`$x / pdmdr1spl5fix$`19187521`$n
 
+# typo
+pdmdr1spl5fix$`25004442`$x <- pdmdr1spl5fix$`25004442`$n
 
+# do some haplotype maths here from table 2 
+pdmdr1spl5fix$`25348116`$x <- 13+45 
+pdmdr1spl5fix$`25348116`$mut <- "mdr1_86Y" # so that the imputation works correctly
+pdmdr1spl5fix$`25348116`$prev <- pdmdr1spl5fix$`25348116`$x / pdmdr1spl5fix$`25348116`$n
+
+# most of the data is missing - manually worked this out from the info in the additional file
+pdmdr1spl5fix$`25890383`$year <- pdmdr1spl5fix$`25890383`$study_start_year
+pdmdr1spl5fix$`25890383`$study_end_year <- pdmdr1spl5fix$`25890383`$study_start_year
+pdmdr1spl5fix$`25890383`$x <- c(16, 75, 55, 7)
+pdmdr1spl5fix$`25890383`$n <- c(18, 87, 65, 8)
+pdmdr1spl5fix$`25890383`$prev <- pdmdr1spl5fix$`25890383`$x / pdmdr1spl5fix$`25890383`$n
+
+# typo
+pdmdr1spl5fix$`26988711`$n[2] <- 37
+pdmdr1spl5fix$`26988711`$prev <- pdmdr1spl5fix$`26988711`$x / pdmdr1spl5fix$`26988711`$n
+
+# remove incorrect imputation and fix typo
+pdmdr1spl5fix$`31358591` <- pdmdr1spl5fix$`31358591`[c(1,3),] # remove row with error -- N will be imputed correctly
+pdmdr1spl5fix$`31358591`$x[2] <- 19
+pdmdr1spl5fix$`31358591`$n[2] == 162 # sanity check
+pdmdr1spl5fix$`31358591`$prev <- pdmdr1spl5fix$`31358591`$x / pdmdr1spl5fix$`31358591`$n
 
 # TODO: combine correct and fixed
-
+pdmdr1spl5fixed <- do.call(rbind, pdmdr1spl5fix) %>%
+  select(names(pdmdr1spl5correct)) 
+pdmdr1spl5 <- rbind(pdmdr1spl5correct, pdmdr1spl5fixed) # omitted removed, pmids fixed and combined with those correct
 
 # TODO: update so that we impute all of the studies at once
 complement <- NULL
-for(i in 1:nrow(pdmdr1spl5correct)) {
-  df <- pdmdr1spl5correct[i,]
+for(i in 1:nrow(pdmdr1spl5)) {
+  df <- pdmdr1spl5[i,]
   df$x <- df$n - df$x
   df$mut <- if_else(df$mut == "mdr1_N86", "mdr1_86Y", "mdr1_N86")
   df$prev <- df$x / df$n
   complement <- rbind(complement, df)
 }
-pdmdr1spl5correct <- rbind(pdmdr1spl5correct, complement) %>% arrange(pmid, uuid)
+pdmdr1spl5 <- rbind(pdmdr1spl5, complement) %>% arrange(pmid, uuid) %>% distinct()
+
+# sanity check
+(pdmdr1spl5 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% nrow()) == 0
+# [1] TRUE
 
 # t6pmid <- pdmdr1 %>%
 #   filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
