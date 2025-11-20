@@ -58,6 +58,37 @@ add_a_row_k13 <- function(df, x_new, gene_mut_new) {
   return(df)
 }
 
+#' Add a row to dataframe with all the same info except x and mut
+#' 
+#' @details
+#' 
+#' This function adds additional rows to the dataframe. 
+#' It keeps all column variables 
+#' the same except for x and mut.
+#' @name add_a_row_pd
+#' @export
+#' 
+#' @param df WWARN partner drug dataframe that you want to add a row to. 
+#' Note: this will probably be a specific survey
+#' @param x_new The value of x in the new row. For imputing wild type, x_new == n
+#' @param mut_new The value of mut in the new row. For imputing wild type, these are the 
+#' WT encodings for codons not detected in the survey
+
+# write a function to add a row
+add_a_row_pd <- function(df, x_new, mut_new) {
+  rows <- nrow(df) 
+  df <- df %>%
+    bind_rows(slice(., 1))
+  df$x[rows+1] <- x_new
+  df$mut[rows+1] <- mut_new
+  df$prev <- df$x/df$n
+  if(sum(df$x) != df$n[1]) {
+    print("x does not sum to n still")
+  }
+  return(df)
+}
+
+
 #' Impute the WT in surveys -- designed for cleaning WWARN
 #' 
 #' @details

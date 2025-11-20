@@ -454,21 +454,6 @@ iss2 <- k13wwdf %>%
   mutate(xs = sum(x)) %>%
   filter(xs < n) %>%
   arrange(uuid) 
-# TODO: decide what to do about the N-terminal SNPs and stop codons in WWARN
-
-# write a function to add a row
-add_a_row <- function(df, x_new, mut_new) {
-  rows <- nrow(df) 
-  df <- df %>%
-    bind_rows(slice(., 1))
-  df$x[rows+1] <- x_new
-  df$mut[rows+1] <- mut_new
-  df$prev <- df$x/df$n
-  if(sum(df$x) != df$n[1]) {
-    print("x does not sum to n still")
-  }
-  return(df)
-}
 
 # There are 23 nids where this fails... FML
 nid_lconcerns <- unique(iss2$nid)
@@ -513,7 +498,7 @@ k13wwdf_lfix$`648`$mut[1] <- "wildtype"
 k13wwdf_lfix$`648`$prev <- k13wwdf_lfix$`648`$x/k13wwdf_lfix$`648`$n
 
 # pmid 29582728 nid 458 and 466
-k13wwdf_lfix$`458` <- add_a_row(k13wwdf_lfix$`458`, 1,
+k13wwdf_lfix$`458` <- add_a_row_k13(k13wwdf_lfix$`458`, 1,
                                 "A676V")
 
 # nid 466 n is wrong, missing mutations and ones extracted are also wrong...
@@ -532,11 +517,11 @@ k13wwdf_lfix$`466` <- k13wwdf_lfix$`466` %>%
 # nid 705 pmid 25537878 
 # n and tot mutants correct
 # based on the text (plus a typo FML) there is one D516Y mut
-k13wwdf_lfix$`705` <- add_a_row(k13wwdf_lfix$`705`, 1,
+k13wwdf_lfix$`705` <- add_a_row_k13(k13wwdf_lfix$`705`, 1,
                                 "D516Y")
 
 # 743 pmid 31833468 - missing one mutation
-k13wwdf_lfix$`743` <- add_a_row(k13wwdf_lfix$`743`, 1,
+k13wwdf_lfix$`743` <- add_a_row_k13(k13wwdf_lfix$`743`, 1,
                                 "G453D")
 
 # 877 34270452 -- I can't even find this site in study
@@ -544,7 +529,7 @@ k13wwdf_lfix$`743` <- add_a_row(k13wwdf_lfix$`743`, 1,
 k13wwdf_lfix$`877` <- NULL
 
 # 1136 34551228 Table S7 https://www.nejm.org/doi/suppl/10.1056/NEJMoa2101746/suppl_file/nejmoa2101746_appendix.pdf
-k13wwdf_lfix$`1136` <- add_a_row(k13wwdf_lfix$`1136`,
+k13wwdf_lfix$`1136` <- add_a_row_k13(k13wwdf_lfix$`1136`,
                                  x_new = 1, mut_new = "V661I")
 
 # 682 - pmid 99999999 cannot find. 1 short of equal
@@ -553,7 +538,7 @@ k13wwdf_lfix$`1136` <- add_a_row(k13wwdf_lfix$`1136`,
 k13wwdf_lfix$`683` <- NULL
 
 # 710 pmid 99999999 - no WT so assume missing val is WT
-k13wwdf_lfix$`710` <- add_a_row(k13wwdf_lfix$`710`, 1,
+k13wwdf_lfix$`710` <- add_a_row_k13(k13wwdf_lfix$`710`, 1,
                                 "wildtype")
 
 # 381 99% WT but cannot find out the missing mutant
@@ -1056,26 +1041,13 @@ pdcrtspl6$`32019571` <- pdcrtspl6$`32019571` %>%
   mutate(x = sum(x), n = unique(n), prev = x/n) %>%
   distinct(mut, .keep_all = TRUE)
 
-add_a_row <- function(df, x_new, mut_new) {
-  rows <- nrow(df) 
-  df <- df %>%
-    bind_rows(df[1, ])
-  df$x[rows+1] <- x_new
-  df$mut[rows+1] <- mut_new
-  df$prev <- df$x/df$n
-  if(sum(df$x) != df$n[1]) {
-    print("x does not sum to n still")
-  }
-  return(df)
-}
-
 fixed <- NULL
 for(i in 1:(nrow(pdcrtspl6$`32019571`)/2)) {
   df <- pdcrtspl6$`32019571`[c(2*i-1,2*i),]
   
   mixed <- unique(df$n) - sum(df$x)
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
   
   fixed <- rbind(fixed, df)
   
@@ -1113,7 +1085,7 @@ pdcrtspl6 %>%
   dplyr::reframe(equal = ( sum(x) == unique(n))) %>%
   dplyr::filter(equal == FALSE)
 
-# TODO: FIX TYPE 7 - sum(x) > n
+# FIX TYPE 7 - sum(x) > n
 
 pdcrtspl7 <- pdcrt %>%
   filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid, pdcrtspl6$uuid))) %>% 
@@ -1121,8 +1093,7 @@ pdcrtspl7 <- pdcrt %>%
   filter(sum(x) > n[1]) %>% 
   split(.$pmid)
 
-# fix these
-
+# fix these one at a time
 # "15238686" - EH gives correct values
 pdcrtspl7$`15238686` <- pdcrtspl7$`15238686` %>%
   dplyr::filter(mut %in% other_loc) %>% 
@@ -1184,7 +1155,7 @@ pdcrtspl7$`17376240` <-
 ## https://d1wqtxts1xzle7.cloudfront.net/79635048/0760844-libre.pdf?1643531950=&response-content-disposition=inline%3B+filename%3DPlasmodium_falciparum_genotypes_associat.pdf&Expires=1753198742&Signature=GOBGCSa8gVB8FGdw-AM59OJqqdvnYil3lr1t7oPEX9qHGPwXCefTLp3u~woQzl3WX5key~bukoLgQzz7Aoe29J9CLb6z-U3mQDNQ979JRxQTlswGAXDeFLCXRHKuuU8e9vQk~nIdZNWYymsPc0Tvl6BRbydzRT2bAWMSsSMypvn7WfrGDXE7KtSqQWXED8IE8wT7rIxxc-B6JduNvbW8LQrh1hqi0vDU~YprB6OPcCdp9AL~PLBLM468UVTjyYtEPpf6adZKQBnd82OvWOw1J6Gbtuau~W2F6eh2uZh43k0aq9W7L1c29vzKk~nLEx8HyY-ty3PDhCJ4R67viM0j6w__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA
 # double count mixed in the text
 pdcrtspl7$`17488902`$x <- c(93, 368)
-pdcrtspl7$`17488902` <- add_a_row(df = pdcrtspl7$`17488902`, 17, "pfcrt 76K/T")
+pdcrtspl7$`17488902` <- add_a_row_pd(df = pdcrtspl7$`17488902`, 17, "pfcrt 76K/T")
 pdcrtspl7$`17488902`$prev <- pdcrtspl7$`17488902`$x/pdcrtspl7$`17488902`$n
 
 # Mixed infections contribute equally to the prevalence estimates for both alleles.
@@ -1198,7 +1169,7 @@ for(i in 1:(nrow(pdcrtspl7$`18008244`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
   
   fixed <- rbind(fixed, df)
   
@@ -1231,7 +1202,7 @@ for(i in 1:(nrow(pdcrtspl7$`19718439`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
   
   fixed <- rbind(fixed, df)
   
@@ -1253,7 +1224,7 @@ pdcrtspl7$`21645634`$prev <- pdcrtspl7$`21645634`$x/pdcrtspl7$`21645634`$n
 
 # issues with mixed and numbers in text
 pdcrtspl7$`22004584`$x <- c(3, 140)
-pdcrtspl7$`22004584` <- add_a_row(pdcrtspl7$`22004584`, 1, "pfcrt 76K/T")
+pdcrtspl7$`22004584` <- add_a_row_pd(pdcrtspl7$`22004584`, 1, "pfcrt 76K/T")
 pdcrtspl7$`22004584`$prev <- pdcrtspl7$`22004584`$x / pdcrtspl7$`22004584`$n
 
 # two mixed
@@ -1286,7 +1257,7 @@ pdcrtspl7$`22904636` <- pdcrtspl7$`22904636`[4:5,]
 pdcrtspl7$`22904636`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
 pdcrtspl7$`22904636`$x <- c(40,1)
 pdcrtspl7$`22904636`$n <- c(42, 42)
-pdcrtspl7$`22904636` <- add_a_row(pdcrtspl7$`22904636`, 1, "pfcrt K76")
+pdcrtspl7$`22904636` <- add_a_row_pd(pdcrtspl7$`22904636`, 1, "pfcrt K76")
 pdcrtspl7$`22904636`$prev <- pdcrtspl7$`22904636`$x / pdcrtspl7$`22904636`$n
 
 ## correct numbers for extraction
@@ -1306,7 +1277,7 @@ pdcrtspl7$`23870667`$prev <- pdcrtspl7$`23870667`$x / pdcrtspl7$`23870667`$n
 pdcrtspl7$`24359280` <- pdcrtspl7$`24359280` %>%
   dplyr::filter(mut == "pfcrt 76T") %>%
   dplyr::mutate(n = 198, prev = x/n)
-pdcrtspl7$`24359280` <- add_a_row(pdcrtspl7$`24359280`, x_new = 198 - 145, mut_new = "pfcrt K76")
+pdcrtspl7$`24359280` <- add_a_row_pd(pdcrtspl7$`24359280`, x_new = 198 - 145, mut_new = "pfcrt K76")
 
 # this is the entire study -- mixed infections counted twice
 fixed <- NULL
@@ -1318,7 +1289,7 @@ for(i in 1:(nrow(pdcrtspl7$`25421474`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
   
   fixed <- rbind(fixed, df)
   
@@ -1496,7 +1467,7 @@ pdmdr1 <- pdmdr1 %>%
   ungroup() 
 
 ## STEP 1: Work out how to sort out the markers ------------------------------
-# mdr1 cleaning is restricted to codon 86
+# mdr1 cleaning is restricted to codon 86 as this is the focus of this work
 
 pdmdr1 %>% pull(mut) %>% unique()
 
@@ -1508,9 +1479,9 @@ pdmdr1 %>% pull(mut) %>% unique()
 #  [6,] "pfmdr1 86N/Y" # KEEP
 #  [7,] "pfmdr1 Y184"
 #  [8,] "pfmdr1 184Y/F"
-#  [9,] "pfmdr1 YYXXY" : These are just giving EH info but in all studies prevalence can be identified from the other markers : remove
-#  [10,] "pfmdr1 YYY" : Likewise with YYY and NFD
-#  [11,] "pfmdr1 NFD"
+#  [9,] "pfmdr1 YYXXY" : the same as"pfmdr1 86Y" # KEEP but ensure no duplicates with 86Y -> EH
+#  [10,] "pfmdr1 YYY" : the same as"pfmdr1 86Y" # KEEP but ensure no duplicates with 86Y -> EH
+#  [11,] "pfmdr1 NFD" : the same as"pfmdr1 N86" # KEEP but ensure no duplicates with N86
 
 # filter out those that do not report codon 86
 pdmdr1 <- pdmdr1 %>%
@@ -1585,7 +1556,7 @@ pdmdr1spl4 <- pdmdr1 %>%
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
   filter(!xn) %>% # sum(x) =/= n if EH included
-  filter(!(mut %in% c(mut_loc,wt_loc,mix_loc))) %>% # EH only
+  filter(!(mut %in% c(res_loc,wt_loc,mix_loc))) %>% # EH only
   group_by(uuid) %>%
   mutate(xn = all(sum(x) == n[1])) %>%
   filter(xn) %>% # sum(x) = n when we only consider EH
@@ -1620,6 +1591,33 @@ pdmdr1spl5 <- pdmdr1 %>%
   select(iso3c, admin_0, admin_1, site, lat, long,
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# manually checked the pmids
+# > pdmdr1spl5$pmid %>% unique()
+# [15] "19704124" "25890383" "25004442" "15388456" "21881128" "26988711" "29390014" "27562216" "31358591" "35357271" "35346205"
+pdmdr1spl5 %>% filter(pmid == "22850519") %>% View() # pmid already included correctly -- this has different n. omit
+pdmdr1spl5 %>% filter(pmid == "17292769") %>% View() # correct 
+pdmdr1spl5 %>% filter(pmid == "17336652") %>% View() # no mdr1 presented in paper -- assume correct. also not in Africa
+pdmdr1spl5 %>% filter(pmid == "17538894") %>% View() # correct
+pdmdr1spl5 %>% filter(pmid == "18826834") %>% View() # numbers not given but consistent with text
+pdmdr1spl5 %>% filter(pmid == "12224572") %>% View() # pmid already included correctly -- this has different n. omit
+pdmdr1spl5 %>% filter(pmid == "25348116") %>% View() # needs fixing manually -- do some haplotype maths here on table 2
+pdmdr1spl5 %>% filter(pmid == "27538948") %>% View() # study has been retracted -- remove
+pdmdr1spl5 %>% filter(pmid == "25348538") %>% View() # numbers correct and they don't test for mixed so assume monoclonal
+pdmdr1spl5 %>% filter(pmid == "19187521") %>% View() # typo -- easy fix; x = 30; n = 55
+pdmdr1spl5 %>% filter(pmid == "24994911") %>% View()
+pdmdr1spl5 %>% filter(pmid == "23836177") %>% View()
+pdmdr1spl5 %>% filter(pmid == "17467344") %>% View()
+pdmdr1spl5 %>% filter(pmid == "16271310") %>% View()
+
+# check incorrect ones to see if they are correct under different headings
+pdmdr1 %>% filter(pmid == "22850519") %>% View()
+
+# these pmids are already correctly extracted elsewhere. generally an EH with a different n to the rest of the study
+omit_pmids <- c("22850519", "12224572", "27538948")
+fix_pmids <- c("25348116")
+
+
 
 # assuming that this is correct and omitting mixed
 complement <- NULL
@@ -1709,7 +1707,7 @@ pdmdr1spl7 <- pdmdr1 %>%
 
 # N = 250; Y/N = 86; Y = 141 -- study added mixed to single alleles
 pdmdr1spl7$`17488902`$x <- pdmdr1spl7$`17488902`$x - 86
-pdmdr1spl7$`17488902` <- add_a_row(pdmdr1spl7$`17488902`, 86, "pfmdr1 86N/Y") # add mixed alleles
+pdmdr1spl7$`17488902` <- add_a_row_pd(pdmdr1spl7$`17488902`, 86, "pfmdr1 86N/Y") # add mixed alleles
 
 # "Mixed infections contribute equally to the prevalence estimates for both alleles."
 fixed <- NULL
@@ -1720,7 +1718,7 @@ for(i in 1:(nrow(pdmdr1spl7$`18008244`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
   
   fixed <- rbind(fixed, df)
   
@@ -1745,7 +1743,7 @@ for(i in 1:(nrow(pdmdr1spl7$`19718439`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
   
   fixed <- rbind(fixed, df)
   
@@ -1761,7 +1759,7 @@ for(i in 1:(nrow(pdmdr1spl7$`24657918`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
   
   fixed <- rbind(fixed, df)
   
@@ -1777,7 +1775,7 @@ for(i in 1:(nrow(pdmdr1spl7$`25421474`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
   
   fixed <- rbind(fixed, df)
   
@@ -1787,7 +1785,7 @@ pdmdr1spl7$`25421474` <- fixed
 # mixed double counted
 mixed <- sum(pdmdr1spl7$`28546554`$x) -  unique(pdmdr1spl7$`28546554`$n)
 pdmdr1spl7$`28546554`$x <- pdmdr1spl7$`28546554`$x - mixed
-pdmdr1spl7$`28546554` <- add_a_row(df = pdmdr1spl7$`28546554`, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+pdmdr1spl7$`28546554` <- add_a_row_pd(df = pdmdr1spl7$`28546554`, x_new = mixed, mut_new = "pfmdr1 86N/Y")
 
 pdmdr1spl7$`29458380` <- pdmdr1spl7$`29458380` %>%
   filter(!(mut %in% other_loc))
@@ -1801,7 +1799,7 @@ for(i in 1:(nrow(pdmdr1spl7$`29458380`)/2)) {
   
   df$x <- df$x - mixed
   
-  df <- add_a_row(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
   
   fixed <- rbind(fixed, df)
   
@@ -1809,7 +1807,7 @@ for(i in 1:(nrow(pdmdr1spl7$`29458380`)/2)) {
 pdmdr1spl7$`29458380` <- fixed
 
 pdmdr1spl7$`29582732`$x <- pdmdr1spl7$`29582732`$x - 5
-pdmdr1spl7$`29582732` <- add_a_row(pdmdr1spl7$`29582732`, 5, "pfmdr1 86N/Y")
+pdmdr1spl7$`29582732` <- add_a_row_pd(pdmdr1spl7$`29582732`, 5, "pfmdr1 86N/Y")
 pdmdr1spl7$`29582732`$prev <- pdmdr1spl7$`29582732`$x / pdmdr1spl7$`29582732`$n
 
 pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%

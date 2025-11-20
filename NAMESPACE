@@ -2,6 +2,7 @@
 
 export("%>%")
 export(add_a_row_k13)
+export(add_a_row_pd)
 export(add_tags_diff_studyID)
 export(add_tags_same_studyID)
 export(adjust_invalid_date)
