@@ -1592,46 +1592,64 @@ pdmdr1spl5 <- pdmdr1 %>%
          year, study_start_year, study_end_year,
          x, n, prev, gene, mut, database, pmid, url, source, uuid) 
 
-# manually checked the pmids
-# > pdmdr1spl5$pmid %>% unique()
-# [15] "19704124" "25890383" "25004442" "15388456" "21881128" "26988711" "29390014" "27562216" "31358591" "35357271" "35346205"
-pdmdr1spl5 %>% filter(pmid == "22850519") %>% View() # pmid already included correctly -- this has different n. omit
-pdmdr1spl5 %>% filter(pmid == "17292769") %>% View() # correct 
-pdmdr1spl5 %>% filter(pmid == "17336652") %>% View() # no mdr1 presented in paper -- assume correct. also not in Africa
-pdmdr1spl5 %>% filter(pmid == "17538894") %>% View() # correct
-pdmdr1spl5 %>% filter(pmid == "18826834") %>% View() # numbers not given but consistent with text
-pdmdr1spl5 %>% filter(pmid == "12224572") %>% View() # pmid already included correctly -- this has different n. omit
-pdmdr1spl5 %>% filter(pmid == "25348116") %>% View() # needs fixing manually -- do some haplotype maths here on table 2
-pdmdr1spl5 %>% filter(pmid == "27538948") %>% View() # study has been retracted -- remove
-pdmdr1spl5 %>% filter(pmid == "25348538") %>% View() # numbers correct and they don't test for mixed so assume monoclonal
-pdmdr1spl5 %>% filter(pmid == "19187521") %>% View() # typo -- easy fix; x = 30; n = 55
-pdmdr1spl5 %>% filter(pmid == "24994911") %>% View()
-pdmdr1spl5 %>% filter(pmid == "23836177") %>% View()
-pdmdr1spl5 %>% filter(pmid == "17467344") %>% View()
-pdmdr1spl5 %>% filter(pmid == "16271310") %>% View()
+# manually checked the pmids -- omitted rows that were fine and grouped omitted and those to be fixed
+# omission
+# pdmdr1spl5 %>% filter(pmid == "22850519") %>% View() # pmid already included correctly -- this has different n. omit
+# pdmdr1spl5 %>% filter(pmid == "12224572") %>% View() # pmid already included correctly -- this has different n. omit
+# pdmdr1spl5 %>% filter(pmid == "27538948") %>% View() # study has been retracted -- remove
+# pdmdr1spl5 %>% filter(pmid == "19704124") %>% View() # omit -- manually fixed this in spl6 already
+# pdmdr1spl5 %>% filter(pmid == "21881128") %>% View() # study correct, this is haplotype. remove
+# pdmdr1spl5 %>% filter(pmid == "29390014") %>% View() # pmid already extracted correctly. this is the NFD haplotype only so omit
+# pdmdr1spl5 %>% filter(pmid == "27562216") %>% View() # pmid already extracted correctly. this is the NFD haplotype only so omit
+# pdmdr1spl5 %>% filter(pmid == "35357271") %>% View() # pmid already extracted correctly. this is the NFD haplotype only so omit
+# 
+# fix these
+# pdmdr1spl5 %>% filter(pmid == "25348116") %>% View() # needs fixing manually -- do some haplotype maths here on table 2
+# pdmdr1spl5 %>% filter(pmid == "19187521") %>% View() # typo -- easy fix; x = 30; n = 55
+# pdmdr1spl5 %>% filter(pmid == "17467344") %>% View() # Tanzania rows extracted correctly already so needs cleaning up; Kenya correct
+# pdmdr1spl5 %>% filter(pmid == "25890383") %>% View() # needs fixing -- missing most of the data here
+# pdmdr1spl5 %>% filter(pmid == "25004442") %>% View() # extracted NFD correct but actually 100% N -- fix
+# pdmdr1spl5 %>% filter(pmid == "26988711") %>% View() # typo -- both ns should be 37
+# pdmdr1spl5 %>% filter(pmid == "31358591") %>% View() # needs fixing - error in 2016 year and 20212-2017 for N86
 
-# check incorrect ones to see if they are correct under different headings
-pdmdr1 %>% filter(pmid == "22850519") %>% View()
 
 # these pmids are already correctly extracted elsewhere. generally an EH with a different n to the rest of the study
-omit_pmids <- c("22850519", "12224572", "27538948")
-fix_pmids <- c("25348116")
+omit_pmids <- c("22850519", "12224572", "27538948", "19704124", "21881128", 
+                "29390014", "27562216", "35357271")
+fix_pmids <- c("25348116", "19187521", "17467344", "25890383", "25004442", 
+               "26988711", "31358591")
 
+pdmdr1spl5correct <- pdmdr1spl5 %>%
+  filter(!(pmid %in% c(omit_pmids, fix_pmids)))
+
+# sanity check
+# length(unique(pdmdr1spl5$pmid)) == length(pdmdr1spl5correct$pmid) + length(omit_pmids) + length(fix_pmids)
 
 
 # assuming that this is correct and omitting mixed
 complement <- NULL
-for(i in 1:nrow(pdmdr1spl5)) {
-  df <- pdmdr1spl5[i,]
+for(i in 1:nrow(pdmdr1spl5correct)) {
+  df <- pdmdr1spl5correct[i,]
   df$x <- df$n - df$x
   df$mut <- if_else(df$mut == "mdr1_N86", "mdr1_86Y", "mdr1_N86")
   df$prev <- df$x / df$n
   complement <- rbind(complement, df)
 }
-pdmdr1spl5 <- rbind(pdmdr1spl5, complement) %>% arrange(pmid, uuid)
+pdmdr1spl5correct <- rbind(pdmdr1spl5correct, complement) %>% arrange(pmid, uuid)
 
-# 
-# 
+pdmdr1spl5fix <- pdmdr1spl5 %>%
+  filter(pmid %in% fix_pmids) %>%
+  split(.$pmid)
+
+pdmdr1spl5fix$`17467344` <- pdmdr1spl5fix$`17467344`[1,] # keep only kenya row and then fix
+pdmdr1spl5fix$`17467344`$x <- 58
+pdmdr1spl5fix$`17467344`$n <- 91
+pdmdr1spl5fix$`17467344`$prev <- pdmdr1spl5fix$`17467344`$x/pdmdr1spl5fix$`17467344`$n
+pdmdr1spl5fix$`17467344` <- add_a_row_pd(pdmdr1spl5fix$`17467344`, x_new = 91-58, mut_new = "mdr1_N86")
+# sum(pdmdr1spl5fix$`17467344`$x) == unique(pdmdr1spl5fix$`17467344`$n)
+
+
+
 # t6pmid <- pdmdr1 %>%
 #   filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
 #   group_by(uuid) %>%
