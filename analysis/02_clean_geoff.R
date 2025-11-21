@@ -1045,6 +1045,7 @@ mdr1_fix <- mdr1_original %>%
   arrange(survey_ID, total_num)
 
 # TODO: manually fix these 48 rows -- largely a haplotype issue that should be easily resolved
+write.csv(mdr1_fix, "mdr1_manual_fix.csv")
 
 # make a dataset with these rows removed and with a variable for the # of variants in each survey/date combination
 mdr1 <- mdr1_original %>% 
@@ -1143,38 +1144,61 @@ mdr1_2_NM %>%
   mutate(xs = sum(variant_num)) %>%
   filter(xs != total_num) %>% nrow()
 
+# now looking at N & Y
+mdr1_2_NY <- mdr1_2_NY %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(sid = cur_group_id()) %>%
+  arrange(sid)
 
+mdr1_2_NY_impute <- NULL
+for(i in 1:length(unique(mdr1_2_NY$sid))) {
+  df <- mdr1_2_NY[c((2*i)-1, 2*i),]
+  df[3,] <- df[2,]
+  df[3,]$variant_string <- "mdr1:86:N/Y"
+  df[3,]$variant_num <- df[3,]$total_num - df[3,]$xs
+  df[3,]$prev <- df[3,]$variant_num / df[3,]$total_num
+  mdr1_2_NY_impute <- rbind(df, mdr1_2_NY_impute)
+}
+mdr1_2_NY_impute %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow() # check these are all fixed
 
+mdr1_2_NY <- mdr1_2_NY_impute
 
+# now clean YM
+mdr1_2_YM <- mdr1_2_YM %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(sid = cur_group_id()) %>%
+  arrange(sid)
 
-# deal with each separately
-# N & N/Y => assume the rest are Y -- only 1 study
+mdr1_2_YM_impute <- NULL
+for(i in 1:length(unique(mdr1_2_YM$sid))) {
+  df <- mdr1_2_YM[c((2*i)-1, 2*i),]
+  df[3,] <- df[2,]
+  df[3,]$variant_string <- "mdr1:86:N/Y"
+  df[3,]$variant_num <- df[3,]$total_num - df[3,]$xs
+  df[3,]$prev <- df[3,]$variant_num / df[3,]$total_num
+  mdr1_2_YM_impute <- rbind(df, mdr1_2_YM_impute)
+}
 
+mdr1_2_YM_impute %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow() # check these are all fixed
 
-# N and Y => most common due to emphasis on mutants. assume rest are N/Y
-# 3 possible scenarios a) sum(x) = n - no imputation
-# b) sum(x) < n => assume the difference are mixed
-# c) sum(x) > n => manual investigation -- I imagine this may be a haplotype issue again?
-df_split <- df_list$`N+Y` %>%
-  mutate(group_xn = case_when(
-    x == n  ~ "x_eq_n",
-    x < n   ~ "x_lt_n",
-    x > n   ~ "x_gt_n"
-  )) %>%
-  split(.$group_xn)
+mdr1_2_YM <- mdr1_2_YM_impute
 
-# df_split$x_eq_n -- leave alone
-# df_split$x_gt_n %>% pull(nid) %>% unique()  
-df_split$x_gt_n <- NULL # omit until this is fixed
-
-df_split$x_lt_n %>% arrange(nid) %>% View()
-
-
-
-pending_nid <- c(1747, 1749, 1752)
-
-
+mdr1 <- rbind(mdr1_1,
+                mdr1_3, 
+                mdr1_2_NM,
+                mdr1_2_NY,
+                mdr1_2_YM) %>%
+  select(names(master_table_simplified)) %>%
+  mutate(prev = variant_num / total_num)
   
+gene_keep <- rbind(gene_keep, mdr1)
+
 # Save the cleaned and formatted data
-saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
+saveRDS(gene_keep, here("analysis", "data-derived", "geoff_clean.rds"))
 saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
