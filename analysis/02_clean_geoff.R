@@ -1083,21 +1083,29 @@ for(i in 1:nrow(mdr1_1_n)) {
 mdr1_1_n <- rbind(mdr1_1_n, complement) %>%
   arrange(nid)
 
+survey_fix_1 <- mdr1_1 %>%
+  filter(variant_string == "mdr1:86:N/Y") %>%
+  pull(survey_ID)
+
 mdr1_1 <- rbind(mdr1_1_n, mdr1_1_y) %>%
   arrange(survey_ID) %>%
   mutate(prev = variant_num/total_num)
 
-
-
-
-
-# for those reporting all 3, keep the correct ones. the others flagged for later fix
-mdr1$`3` <- mdr1$`3` %>% 
+# now clean those that report all three because this is another simple case
+mdr1_3 <- mdr1 %>% 
+  filter(num_variants == 3) %>%
   group_by(nid) %>%
-  distinct(across(c(nid, variant_string, x, n)), .keep_all = TRUE) %>%
-  group_by(nid, n) %>%
-  mutate(xs = sum(x)) %>%
-  filter(xs == n) 
+  mutate(xs = sum(variant_num)) 
+
+mdr1_3_correct <- mdr1_3 %>%
+  filter(xs == total_num)
+
+survey_fix_3 <- mdr1_3 %>%
+  filter(xs != total_num) %>%
+  pull(survey_ID)
+
+
+
 
 # split the dataframe with two unique variants into what combination of variants
 df_list <- mdr1$`2` %>%
@@ -1142,6 +1150,8 @@ df_split$x_lt_n %>% arrange(nid) %>% View()
 
 
 pending_nid <- c(1747, 1749, 1752)
+
+
   
 # Save the cleaned and formatted data
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
