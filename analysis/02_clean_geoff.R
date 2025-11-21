@@ -1042,18 +1042,54 @@ mdr1 <- mdr1_original %>%
   ungroup() %>%
   distinct(nid, variant_string, x, n, .keep_all = TRUE) %>% 
   group_by(nid, n) %>%
-  mutate(num_variants = length(unique(variant_string))) %>%
-  split(.$num_variants)
+  mutate(num_variants = n())
 
-# num_variants == 3
-nrow(mdr1$`3`) #12
-# manually checked that all others have sum(x) == n
-# mdr1$`3` %>% 
-#   group_by(nid) %>%
-#   distinct(across(c(nid, variant_string, x, n)), .keep_all = TRUE) %>%
-#   group_by(nid, n) %>%
-#   mutate(xs = sum(x)) %>%
-#   filter(xs != n) 
+mdr1_1 <- mdr1 %>% filter(num_variants == 1)
+mdr1_2 <- mdr1 %>% filter(num_variants == 2)
+mdr1_3 <- mdr1 %>% filter(num_variants == 3)
+
+# start with cleaning the surveys where we only have one variant
+mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all by 3 are mdr1:86:Y only
+
+# fix those which are mdr1:86:Y only first -- we assume that they are either mutant or wild and no mixed 
+# given this is GEOFF, mixed infections should be explicitly extracted
+mdr1_1_y <- mdr1_1 %>% 
+  filter(variant_string == "mdr1:86:Y")
+
+# for each row in mdr1_1_y add an additional row that is the complement
+complement <- NULL
+for(i in 1:nrow(mdr1_1_y)) {
+  df <- mdr1_1_y[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:N"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+
+# checked that sum(variants) == denom
+mdr1_1_y <- rbind(mdr1_1_y, complement) %>%
+  arrange(nid)
+
+mdr1_1_n <- mdr1_1 %>%
+  filter(variant_string == "mdr1:86:N") # exclude the one study with only N/Y for the moment -- flagged survey ID
+complement <- NULL
+for(i in 1:nrow(mdr1_1_n)) {
+  df <- mdr1_1_n[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:N"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+mdr1_1_n <- rbind(mdr1_1_n, complement) %>%
+  arrange(nid)
+
+mdr1_1 <- rbind(mdr1_1_n, mdr1_1_y) %>%
+  arrange(survey_ID) %>%
+  mutate(prev = variant_num/total_num)
+
+
+
+
 
 # for those reporting all 3, keep the correct ones. the others flagged for later fix
 mdr1$`3` <- mdr1$`3` %>% 
