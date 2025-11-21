@@ -1032,34 +1032,48 @@ standardise_mdr1_86("mdr1:86_184:Y/F_N")
 # filter(denom > 1) %>% View()
 # mutate(x = sum(variant_num), n = unique(total_num))
 
+# make the original easier to examine and add ids to the 
 mdr1_original <- assign_ids(gene_simplified$mdr1) 
+
+# some issues with different ns in different rows -- these need manual fixing
+# find these studies: same survey ID and different total_num
+# mdr1_fix -- these have been sent to Neeva to manually exmaine
+mdr1_fix <- mdr1_original %>%
+  dplyr::group_by(survey_ID, collection_day) %>%
+  mutate(n = length(unique(total_num))) %>%
+  filter(n > 1) %>%
+  arrange(survey_ID, total_num)
+
+# TODO: manually fix these 48 rows -- largely a haplotype issue that should be easily resolved
+
+# make a dataset with these rows removed and with a variable for the # of variants in each survey/date combination
 mdr1 <- mdr1_original %>% 
   mutate(variant_string = standardise_mdr1_86(variant_string)) %>% 
   filter(variant_string != "mdr1:86:F") %>%
-  group_by(nid, variant_string) %>%
+  dplyr::group_by(survey_ID, collection_day) %>%
+  mutate(n = length(unique(total_num))) %>%
+  filter(n == 1) %>% # exclude surveys with different Ns
+  ungroup() %>%
+  group_by(survey_ID, collection_day, total_num, variant_string) %>%
   mutate(x = sum(variant_num),
          n = unique(total_num)) %>%
   ungroup() %>%
-  distinct(nid, variant_string, x, n, .keep_all = TRUE) %>% 
-  group_by(nid, n) %>%
+  distinct(survey_ID, collection_day, total_num, variant_string, x, n, .keep_all = TRUE) %>% 
+  group_by(survey_ID, collection_day, total_num) %>%
   mutate(num_variants = n())
 
+# split by the number of variants in the survey
 mdr1_1 <- mdr1 %>% filter(num_variants == 1)
 mdr1_2 <- mdr1 %>% filter(num_variants == 2)
 mdr1_3 <- mdr1 %>% filter(num_variants == 3)
 
 # start with cleaning the surveys where we only have one variant
-mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all by 3 are mdr1:86:Y only
-
-# fix those which are mdr1:86:Y only first -- we assume that they are either mutant or wild and no mixed 
-# given this is GEOFF, mixed infections should be explicitly extracted
-mdr1_1_y <- mdr1_1 %>% 
-  filter(variant_string == "mdr1:86:Y")
+mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all are mdr1:86:Y only
 
 # for each row in mdr1_1_y add an additional row that is the complement
 complement <- NULL
-for(i in 1:nrow(mdr1_1_y)) {
-  df <- mdr1_1_y[i,]
+for(i in 1:nrow(mdr1_1)) {
+  df <- mdr1_1[i,]
   df$variant_num <- df$total_num - df$variant_num
   df$variant_string <- "mdr1:86:N"
   df$prev <- df$variant_num / df$total_num
@@ -1067,27 +1081,7 @@ for(i in 1:nrow(mdr1_1_y)) {
 }
 
 # checked that sum(variants) == denom
-mdr1_1_y <- rbind(mdr1_1_y, complement) %>%
-  arrange(nid)
-
-mdr1_1_n <- mdr1_1 %>%
-  filter(variant_string == "mdr1:86:N") # exclude the one study with only N/Y for the moment -- flagged survey ID
-complement <- NULL
-for(i in 1:nrow(mdr1_1_n)) {
-  df <- mdr1_1_n[i,]
-  df$variant_num <- df$total_num - df$variant_num
-  df$variant_string <- "mdr1:86:N"
-  df$prev <- df$variant_num / df$total_num
-  complement <- rbind(complement, df)
-}
-mdr1_1_n <- rbind(mdr1_1_n, complement) %>%
-  arrange(nid)
-
-survey_fix_1 <- mdr1_1 %>%
-  filter(variant_string == "mdr1:86:N/Y") %>%
-  pull(survey_ID)
-
-mdr1_1 <- rbind(mdr1_1_n, mdr1_1_y) %>%
+mdr1_1 <- rbind(mdr1_1, complement) %>%
   arrange(survey_ID) %>%
   mutate(prev = variant_num/total_num)
 
@@ -1104,11 +1098,12 @@ survey_fix_3 <- mdr1_3 %>%
   filter(xs != total_num) %>%
   pull(survey_ID)
 
+mdr1_3 <- mdr1_3_correct
 
-
-
-# split the dataframe with two unique variants into what combination of variants
-df_list <- mdr1$`2` %>%
+# now clean those with 2 mutations
+# 3 possible iterations of 2 mutations
+# add a column that indicates which of the three classes it falls into so that we can treat them separately
+mdr1_2_groups <- mdr1_2 %>%
   group_by(nid) %>%
   mutate(
     pair = unique(variant_string) |> str_c(collapse = "+"),
@@ -1119,15 +1114,42 @@ df_list <- mdr1$`2` %>%
       TRUE                                                          ~ pair
     )
   ) %>%
-  ungroup() %>%
-  split(.$pair_simple)
+  ungroup() 
+
+
+mdr1_2_groups <-  mdr1_2_groups %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  mutate(correct = if_else(xs == total_num, "yes", "no"))
+
+# these rows are already correct and not missing imputation -- leave as is 
+mdr1_2_groups_correct <- mdr1_2_groups %>% filter(correct == "yes")
+  
+# these are the rows that need fixing -- fix based on the classification
+mdr1_2_groups <- mdr1_2_groups %>% filter(correct == "no") 
+  
+# split the dataframe with two unique variants into what combination of variants - M ~ mixed
+mdr1_2_NY <- mdr1_2_groups %>% filter(pair_simple == "N+Y")
+mdr1_2_NM <- mdr1_2_groups %>% filter(pair_simple == "N+N/Y")
+mdr1_2_YM <- mdr1_2_groups %>% filter(pair_simple == "Y+N/Y")
+
+# NM = 2 rows
+mdr1_2_NM[3,] <- mdr1_2_NM[2,]
+mdr1_2_NM[3,]$variant_num <- mdr1_2_NM[3,]$total_num - sum(mdr1_2_NM$variant_num[1:2])
+mdr1_2_NM[3,]$variant_string <- "mdr1:86:Y"
+# check that sum numerator = denominator now 
+mdr1_2_NM %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow()
+
+
+
 
 
 # deal with each separately
 # N & N/Y => assume the rest are Y -- only 1 study
-df_list$`N+N/Y`[3,] <- df_list$`N+N/Y`[2,]
-df_list$`N+N/Y`[3,]$x <- df_list$`N+N/Y`[3,]$n - sum(df_list$`N+N/Y`$x[1:2])
-df_list$`N+N/Y`[3,]$variant_string <- "mdr1:86:Y"
+
 
 # N and Y => most common due to emphasis on mutants. assume rest are N/Y
 # 3 possible scenarios a) sum(x) = n - no imputation
