@@ -975,6 +975,7 @@ gene_simplified$mdr1 <- gene_simplified$mdr1 %>%
 
 # assign to uuids 
 # TODO: check if we actually need this and if not, exclude
+# TODO: Neeva, I don't think you need to use this so just omit this. it adds lots of columns but I don't use them
 assign_ids <- function(x) {
   x %>%
     group_by(across(c(-variant_num, -total_num, -prev, -variant_string))) %>%
@@ -988,6 +989,8 @@ assign_ids <- function(x) {
 
 # fix the sheer number of mutants we are dealing with -- combine all 86s together
 # TODO: make this a proper function with documentatin and tests
+# TODO: Neeva, you'll need to rewrite this so that the function picks up the last allele in the haplotypes 
+# use ChatGPT if you need to -- it's pretty good at string manipulation!
 standardise_mdr1_86 <- function(x) {
   # split into 3 parts: "mdr1", positions, alleles
   parts <- str_split_fixed(x, ":", 3)
@@ -1034,7 +1037,8 @@ standardise_mdr1_86("mdr1:86_184:Y/F_N")
 # filter(denom > 1) %>% View()
 # mutate(x = sum(variant_num), n = unique(total_num))
 
-# make the original easier to examine and add ids to the 
+# make the original easier to examine and add ids to the
+# TODO: see if we can omit assign_ids -- check if we actually use them anywhere?!
 mdr1_original <- assign_ids(gene_simplified$mdr1) 
 
 # some issues with different ns in different rows -- these need manual fixing
@@ -1100,8 +1104,9 @@ mdr1_2 <- mdr1 %>% filter(num_variants == 2)
 mdr1_3 <- mdr1 %>% filter(num_variants == 3)
 
 # start with cleaning the surveys where we only have one variant
-mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all are mdr1:86:Y only
+mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all are mdr1:86:N or mdr1:86:Y only
 
+# split them into the type of one variant we have
 mdr1_1_n <- mdr1_1 %>% filter(variant_string == "mdr1:86:N")
 mdr1_1_y <- mdr1_1 %>% filter(variant_string == "mdr1:86:Y")
 
@@ -1186,10 +1191,14 @@ mdr1_2_groups_correct <- mdr1_2_groups %>% filter(correct == "yes")
 # these are the rows that need fixing -- fix based on the classification
 mdr1_2_groups <- mdr1_2_groups %>% filter(correct == "no") 
   
+# TODO: fix these studies where sum(x) > denom 
+# I think these are data issues 
+mdr1_2_fix <- mdr1_2_groups %>% filter(xs > total_num)
+
 # split the dataframe with two unique variants into what combination of variants - M ~ mixed
-mdr1_2_NY <- mdr1_2_groups %>% filter(pair_simple == "N+Y")
-mdr1_2_NM <- mdr1_2_groups %>% filter(pair_simple == "N+N/Y")
-mdr1_2_YM <- mdr1_2_groups %>% filter(pair_simple == "Y+N/Y")
+mdr1_2_NY <- mdr1_2_groups %>% filter(pair_simple == "N+Y") %>% filter(xs <= total_num)
+mdr1_2_NM <- mdr1_2_groups %>% filter(pair_simple == "N+N/Y") %>% filter(xs <= total_num)
+mdr1_2_YM <- mdr1_2_groups %>% filter(pair_simple == "Y+N/Y") %>% filter(xs <= total_num)
 
 # NM = 2 rows
 mdr1_2_NM[3,] <- mdr1_2_NM[2,]
@@ -1246,11 +1255,13 @@ mdr1_2_YM_impute %>%
 
 mdr1_2_YM <- mdr1_2_YM_impute
 
-mdr1 <- rbind(mdr1_1,
-                mdr1_3, 
-                mdr1_2_NM,
+mdr1_2 <- rbind(mdr1_2_NM,
                 mdr1_2_NY,
-                mdr1_2_YM) %>%
+                mdr1_2_YM)
+
+mdr1 <- rbind(mdr1_1,
+              mdr1_2, 
+              mdr1_3) %>%
   select(names(master_table_simplified)) %>%
   mutate(prev = variant_num / total_num)
 
