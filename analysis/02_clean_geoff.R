@@ -987,20 +987,15 @@ assign_ids <- function(x) {
 # fix the sheer number of mutants we are dealing with -- combine all 86s together
 # TODO: make this a proper function with documentatin and tests
 standardise_mdr1_86 <- function(x) {
-  
   # split into 3 parts: "mdr1", positions, alleles
   parts <- str_split_fixed(x, ":", 3)
-  
   # alleles for *all positions*
   alleles_all <- parts[,3]
-  
   # extract only the allele block for the first position (86)
   first_block <- str_extract(alleles_all, "^[A-Z/]+")
-  
   # keep only A or A/B
   first_allele <- str_extract(first_block, "^[A-Z](?:/[A-Z])?")
-  
-  # ----- NEW RULE: drop F if mixed with F -----
+  # ----- NEW RULE: drop F if mixed -----
   # N/F → N
   # Y/F → Y
   first_allele <- gsub("^N/F$", "N", first_allele)
@@ -1016,13 +1011,10 @@ standardise_mdr1_86 <- function(x) {
 # test this function
 standardise_mdr1_86("mdr1:86:N")
 # "mdr1:86:N"
-
 standardise_mdr1_86("mdr1:86:Y/N")
 # "mdr1:86:N/Y"
-
 standardise_mdr1_86("mdr1:86_184_1246:N_Y_D")
 # "mdr1:86:N"
-
 standardise_mdr1_86("mdr1:86_184:Y/F_N")
 # "mdr1:86:Y" 
 
@@ -1038,42 +1030,82 @@ standardise_mdr1_86("mdr1:86_184:Y/F_N")
 # group_by(survey_ID, collection_day, nid, string_86) %>%
 # mutate(denom = length(unique(total_num))) %>%
 # filter(denom > 1) %>% View()
-  # mutate(x = sum(variant_num), n = unique(total_num))
+# mutate(x = sum(variant_num), n = unique(total_num))
 
-mdr1 <- assign_ids(gene_simplified$mdr1) 
-mdr1 <- mdr1 %>% mutate(string_86 = standardise_mdr1_86(variant_string)) %>% 
-  filter(string_86 != "mdr1:86:F") %>%
-  group_by(nid, string_86) %>%
+mdr1_original <- assign_ids(gene_simplified$mdr1) 
+mdr1 <- mdr1_original %>% 
+  mutate(variant_string = standardise_mdr1_86(variant_string)) %>% 
+  filter(variant_string != "mdr1:86:F") %>%
+  group_by(nid, variant_string) %>%
   mutate(x = sum(variant_num),
          n = unique(total_num)) %>%
   ungroup() %>%
-  group_by(nid) %>%
-  mutate(num_variants = length(unique(string_86))) %>%
+  distinct(nid, variant_string, x, n, .keep_all = TRUE) %>% 
+  group_by(nid, n) %>%
+  mutate(num_variants = length(unique(variant_string))) %>%
   split(.$num_variants)
-  
+
 # num_variants == 3
-nrow(mdr1$`3`) #38
+nrow(mdr1$`3`) #12
 # manually checked that all others have sum(x) == n
+# mdr1$`3` %>% 
+#   group_by(nid) %>%
+#   distinct(across(c(nid, variant_string, x, n)), .keep_all = TRUE) %>%
+#   group_by(nid, n) %>%
+#   mutate(xs = sum(x)) %>%
+#   filter(xs != n) 
+
+# for those reporting all 3, keep the correct ones. the others flagged for later fix
 mdr1$`3` <- mdr1$`3` %>% 
   group_by(nid) %>%
-  distinct(across(c(nid, string_86, x, n)), .keep_all = TRUE) %>%
+  distinct(across(c(nid, variant_string, x, n)), .keep_all = TRUE) %>%
   group_by(nid, n) %>%
   mutate(xs = sum(x)) %>%
-  filter(xs == n) # flagged the nid with issue -- omit for now
-  
+  filter(xs == n) 
+
+# split the dataframe with two unique variants into what combination of variants
+df_list <- mdr1$`2` %>%
+  group_by(nid) %>%
+  mutate(
+    pair = unique(variant_string) |> str_c(collapse = "+"),
+    pair_simple = case_when(
+      pair %in% c("mdr1:86:N+mdr1:86:Y", "mdr1:86:Y+mdr1:86:N")   ~ "N+Y",
+      pair %in% c("mdr1:86:N+mdr1:86:N/Y", "mdr1:86:N/Y+mdr1:86:N") ~ "N+N/Y",
+      pair %in% c("mdr1:86:Y+mdr1:86:N/Y", "mdr1:86:N/Y+mdr1:86:Y") ~ "Y+N/Y",
+      TRUE                                                          ~ pair
+    )
+  ) %>%
+  ungroup() %>%
+  split(.$pair_simple)
+
+
+# deal with each separately
+# N & N/Y => assume the rest are Y -- only 1 study
+df_list$`N+N/Y`[3,] <- df_list$`N+N/Y`[2,]
+df_list$`N+N/Y`[3,]$x <- df_list$`N+N/Y`[3,]$n - sum(df_list$`N+N/Y`$x[1:2])
+df_list$`N+N/Y`[3,]$variant_string <- "mdr1:86:Y"
+
+# N and Y => most common due to emphasis on mutants. assume rest are N/Y
+# 3 possible scenarios a) sum(x) = n - no imputation
+# b) sum(x) < n => assume the difference are mixed
+# c) sum(x) > n => manual investigation -- I imagine this may be a haplotype issue again?
+df_split <- df_list$`N+Y` %>%
+  mutate(group_xn = case_when(
+    x == n  ~ "x_eq_n",
+    x < n   ~ "x_lt_n",
+    x > n   ~ "x_gt_n"
+  )) %>%
+  split(.$group_xn)
+
+# df_split$x_eq_n -- leave alone
+# df_split$x_gt_n %>% pull(nid) %>% unique()  
+df_split$x_gt_n <- NULL # omit until this is fixed
+
+df_split$x_lt_n %>% arrange(nid) %>% View()
 
 
 
-
-
-
-
-
-
-
-  
-  
-omit_nid <- c(1747)
+pending_nid <- c(1747, 1749, 1752)
   
 # Save the cleaned and formatted data
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
