@@ -970,7 +970,8 @@ gene_simplified <- master_table_simplified %>%
 
 # need to filter out rows that don't contant mdr1 86 at all
 gene_simplified$mdr1 <- gene_simplified$mdr1 %>%
-  filter(grepl("^mdr1:[^:]*86[^:]*:", variant_string))
+  filter(grepl("^mdr1:[^:]*86[^:]*:", variant_string)) %>%
+  dplyr::filter(variant_string != "mdr1:86:F")
 
 # assign to uuids 
 assign_ids <- function(x) {
@@ -1042,12 +1043,40 @@ mdr1_fix <- mdr1_original %>%
   dplyr::group_by(survey_ID, collection_day) %>%
   mutate(n = length(unique(total_num))) %>%
   filter(n > 1) %>%
-  arrange(survey_ID, total_num)
+  arrange(survey_ID, total_num) %>%
+  split(.$study_name)
 
-# TODO: manually fix these 48 rows -- largely a haplotype issue that should be easily resolved
-write.csv(mdr1_fix, "mdr1_manual_fix.csv")
+# fix these and add them back into the cleaning
 
-# make a dataset with these rows removed and with a variable for the # of variants in each survey/date combination
+# keep the bottom row -- impute the others
+mdr1_fix$geoff_S0036Schreidah <- mdr1_fix$geoff_S0036Schreidah[3,]
+
+# keep bottom 3 rows
+mdr1_fix$geoff_S0062Vonwowern2024 <- mdr1_fix$geoff_S0062Vonwowern2024[4:6,]
+
+# Plucinski needs new entries
+mdr1_fix$geoff_S0101Plucinski2017 <- mdr1_fix$geoff_S0101Plucinski2017 %>%
+  distinct(site_name, collection_day, total_num, .keep_all = TRUE) %>%
+  mutate(variant_string = "mdr1:86:N") %>%
+  ungroup() %>%
+  mutate(variant_num = c(1, 13, 9, 22)) %>% 
+  mutate(prev = variant_num / total_num)
+
+# fix incorrect denominator
+mdr1_fix$geoff_S0115Tuedomagb2021$total_num <- 739
+mdr1_fix$geoff_S0115Tuedomagb2021$prev <- mdr1_fix$geoff_S0115Tuedomagb2021$variant_num / 
+  mdr1_fix$geoff_S0115Tuedomagb2021$total_num
+
+# drop
+mdr1_fix$geoff_S0177Hussien2020 <- NULL
+
+# keep specific entries
+mdr1_fix$geoff_S0204Nibaptn2023 <- mdr1_fix$geoff_S0204Nibaptn2023 %>%
+  filter(variant_string == "mdr1:86:Y") # these are the correct rows
+
+mdr1_fix <- do.call(rbind, mdr1_fix) # removed 34 rows
+
+# make a dataset with the manual fixes combined
 mdr1 <- mdr1_original %>% 
   mutate(variant_string = standardise_mdr1_86(variant_string)) %>% 
   filter(variant_string != "mdr1:86:F") %>%
@@ -1055,11 +1084,12 @@ mdr1 <- mdr1_original %>%
   mutate(n = length(unique(total_num))) %>%
   filter(n == 1) %>% # exclude surveys with different Ns
   ungroup() %>%
+  rbind(mdr1_fix) %>%
   group_by(survey_ID, collection_day, total_num, variant_string) %>%
-  mutate(x = sum(variant_num),
-         n = unique(total_num)) %>%
+  mutate(variant_num = sum(variant_num),
+         total_num = unique(total_num)) %>%
   ungroup() %>%
-  distinct(survey_ID, collection_day, total_num, variant_string, x, n, .keep_all = TRUE) %>% 
+  distinct(survey_ID, collection_day, total_num, variant_string,.keep_all = TRUE) %>% 
   group_by(survey_ID, collection_day, total_num) %>%
   mutate(num_variants = n())
 
@@ -1071,33 +1101,59 @@ mdr1_3 <- mdr1 %>% filter(num_variants == 3)
 # start with cleaning the surveys where we only have one variant
 mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all are mdr1:86:Y only
 
+mdr1_1_n <- mdr1_1 %>% filter(variant_string == "mdr1:86:N")
+mdr1_1_y <- mdr1_1 %>% filter(variant_string == "mdr1:86:Y")
+
+# for each row in mdr1_1_n add an additional row that is the complement
+complement <- NULL
+for(i in 1:nrow(mdr1_1_n)) {
+  df <- mdr1_1_n[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:Y"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+
+# checked that sum(variants) == denom
+mdr1_1_n <- rbind(mdr1_1_n, complement) %>%
+  arrange(survey_ID, collection_day, total_num) %>%
+  mutate(prev = variant_num/total_num)
+
 # for each row in mdr1_1_y add an additional row that is the complement
 complement <- NULL
-for(i in 1:nrow(mdr1_1)) {
-  df <- mdr1_1[i,]
+for(i in 1:nrow(mdr1_1_y)) {
+  df <- mdr1_1_y[i,]
   df$variant_num <- df$total_num - df$variant_num
   df$variant_string <- "mdr1:86:N"
   df$prev <- df$variant_num / df$total_num
   complement <- rbind(complement, df)
 }
 
-# checked that sum(variants) == denom
-mdr1_1 <- rbind(mdr1_1, complement) %>%
-  arrange(survey_ID) %>%
+mdr1_1_y <- rbind(mdr1_1_y, complement) %>%
+  arrange(survey_ID, collection_day, total_num) %>%
   mutate(prev = variant_num/total_num)
+
+mdr1_1 <- rbind(mdr1_1_n, mdr1_1_y) %>%
+  mutate(prev = variant_num / total_num) 
+
+# checked that sum(variants) == denom
+mdr1_1 %>%
+  group_by(collection_day, survey_ID, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>%
+  nrow() 
+# [1] 0
 
 # now clean those that report all three because this is another simple case
 mdr1_3 <- mdr1 %>% 
   filter(num_variants == 3) %>%
-  group_by(nid) %>%
+  group_by(collection_day, survey_ID, total_num) %>%
   mutate(xs = sum(variant_num)) 
 
 mdr1_3_correct <- mdr1_3 %>%
   filter(xs == total_num)
 
-survey_fix_3 <- mdr1_3 %>%
-  filter(xs != total_num) %>%
-  pull(survey_ID)
+# TODO: one study that still needs fixing
 
 mdr1_3 <- mdr1_3_correct
 
