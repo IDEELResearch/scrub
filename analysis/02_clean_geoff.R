@@ -3,6 +3,7 @@ library(tidyverse)
 library(lubridate)
 library(here)
 library(purrr)
+library(stringr)
 devtools::load_all()
 
 ################################################################################
@@ -956,6 +957,124 @@ if (nrow(missing_summary) > 0) {
 
 cat(paste(rep("=", 60), collapse = ""), "\n\n")
 
+# 13. Imputing the partner drugs
+# 13a. Starting with mdr1
+
+# first split the dataframes so that I don't break the k13 which is working fine
+gene_keep <- master_table_simplified %>% 
+  filter(!(gene %in% c("mdr1", "crt")))
+
+gene_simplified <- master_table_simplified %>% 
+  filter(gene %in% c("mdr1", "crt")) %>%
+  split(.$gene)
+
+# need to filter out rows that don't contant mdr1 86 at all
+gene_simplified$mdr1 <- gene_simplified$mdr1 %>%
+  filter(grepl("^mdr1:[^:]*86[^:]*:", variant_string))
+
+# assign to uuids 
+assign_ids <- function(x) {
+  x %>%
+    group_by(across(c(-variant_num, -total_num, -prev, -variant_string))) %>%
+    mutate(uuid = cur_group_id()) %>%
+    ungroup %>% 
+    group_by(across(c(-variant_num, -prev, -variant_string))) %>%
+    mutate(nid = cur_group_id()) %>%
+    ungroup() %>% 
+    mutate(iid = seq_len(n()))
+}
+
+# fix the sheer number of mutants we are dealing with -- combine all 86s together
+# TODO: make this a proper function with documentatin and tests
+standardise_mdr1_86 <- function(x) {
+  
+  # split into 3 parts: "mdr1", positions, alleles
+  parts <- str_split_fixed(x, ":", 3)
+  
+  # alleles for *all positions*
+  alleles_all <- parts[,3]
+  
+  # extract only the allele block for the first position (86)
+  first_block <- str_extract(alleles_all, "^[A-Z/]+")
+  
+  # keep only A or A/B
+  first_allele <- str_extract(first_block, "^[A-Z](?:/[A-Z])?")
+  
+  # ----- NEW RULE: drop F if mixed with F -----
+  # N/F → N
+  # Y/F → Y
+  first_allele <- gsub("^N/F$", "N", first_allele)
+  first_allele <- gsub("^Y/F$", "Y", first_allele)
+  
+  # normalise N/Y ordering
+  first_allele <- ifelse(first_allele == "Y/N", "N/Y", first_allele)
+  
+  paste0("mdr1:86:", first_allele)
+}
+
+# TODO: test the function more thoroughly
+# test this function
+standardise_mdr1_86("mdr1:86:N")
+# "mdr1:86:N"
+
+standardise_mdr1_86("mdr1:86:Y/N")
+# "mdr1:86:N/Y"
+
+standardise_mdr1_86("mdr1:86_184_1246:N_Y_D")
+# "mdr1:86:N"
+
+standardise_mdr1_86("mdr1:86_184:Y/F_N")
+# "mdr1:86:Y" 
+
+# current approach:
+# convert full variant strings into simplified version focused on codon 86
+# group by study info and 86 variant, num = sum(variant_num), denom = unique(total_num) if there is only one unique value
+# clean based on the length of unique(86_string)
+
+# checked that the length of the denominator is always 1 when we group by nid
+# mdr1 %>%
+# mutate(string_86 = standardise_mdr1_86(variant_string)) %>% 
+# filter(string_86 != "mdr1:86:F") %>%
+# group_by(survey_ID, collection_day, nid, string_86) %>%
+# mutate(denom = length(unique(total_num))) %>%
+# filter(denom > 1) %>% View()
+  # mutate(x = sum(variant_num), n = unique(total_num))
+
+mdr1 <- assign_ids(gene_simplified$mdr1) 
+mdr1 <- mdr1 %>% mutate(string_86 = standardise_mdr1_86(variant_string)) %>% 
+  filter(string_86 != "mdr1:86:F") %>%
+  group_by(nid, string_86) %>%
+  mutate(x = sum(variant_num),
+         n = unique(total_num)) %>%
+  ungroup() %>%
+  group_by(nid) %>%
+  mutate(num_variants = length(unique(string_86))) %>%
+  split(.$num_variants)
+  
+# num_variants == 3
+nrow(mdr1$`3`) #38
+# manually checked that all others have sum(x) == n
+mdr1$`3` <- mdr1$`3` %>% 
+  group_by(nid) %>%
+  distinct(across(c(nid, string_86, x, n)), .keep_all = TRUE) %>%
+  group_by(nid, n) %>%
+  mutate(xs = sum(x)) %>%
+  filter(xs == n) # flagged the nid with issue -- omit for now
+  
+
+
+
+
+
+
+
+
+
+
+  
+  
+omit_nid <- c(1747)
+  
 # Save the cleaned and formatted data
 saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
 saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
