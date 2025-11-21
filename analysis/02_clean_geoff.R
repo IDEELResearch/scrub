@@ -974,6 +974,7 @@ gene_simplified$mdr1 <- gene_simplified$mdr1 %>%
   dplyr::filter(variant_string != "mdr1:86:F")
 
 # assign to uuids 
+# TODO: check if we actually need this and if not, exclude
 assign_ids <- function(x) {
   x %>%
     group_by(across(c(-variant_num, -total_num, -prev, -variant_string))) %>%
@@ -1252,8 +1253,12 @@ mdr1 <- rbind(mdr1_1,
                 mdr1_2_YM) %>%
   select(names(master_table_simplified)) %>%
   mutate(prev = variant_num / total_num)
-  
-gene_keep <- rbind(gene_keep, mdr1)
+
+# TODO: Neeva to attempt to clean the crt using the above format -- you've got this queen
+# TODO: please delete completed todos and comments we don't want published lmao
+
+gene_keep <- rbind(gene_keep, mdr1, 
+                   gene_simplified$crt) # TODO: NEEVA: replace with your cleaned crt
 
 # Save the cleaned and formatted data
 saveRDS(gene_keep, here("analysis", "data-derived", "geoff_clean.rds"))

@@ -1,5 +1,5 @@
 # load stave  
-#devtools::install_github("mrc-ide/STAVE")
+# devtools::install_github("mrc-ide/STAVE")
 library(STAVE)
 library(tidyverse)
 
