@@ -68,7 +68,7 @@ studies_all_WT_k13 <- wwarn_k13 %>%
   filter(all_WT) %>%
   pull(pmid)
 
-# no all WT studies for crt or mdr1 so no need to impute
+# no all WT studies for crt or mdr1 so will impute more simply at the end of the script
 studies_all_WT_crt <- wwarn_crt %>%
   group_by(pmid) %>%
   summarise(all_WT = all(gene_mut == "crt:WT")) %>%
@@ -226,6 +226,199 @@ wwarn_pd_clean <- wwarn_pd_edit %>%
 
 # Last extra cleans to align with STAVE
 wwarn_pd_clean$survey_ID <- gsub("'", "", wwarn_pd_clean$survey_ID)
+
+# 2. Impute the pd WT and mutants
+# now impute the mutations in mdr1 and crt 
+mdr1 <- wwarn_pd_clean %>% filter(gene == "mdr1")
+crt <- wwarn_pd_clean %>% filter(gene == "crt")
+nrow(mdr1) + nrow(crt) == nrow(wwarn_pd_clean)
+
+# make a dataset with the manual fixes combined
+mdr1 <- mdr1_original %>% 
+  mutate(variant_string = standardise_mdr1_86(variant_string)) %>% 
+  filter(variant_string != "mdr1:86:F") %>%
+  dplyr::group_by(survey_ID, collection_day) %>%
+  mutate(n = length(unique(total_num))) %>%
+  filter(n == 1) %>% # exclude surveys with different Ns
+  ungroup() %>%
+  rbind(mdr1_fix) %>%
+  group_by(survey_ID, collection_day, total_num, variant_string) %>%
+  mutate(variant_num = sum(variant_num),
+         total_num = unique(total_num)) %>%
+  ungroup() %>%
+  distinct(survey_ID, collection_day, total_num, variant_string,.keep_all = TRUE) %>% 
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(num_variants = n())
+
+# split by the number of variants in the survey
+mdr1_1 <- mdr1 %>% filter(num_variants == 1)
+mdr1_2 <- mdr1 %>% filter(num_variants == 2)
+mdr1_3 <- mdr1 %>% filter(num_variants == 3)
+
+# start with cleaning the surveys where we only have one variant
+mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all are mdr1:86:N or mdr1:86:Y only
+
+# split them into the type of one variant we have
+mdr1_1_n <- mdr1_1 %>% filter(variant_string == "mdr1:86:N")
+mdr1_1_y <- mdr1_1 %>% filter(variant_string == "mdr1:86:Y")
+
+# for each row in mdr1_1_n add an additional row that is the complement
+complement <- NULL
+for(i in 1:nrow(mdr1_1_n)) {
+  df <- mdr1_1_n[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:Y"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+
+# checked that sum(variants) == denom
+mdr1_1_n <- rbind(mdr1_1_n, complement) %>%
+  arrange(survey_ID, collection_day, total_num) %>%
+  mutate(prev = variant_num/total_num)
+
+# for each row in mdr1_1_y add an additional row that is the complement
+complement <- NULL
+for(i in 1:nrow(mdr1_1_y)) {
+  df <- mdr1_1_y[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:N"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+
+mdr1_1_y <- rbind(mdr1_1_y, complement) %>%
+  arrange(survey_ID, collection_day, total_num) %>%
+  mutate(prev = variant_num/total_num)
+
+mdr1_1 <- rbind(mdr1_1_n, mdr1_1_y) %>%
+  mutate(prev = variant_num / total_num) 
+
+# checked that sum(variants) == denom
+mdr1_1 %>%
+  group_by(collection_day, survey_ID, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>%
+  nrow() 
+# [1] 0
+
+# now clean those that report all three because this is another simple case
+mdr1_3 <- mdr1 %>% 
+  filter(num_variants == 3) %>%
+  group_by(collection_day, survey_ID, total_num) %>%
+  mutate(xs = sum(variant_num)) 
+
+mdr1_3_correct <- mdr1_3 %>%
+  filter(xs == total_num)
+
+# TODO: one study that still needs fixing
+
+mdr1_3 <- mdr1_3_correct
+
+# now clean those with 2 mutations
+# 3 possible iterations of 2 mutations
+# add a column that indicates which of the three classes it falls into so that we can treat them separately
+mdr1_2_groups <- mdr1_2 %>%
+  group_by(nid) %>%
+  mutate(
+    pair = unique(variant_string) |> str_c(collapse = "+"),
+    pair_simple = case_when(
+      pair %in% c("mdr1:86:N+mdr1:86:Y", "mdr1:86:Y+mdr1:86:N")   ~ "N+Y",
+      pair %in% c("mdr1:86:N+mdr1:86:N/Y", "mdr1:86:N/Y+mdr1:86:N") ~ "N+N/Y",
+      pair %in% c("mdr1:86:Y+mdr1:86:N/Y", "mdr1:86:N/Y+mdr1:86:Y") ~ "Y+N/Y",
+      TRUE                                                          ~ pair
+    )
+  ) %>%
+  ungroup() 
+
+
+mdr1_2_groups <-  mdr1_2_groups %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  mutate(correct = if_else(xs == total_num, "yes", "no"))
+
+# these rows are already correct and not missing imputation -- leave as is 
+mdr1_2_groups_correct <- mdr1_2_groups %>% filter(correct == "yes")
+
+# these are the rows that need fixing -- fix based on the classification
+mdr1_2_groups <- mdr1_2_groups %>% filter(correct == "no") 
+
+# TODO: fix these studies where sum(x) > denom 
+# I think these are data issues 
+mdr1_2_fix <- mdr1_2_groups %>% filter(xs > total_num)
+
+# split the dataframe with two unique variants into what combination of variants - M ~ mixed
+mdr1_2_NY <- mdr1_2_groups %>% filter(pair_simple == "N+Y") %>% filter(xs <= total_num)
+mdr1_2_NM <- mdr1_2_groups %>% filter(pair_simple == "N+N/Y") %>% filter(xs <= total_num)
+mdr1_2_YM <- mdr1_2_groups %>% filter(pair_simple == "Y+N/Y") %>% filter(xs <= total_num)
+
+# NM = 2 rows
+mdr1_2_NM[3,] <- mdr1_2_NM[2,]
+mdr1_2_NM[3,]$variant_num <- mdr1_2_NM[3,]$total_num - sum(mdr1_2_NM$variant_num[1:2])
+mdr1_2_NM[3,]$variant_string <- "mdr1:86:Y"
+# check that sum numerator = denominator now 
+mdr1_2_NM %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow()
+
+# now looking at N & Y
+mdr1_2_NY <- mdr1_2_NY %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(sid = cur_group_id()) %>%
+  arrange(sid)
+
+mdr1_2_NY_impute <- NULL
+for(i in 1:length(unique(mdr1_2_NY$sid))) {
+  df <- mdr1_2_NY[c((2*i)-1, 2*i),]
+  df[3,] <- df[2,]
+  df[3,]$variant_string <- "mdr1:86:N/Y"
+  df[3,]$variant_num <- df[3,]$total_num - df[3,]$xs
+  df[3,]$prev <- df[3,]$variant_num / df[3,]$total_num
+  mdr1_2_NY_impute <- rbind(df, mdr1_2_NY_impute)
+}
+mdr1_2_NY_impute %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow() # check these are all fixed
+
+mdr1_2_NY <- mdr1_2_NY_impute
+
+# now clean YM
+mdr1_2_YM <- mdr1_2_YM %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(sid = cur_group_id()) %>%
+  arrange(sid)
+
+mdr1_2_YM_impute <- NULL
+for(i in 1:length(unique(mdr1_2_YM$sid))) {
+  df <- mdr1_2_YM[c((2*i)-1, 2*i),]
+  df[3,] <- df[2,]
+  df[3,]$variant_string <- "mdr1:86:N/Y"
+  df[3,]$variant_num <- df[3,]$total_num - df[3,]$xs
+  df[3,]$prev <- df[3,]$variant_num / df[3,]$total_num
+  mdr1_2_YM_impute <- rbind(df, mdr1_2_YM_impute)
+}
+
+mdr1_2_YM_impute %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow() # check these are all fixed
+
+mdr1_2_YM <- mdr1_2_YM_impute
+
+mdr1_2 <- rbind(mdr1_2_NM,
+                mdr1_2_NY,
+                mdr1_2_YM)
+
+mdr1 <- rbind(mdr1_1,
+              mdr1_2, 
+              mdr1_3) %>%
+  select(names(master_table_simplified)) %>%
+  mutate(prev = variant_num / total_num)
+
+
+
 
 wwarn_clean <- rbind(wwarn_k13_clean, wwarn_pd_clean)
 saveRDS(wwarn_clean, "analysis/data-derived/wwarn_clean.rds")

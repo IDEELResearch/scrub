@@ -988,41 +988,7 @@ assign_ids <- function(x) {
 }
 
 # fix the sheer number of mutants we are dealing with -- combine all 86s together
-# TODO: make this a proper function with documentatin and tests
-# TODO: Neeva, you'll need to rewrite this so that the function picks up the last allele in the haplotypes 
-# use ChatGPT if you need to -- it's pretty good at string manipulation!
-standardise_mdr1_86 <- function(x) {
-  # split into 3 parts: "mdr1", positions, alleles
-  parts <- str_split_fixed(x, ":", 3)
-  # alleles for *all positions*
-  alleles_all <- parts[,3]
-  # extract only the allele block for the first position (86)
-  first_block <- str_extract(alleles_all, "^[A-Z/]+")
-  # keep only A or A/B
-  first_allele <- str_extract(first_block, "^[A-Z](?:/[A-Z])?")
-  # ----- NEW RULE: drop F if mixed -----
-  # N/F → N
-  # Y/F → Y
-  first_allele <- gsub("^N/F$", "N", first_allele)
-  first_allele <- gsub("^Y/F$", "Y", first_allele)
-  
-  # normalise N/Y ordering
-  first_allele <- ifelse(first_allele == "Y/N", "N/Y", first_allele)
-  
-  paste0("mdr1:86:", first_allele)
-}
-
-# TODO: test the function more thoroughly
-# test this function
-standardise_mdr1_86("mdr1:86:N")
-# "mdr1:86:N"
-standardise_mdr1_86("mdr1:86:Y/N")
-# "mdr1:86:N/Y"
-standardise_mdr1_86("mdr1:86_184_1246:N_Y_D")
-# "mdr1:86:N"
-standardise_mdr1_86("mdr1:86_184:Y/F_N")
-# "mdr1:86:Y" 
-
+# TODO: Neeva -- you will need to write a custom 76 version (if I haven't doneso already)
 # current approach:
 # convert full variant strings into simplified version focused on codon 86
 # group by study info and 86 variant, num = sum(variant_num), denom = unique(total_num) if there is only one unique value
