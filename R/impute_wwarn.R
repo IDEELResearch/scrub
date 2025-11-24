@@ -35,7 +35,36 @@ extract_from_entry <- function(entry) {
 #' @details
 #' 
 #' This function adds additional rows to the dataframe. It keeps all column variables 
-#' the same except for x and mut.
+#' the same except for x and mut. This is a version of the function to be used in cleaning scripts
+#' There is a different version of this used in the imputation hence the different names
+#' TODO: get these aligned but most important for now that this works
+#' @name add_a_row_k13_clean
+#' @export
+#' 
+#' @param df WWARN dataframe that you want to add a row to. 
+#' Note: this will probably be a specific survey
+#' @param x_new The value of x in the new row. For imputing wild type, x_new == n
+#' @param mut_new The value of mut in the new row. For imputing wild type, these are the 
+#' WT encodings for codons not detected in the survey
+
+add_a_row_k13_clean <- function(df, x_new, mut_new) {
+  rows <- nrow(df) 
+  df <- df %>%
+    dplyr::bind_rows(df[1, ])
+  df$x[rows+1] <- x_new
+  df$mut[rows+1] <- gene_mut_new
+  df$prev <- df$x/df$n
+  return(df)
+}
+
+#' Add a row to dataframe with all the same info except x and mut
+#' 
+#' @details
+#' 
+#' This function adds additional rows to the dataframe. It keeps all column variables 
+#' the same except for x and mut. This version of the function is for the imputation scripts 
+#' and functions specifically
+#' 
 #' @name add_a_row_k13
 #' @export
 #' 
