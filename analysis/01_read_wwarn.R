@@ -1484,6 +1484,7 @@ pdmdr1 %>% pull(mut) %>% unique()
 #  [10,] "pfmdr1 YYY" : the same as"pfmdr1 86Y" # KEEP but ensure no duplicates with 86Y -> EH
 #  [11,] "pfmdr1 NFD" : the same as"pfmdr1 N86" # KEEP but ensure no duplicates with N86
 
+# check all of the imputations here are complete
 # filter out those that do not report codon 86
 pdmdr1 <- pdmdr1 %>%
   filter(grepl("N|Y|86", mut)) %>%
