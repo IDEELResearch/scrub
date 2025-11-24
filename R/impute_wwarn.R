@@ -112,6 +112,8 @@ impute_survey <- function(survey_df, impute_markers) {
     stop("Classification not eligible for imputation")
   }
   
+  denom <- round(mean(survey_df$n), digits = 0)
+  
   if(classification == "validated") {
     mutations <- survey_df$mut[survey_df$mut != "WT"]
     survey_mut <- unlist(lapply(mutations, extract_from_entry))
@@ -119,9 +121,10 @@ impute_survey <- function(survey_df, impute_markers) {
       dplyr::filter((codon %in% survey_mut) == FALSE) |>
       dplyr::pull(gene_mut) |>
       unique()
+    
     if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
-        survey_df <- add_a_row_k13(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+        survey_df <- add_a_row_k13(survey_df, x_new = denom, gene_mut_new = survey_imputation[i])
       }
     }
   } else {
@@ -135,7 +138,7 @@ impute_survey <- function(survey_df, impute_markers) {
       unique()
     if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
-        survey_df <- add_a_row_k13(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+        survey_df <- add_a_row_k13(survey_df, x_new = denom, gene_mut_new = survey_imputation[i])
       }
     }
   }

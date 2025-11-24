@@ -33,7 +33,6 @@ wwarn <- wwarn_data %>%
   dplyr::mutate(study_start_year = if_else(is.na(study_start_year),
                                          as.numeric(year), study_start_year)) %>%
   # fix the years on this study
-  # TODO: find the correct values for the years
   # dplyr::mutate(study_start_year = if_else(study_start_year == 1, 2001, study_start_year))
   dplyr::filter(study_end_year != 3) %>% 
   dplyr::rename(first_author_surname = source) %>%
