@@ -134,7 +134,7 @@ k13wwdf <- bind_rows(
 # before doing manual cleaning - one study corresponds to many of the issues
 # Gina has this data on her laptop but it is in .gitignore as already published
 # Victor Asua's paper, PMID 33146722, supplement 3
-# df <- readxl::read_excel("analysis/data-raw/asua.xlsx") %>% janitor::clean_names()
+df <- readxl::read_excel("analysis/data-raw/asua.xlsx") %>% janitor::clean_names()
 df <- df %>% 
   filter(gene_name == "k13") %>% 
   filter(!(grepl("fs", mutation_name))) # remove frame shift
@@ -497,8 +497,7 @@ k13wwdf_lfix$`648`$prev <- k13wwdf_lfix$`648`$x/k13wwdf_lfix$`648`$n
 # pmid 29582728 nid 458 and 466
 # updated the function to prevent some issues
 # TODO: check that these changes don't break anything in other scripts etc. 
-k13wwdf_lfix$`458` <- add_a_row_k13_clean(k13wwdf_lfix$`458`, 1,
-                                "A676V")
+k13wwdf_lfix$`458` <- add_a_row_k13_clean(k13wwdf_lfix$`458`, 1, "A676V")
 
 # nid 466 n is wrong, missing mutations and ones extracted are also wrong...
 kisumu_cols <- data.frame(

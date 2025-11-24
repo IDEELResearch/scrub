@@ -52,7 +52,7 @@ add_a_row_k13_clean <- function(df, x_new, mut_new) {
   df <- df %>%
     dplyr::bind_rows(df[1, ])
   df$x[rows+1] <- x_new
-  df$mut[rows+1] <- gene_mut_new
+  df$mut[rows+1] <- mut_new
   df$prev <- df$x/df$n
   return(df)
 }
