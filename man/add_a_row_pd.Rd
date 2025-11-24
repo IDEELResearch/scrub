@@ -20,5 +20,6 @@ Add a row to dataframe with all the same info except x and mut
 }
 \details{
 This function adds additional rows to the dataframe.
-It keeps all column variables the same except for x and mut.
+It keeps all column variables
+the same except for x and mut.
 }
