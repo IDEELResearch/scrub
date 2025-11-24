@@ -1680,7 +1680,6 @@ pdmdr1spl5fixed <- do.call(rbind, pdmdr1spl5fix) %>%
   select(names(pdmdr1spl5correct)) 
 pdmdr1spl5 <- rbind(pdmdr1spl5correct, pdmdr1spl5fixed) # omitted removed, pmids fixed and combined with those correct
 
-# TODO: update so that we impute all of the studies at once
 complement <- NULL
 for(i in 1:nrow(pdmdr1spl5)) {
   df <- pdmdr1spl5[i,]
