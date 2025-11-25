@@ -3,6 +3,7 @@ library(tidyverse)
 library(lubridate)
 library(here)
 library(purrr)
+library(stringr)
 devtools::load_all()
 
 ################################################################################
@@ -956,6 +957,559 @@ if (nrow(missing_summary) > 0) {
 
 cat(paste(rep("=", 60), collapse = ""), "\n\n")
 
+# 13. Step 13: Inferring the complement for partner drugs # ------------------------------
+# 13a. Starting with mdr1
+
+# first split the dataframes so that I don't break the k13 which is working fine
+gene_keep <- master_table_simplified %>% 
+  filter(!(gene %in% c("mdr1", "crt")))
+
+gene_simplified <- master_table_simplified %>% 
+  filter(gene %in% c("mdr1", "crt")) %>%
+  split(.$gene)
+
+# need to filter out rows that don't contant mdr1 86 at all
+gene_simplified$mdr1 <- gene_simplified$mdr1 %>%
+  filter(grepl("^mdr1:[^:]*86[^:]*:", variant_string)) %>%
+  dplyr::filter(variant_string != "mdr1:86:F")
+
+mdr1_original <- gene_simplified$mdr1
+
+# fix the sheer number of mutants we are dealing with -- combine all 86s together
+# current approach:
+# convert full variant strings into simplified version focused on codon 86
+# group by study info and 86 variant, num = sum(variant_num), denom = unique(total_num) if there is only one unique value
+# clean based on the length of unique(86_string)
+
+# checked that the length of the denominator is always 1 when we group by nid
+# mdr1 %>%
+# mutate(string_86 = standardise_mdr1_86(variant_string)) %>% 
+# filter(string_86 != "mdr1:86:F") %>%
+# group_by(survey_ID, collection_day, nid, string_86) %>%
+# mutate(denom = length(unique(total_num))) %>%
+# filter(denom > 1) %>% View()
+# mutate(x = sum(variant_num), n = unique(total_num))
+
+# make the original easier to examine and add ids to the
+mdr1_surveys <- mdr1_original %>%
+  pull(survey_ID) %>% unique() %>% length()
+
+# some issues with different ns in different rows -- these need manual fixing
+# find these studies: same survey ID and different total_num
+# mdr1_fix -- these have been sent to Neeva to manually exmaine
+mdr1_fix <- mdr1_original %>%
+  dplyr::group_by(survey_ID, collection_day) %>%
+  mutate(n = length(unique(total_num))) %>%
+  filter(n > 1) %>%
+  arrange(survey_ID, total_num) %>%
+  split(.$study_name)
+
+# fix these and add them back into the cleaning
+# keep the bottom row -- impute the others
+mdr1_fix$geoff_S0036Schreidah <- mdr1_fix$geoff_S0036Schreidah[3,]
+
+# keep bottom 3 rows
+mdr1_fix$geoff_S0062Vonwowern2024 <- mdr1_fix$geoff_S0062Vonwowern2024[4:6,]
+
+# Plucinski needs new entries
+mdr1_fix$geoff_S0101Plucinski2017 <- mdr1_fix$geoff_S0101Plucinski2017 %>%
+  distinct(site_name, collection_day, total_num, .keep_all = TRUE) %>%
+  mutate(variant_string = "mdr1:86:N") %>%
+  ungroup() %>%
+  mutate(variant_num = c(1, 13, 9, 22)) %>% 
+  mutate(prev = variant_num / total_num)
+
+# fix incorrect denominator
+mdr1_fix$geoff_S0115Tuedomagb2021$total_num <- 739
+mdr1_fix$geoff_S0115Tuedomagb2021$prev <- mdr1_fix$geoff_S0115Tuedomagb2021$variant_num / 
+  mdr1_fix$geoff_S0115Tuedomagb2021$total_num
+
+# drop
+mdr1_fix$geoff_S0177Hussien2020 <- NULL
+
+# keep specific entries
+mdr1_fix$geoff_S0204Nibaptn2023 <- mdr1_fix$geoff_S0204Nibaptn2023 %>%
+  filter(variant_string == "mdr1:86:Y") # these are the correct rows
+
+mdr1_fix <- do.call(rbind, mdr1_fix) # removed 34 rows
+
+# make a dataset with the manual fixes combined
+mdr1 <- mdr1_original %>% 
+  mutate(variant_string = standardise_mdr1_86(variant_string)) %>% 
+  filter(variant_string != "mdr1:86:F") %>%
+  dplyr::group_by(survey_ID, collection_day) %>%
+  mutate(n = length(unique(total_num))) %>%
+  filter(n == 1) %>% # exclude surveys with different Ns
+  ungroup() %>%
+  rbind(mdr1_fix) %>% # add back in the surveys that we fixed
+  group_by(survey_ID, collection_day, total_num, variant_string) %>%
+  mutate(variant_num = sum(variant_num),
+         total_num = unique(total_num)) %>%
+  ungroup() %>%
+  distinct(survey_ID, collection_day, total_num, variant_string,.keep_all = TRUE) %>% 
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(num_variants = n())
+
+# check we haven't lost any surveys
+# lost one survey somewhere...
+(mdr1 %>% pull(survey_ID) %>% unique() %>% length()) == mdr1_surveys
+unique(mdr1_original$survey_ID)[which((unique(mdr1_original$survey_ID) %in% unique(mdr1$survey_ID)) == FALSE)]
+
+# remove whole study and fix
+mdr1 <- mdr1 %>% filter(study_ID != "geoff_S0177Hussien2020")
+
+# fix Hussein study
+hussein <- mdr1_original %>% 
+  filter(study_ID == "geoff_S0177Hussien2020") %>% 
+  split(.$survey_ID)
+
+# Gezira
+hussein$geoff_S0177Hussien2020_Gezira_2015 <- 
+  hussein$geoff_S0177Hussien2020_Gezira_2015[1,] %>%
+  bind_rows(hussein$geoff_S0177Hussien2020_Gezira_2015[1,])
+hussein$geoff_S0177Hussien2020_Gezira_2015$variant_string <- c("mdr1:86:N",
+                                                               "mdr1:86:Y")
+hussein$geoff_S0177Hussien2020_Gezira_2015$variant_num <- c(13, 9)
+hussein$geoff_S0177Hussien2020_Gezira_2015$total_num <- c(21, 21)
+hussein$geoff_S0177Hussien2020_Gezira_2015$prev <- 
+  hussein$geoff_S0177Hussien2020_Gezira_2015$variant_num / 
+  hussein$geoff_S0177Hussien2020_Gezira_2015$total_num
+
+# Khartorum
+hussein$geoff_S0177Hussien2020_Khartorum_2015 <- 
+  hussein$geoff_S0177Hussien2020_Khartorum_2015 [1,] %>%
+  bind_rows(hussein$geoff_S0177Hussien2020_Khartorum_2015 [1,])
+hussein$geoff_S0177Hussien2020_Khartorum_2015$variant_string <- c("mdr1:86:N",
+                                                               "mdr1:86:Y")
+hussein$geoff_S0177Hussien2020_Khartorum_2015$variant_num <- c(60, 79)
+hussein$geoff_S0177Hussien2020_Khartorum_2015$total_num <- c(139, 139)
+hussein$geoff_S0177Hussien2020_Khartorum_2015$prev <- 
+  hussein$geoff_S0177Hussien2020_Khartorum_2015$variant_num / 
+  hussein$geoff_S0177Hussien2020_Khartorum_2015$total_num
+
+# New Halfa
+hussein$geoff_S0177Hussien2020_NewHalfa_2015 <- 
+  hussein$geoff_S0177Hussien2020_NewHalfa_2015[1,] %>%
+  bind_rows(hussein$geoff_S0177Hussien2020_NewHalfa_2015[1,])
+hussein$geoff_S0177Hussien2020_NewHalfa_2015$variant_string <- c("mdr1:86:N",
+                                                                  "mdr1:86:Y")
+hussein$geoff_S0177Hussien2020_NewHalfa_2015$variant_num <- c(14, 12)
+hussein$geoff_S0177Hussien2020_NewHalfa_2015$total_num <- c(26, 26)
+hussein$geoff_S0177Hussien2020_NewHalfa_2015$prev <- 
+  hussein$geoff_S0177Hussien2020_NewHalfa_2015$variant_num / 
+  hussein$geoff_S0177Hussien2020_NewHalfa_2015$total_num
+
+# North Kordofan
+hussein$geoff_S0177Hussien2020_NorthKordofan_2015 <- 
+  hussein$geoff_S0177Hussien2020_NorthKordofan_2015 [1,] %>%
+  bind_rows(hussein$geoff_S0177Hussien2020_NorthKordofan_2015 [1,])
+hussein$geoff_S0177Hussien2020_NorthKordofan_2015$variant_string <- c("mdr1:86:N",
+                                                                   "mdr1:86:Y")
+hussein$geoff_S0177Hussien2020_NorthKordofan_2015$variant_num <- c(3, 5)
+hussein$geoff_S0177Hussien2020_NorthKordofan_2015$total_num <- c(8, 8)
+hussein$geoff_S0177Hussien2020_NorthKordofan_2015$prev <- 
+  hussein$geoff_S0177Hussien2020_NorthKordofan_2015$variant_num / 
+  hussein$geoff_S0177Hussien2020_NorthKordofan_2015$total_num
+
+hussein <- rbind(hussein$geoff_S0177Hussien2020_Gezira_2015,
+                 hussein$geoff_S0177Hussien2020_Khartorum_2015,
+                 hussein$geoff_S0177Hussien2020_NewHalfa_2015,
+                 hussein$geoff_S0177Hussien2020_NorthKordofan_2015) %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(num_variants = n())
+
+# add Hussein back to mdr1 -- explicitly filtered this study out
+mdr1 <- rbind(mdr1, hussein)
+# length(unique(mdr1$survey_ID)) == mdr1_surveys [1] TRUE
+
+# split by the number of variants in the survey
+mdr1_1 <- mdr1 %>% filter(num_variants == 1)
+mdr1_2 <- mdr1 %>% filter(num_variants == 2)
+mdr1_3 <- mdr1 %>% filter(num_variants == 3)
+
+# start with cleaning the surveys where we only have one variant
+mdr1_1 %>% group_by(variant_string) %>% summarise(n = n()) # all are mdr1:86:N or mdr1:86:Y only
+
+# split them into the type of one variant we have
+mdr1_1_n <- mdr1_1 %>% filter(variant_string == "mdr1:86:N")
+mdr1_1_y <- mdr1_1 %>% filter(variant_string == "mdr1:86:Y")
+
+# for each row in mdr1_1_n add an additional row that is the complement
+complement <- NULL
+for(i in 1:nrow(mdr1_1_n)) {
+  df <- mdr1_1_n[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:Y"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+
+# checked that sum(variants) == denom
+mdr1_1_n <- rbind(mdr1_1_n, complement) %>%
+  arrange(survey_ID, collection_day, total_num) %>%
+  mutate(prev = variant_num/total_num)
+
+# for each row in mdr1_1_y add an additional row that is the complement
+complement <- NULL
+for(i in 1:nrow(mdr1_1_y)) {
+  df <- mdr1_1_y[i,]
+  df$variant_num <- df$total_num - df$variant_num
+  df$variant_string <- "mdr1:86:N"
+  df$prev <- df$variant_num / df$total_num
+  complement <- rbind(complement, df)
+}
+
+mdr1_1_y <- rbind(mdr1_1_y, complement) %>%
+  arrange(survey_ID, collection_day, total_num) %>%
+  mutate(prev = variant_num/total_num)
+
+mdr1_1 <- rbind(mdr1_1_n, mdr1_1_y) %>%
+  mutate(prev = variant_num / total_num) 
+
+# checked that sum(variants) == denom
+mdr1_1 %>%
+  group_by(collection_day, survey_ID, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>%
+  nrow() 
+# [1] 0
+
+# now clean those that report all three because this is another simple case
+mdr1_3 <- mdr1 %>% 
+  filter(num_variants == 3) %>%
+  group_by(collection_day, survey_ID, total_num) %>%
+  mutate(xs = sum(variant_num)) 
+
+mdr1_3_correct <- mdr1_3 %>%
+  filter(xs == total_num)
+
+plucinski <- mdr1_3 %>%
+  filter(xs != total_num) %>%
+  mutate(total_num = 18) %>%
+  mutate(prev = variant_num / total_num)
+
+mdr1_3 <- rbind(plucinski, mdr1_3_correct)
+
+# now clean those with 2 mutations
+# 3 possible iterations of 2 mutations
+# add a column that indicates which of the three classes it falls into so that we can treat them separately
+mdr1_2_groups <- mdr1_2 %>%
+  group_by(survey_ID, collection_day) %>%
+  mutate(
+    pair = unique(variant_string) |> str_c(collapse = "+"),
+    pair_simple = case_when(
+      pair %in% c("mdr1:86:N+mdr1:86:Y", "mdr1:86:Y+mdr1:86:N")   ~ "N+Y",
+      pair %in% c("mdr1:86:N+mdr1:86:N/Y", "mdr1:86:N/Y+mdr1:86:N") ~ "N+N/Y",
+      pair %in% c("mdr1:86:Y+mdr1:86:N/Y", "mdr1:86:N/Y+mdr1:86:Y") ~ "Y+N/Y",
+      TRUE                                                          ~ pair
+    )
+  ) %>%
+  ungroup() 
+
+
+mdr1_2_groups <-  mdr1_2_groups %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  mutate(correct = if_else(xs == total_num, "yes", "no"))
+
+# these rows are already correct and not missing imputation -- leave as is 
+mdr1_2_groups_correct <- mdr1_2_groups %>% filter(correct == "yes")
+  
+# these are the rows that need fixing -- fix based on the classification
+mdr1_2_groups <- mdr1_2_groups %>% filter(correct == "no") 
+  
+# I think these are data issues 
+mdr1_2_fix <- mdr1_2_groups %>% filter(xs > total_num)
+
+# split the dataframe with two unique variants into what combination of variants - M ~ mixed
+mdr1_2_NY <- mdr1_2_groups %>% filter(pair_simple == "N+Y") %>% filter(xs <= total_num)
+mdr1_2_NM <- mdr1_2_groups %>% filter(pair_simple == "N+N/Y") %>% filter(xs <= total_num)
+mdr1_2_YM <- mdr1_2_groups %>% filter(pair_simple == "Y+N/Y") %>% filter(xs <= total_num)
+
+# NM = 2 rows
+mdr1_2_NM[3,] <- mdr1_2_NM[2,]
+mdr1_2_NM[3,]$variant_num <- mdr1_2_NM[3,]$total_num - sum(mdr1_2_NM$variant_num[1:2])
+mdr1_2_NM[3,]$variant_string <- "mdr1:86:Y"
+# check that sum numerator = denominator now 
+mdr1_2_NM %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow()
+
+# now looking at N & Y
+mdr1_2_NY <- mdr1_2_NY %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(sid = cur_group_id()) %>%
+  arrange(sid)
+
+mdr1_2_NY_impute <- NULL
+for(i in 1:length(unique(mdr1_2_NY$sid))) {
+  df <- mdr1_2_NY[c((2*i)-1, 2*i),]
+  df[3,] <- df[2,]
+  df[3,]$variant_string <- "mdr1:86:N/Y"
+  df[3,]$variant_num <- df[3,]$total_num - df[3,]$xs
+  df[3,]$prev <- df[3,]$variant_num / df[3,]$total_num
+  mdr1_2_NY_impute <- rbind(df, mdr1_2_NY_impute)
+}
+mdr1_2_NY_impute %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow() # check these are all fixed
+
+mdr1_2_NY <- mdr1_2_NY_impute
+
+# now clean YM
+mdr1_2_YM <- mdr1_2_YM %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(sid = cur_group_id()) %>%
+  arrange(sid)
+
+mdr1_2_YM_impute <- NULL
+for(i in 1:length(unique(mdr1_2_YM$sid))) {
+  df <- mdr1_2_YM[c((2*i)-1, 2*i),]
+  df[3,] <- df[2,]
+  df[3,]$variant_string <- "mdr1:86:N/Y"
+  df[3,]$variant_num <- df[3,]$total_num - df[3,]$xs
+  df[3,]$prev <- df[3,]$variant_num / df[3,]$total_num
+  mdr1_2_YM_impute <- rbind(df, mdr1_2_YM_impute)
+}
+
+mdr1_2_YM_impute %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  filter(xs != total_num) %>% nrow() # check these are all fixed
+
+mdr1_2_YM <- mdr1_2_YM_impute
+
+mdr1_2 <- rbind(mdr1_2_NM,
+                mdr1_2_NY,
+                mdr1_2_YM)
+
+mdr1 <- rbind(mdr1_1,
+              mdr1_2, 
+              mdr1_3) %>%
+  select(names(master_table_simplified)) %>%
+  mutate(prev = variant_num / total_num)
+
+# 13b. Now clean the crt # ----------------------------
+# remove all those that don't report the 76 codon
+crt <- gene_simplified$crt %>%
+  filter(str_detect(variant_string, "(^|_|:)76($|_|:)"))
+# check how many surveys so we can be sure that we don't lose any in cleaning
+length(unique(crt$survey_ID))
+
+# check how many have multiple entries i.e. genotype and haplotype
+crt_dup <- crt %>%
+  mutate(simplified_76 = extract_crt_76(x = variant_string)) %>%
+  group_by(survey_ID, collection_day, simplified_76) %>%
+  mutate(n = n()) %>%
+  filter(n > 1)
+
+# only 9 studies
+dup_studies <- unique(crt_dup$study_ID)
+
+# Manually fix the studies with both genotype and haplotype based on the investigations #--------------
+# Details found here: https://docs.google.com/spreadsheets/d/1ukWM58l_rvHlHnTMdDzzxv1T8dDGPHbSzumFVrT_FYw/edit?gid=1798560774#gid=1798560774
+
+# what I sent Neeva to fix
+crt_fix <- crt %>% 
+  filter(study_ID %in% dup_studies) %>% 
+  split(.$study_ID)
+
+# keep only the rows with variant_string = 76T based on looking at data
+crt_fix$geoff_S0050Davlantes <- 
+  crt_fix$geoff_S0050Davlantes %>%
+  filter(variant_string == "crt:76:T")
+
+crt_fix$geoff_S0113Mbenda2016 <- crt_fix$geoff_S0113Mbenda2016 %>%
+  mutate(variant_string = extract_crt_76(variant_string)) %>%
+  group_by(variant_string) %>% 
+  mutate(variant_num = sum(variant_num)) %>%
+  mutate(prev = variant_num / total_num) %>%
+  distinct(.keep_all = TRUE) 
+
+# keep rows that are explicit genotypes
+crt_fix$geoff_S0120Yobi2020 <- crt_fix$geoff_S0120Yobi2020 %>%
+  filter(variant_string == "crt:76:T")
+
+crt_fix$geoff_S0129Woldearegai2019 <- crt_fix$geoff_S0129Woldearegai2019 %>%
+  filter(variant_string == "crt:76:T")
+
+crt_fix$geoff_S0130Nguyen2019 <- 
+  crt_fix$geoff_S0130Nguyen2019 %>% 
+  distinct(survey_ID, .keep_all = TRUE) %>%
+  mutate(variant_string = "crt:76:T",
+         variant_num = c(88, 71),
+         total_num = c(109, 108),
+         prev = variant_num / total_num) 
+
+crt_fix$geoff_S0194Kassaza2021 <- 
+  crt_fix$geoff_S0194Kassaza2021[1,] %>%
+  mutate(variant_string = "crt:76:T",
+         variant_num = 51,
+         total_num = 111,
+         prev = variant_num / total_num)
+
+crt_fix$geoff_S0204Nibaptn2023 <- 
+  crt_fix$geoff_S0204Nibaptn2023 %>%
+  filter(variant_string == "crt:76:T")
+
+crt_fix$geoff_S215Wade2025 <- 
+  crt_fix$geoff_S215Wade2025 %>%
+  filter(variant_string == "crt:76:T")
+
+crt_fix$geoff_S219Amusan2024 <- 
+  crt_fix$geoff_S219Amusan2024 %>%
+  filter(variant_string == "crt:76:T")
+
+crt_fix <- rbind(crt_fix$geoff_S0050Davlantes,
+                 crt_fix$geoff_S0113Mbenda2016,
+                 crt_fix$geoff_S0120Yobi2020,
+                 crt_fix$geoff_S0129Woldearegai2019,
+                 crt_fix$geoff_S0130Nguyen2019,
+                 crt_fix$geoff_S0194Kassaza2021,
+                 crt_fix$geoff_S0204Nibaptn2023,
+                 crt_fix$geoff_S215Wade2025,
+                 crt_fix$geoff_S219Amusan2024)
+
+# add these back into the other data to do the final checks and cleans
+crt_non_dup <- crt %>%
+  filter(!(study_ID %in% dup_studies)) %>%
+  select(names(crt_fix))
+
+# some of the identified studies had additional surveys missing crt mutants
+# hence some additional surveys
+
+crt <- rbind(crt_fix, crt_non_dup)
+
+# add the numbers of mutants in each survey and fix any errors
+crt <- crt %>%
+  mutate(variant_string = extract_crt_76(variant_string)) %>% 
+  dplyr::group_by(survey_ID, collection_day) %>%
+  group_by(survey_ID, collection_day, total_num, variant_string) %>%
+  mutate(variant_num = sum(variant_num),
+         total_num = unique(total_num)) %>%
+  ungroup() %>%
+  distinct(survey_ID, collection_day, total_num, variant_string,.keep_all = TRUE) %>% 
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(num_variants = n())
+
+# split by num variants
+table(crt$num_variants)
+crt_1 <- crt %>% filter(num_variants == 1)
+crt_2 <- crt %>% filter(num_variants == 2)
+crt_3 <- crt %>% filter(num_variants == 3)
+
+# where 1 variant, stave can handle this as long within standard cases
+# check variant_num vs total_num
+crt_1 %>% filter(variant_num > total_num) # none which is good
+
+crt_1 %>% filter(variant_num < total_num) %>%
+  group_by(variant_string) %>% summarise(n = n())
+
+# these ones don't need fixing
+crt_1_correct <- crt_1 %>% filter(variant_num == total_num)
+crt_1_mut <- (crt_1 %>% filter(variant_num < total_num) %>% filter(variant_string == "crt:76:T"))
+
+# fix the two studies where variant is WT
+crt_1_wt <- crt_1 %>% filter(variant_num < total_num) %>% 
+  filter(variant_string != "crt:76:T") %>%
+  split(.$study_ID)
+
+# Ebel - 2018 - Table S3	Count	Mutant Freq
+# 76T	27	0.707
+# K76	10	
+# mixed	2	
+
+crt_1_wt$geoff_S0103Ebel2021 <- crt_1_wt$geoff_S0103Ebel2021 %>%
+  bind_rows(crt_1_wt$geoff_S0103Ebel2021, crt_1_wt$geoff_S0103Ebel2021)
+crt_1_wt$geoff_S0103Ebel2021$variant_string <- c("crt:76:T",
+                                                 "crt:76:K",
+                                                 "crt:76:K/T")
+crt_1_wt$geoff_S0103Ebel2021$variant_num <- c(27, 10, 2)
+crt_1_wt$geoff_S0103Ebel2021$prev <- crt_1_wt$geoff_S0103Ebel2021$variant_num / 
+  crt_1_wt$geoff_S0103Ebel2021$total_num
+
+# looks correct -- just missing the mutant
+crt_1_wt$geoff_S0134Narh2020 <- crt_1_wt$geoff_S0134Narh2020 %>%
+  bind_rows(crt_1_wt$geoff_S0134Narh2020)
+
+crt_1_wt$geoff_S0134Narh2020$variant_num[2] <- crt_1_wt$geoff_S0134Narh2020$total_num[1] - 
+  crt_1_wt$geoff_S0134Narh2020$variant_num[1]
+crt_1_wt$geoff_S0134Narh2020$variant_string <- c("crt:76:K",
+                                                 "crt:76:T")
+
+crt_1_wt$geoff_S0134Narh2020$prev <- crt_1_wt$geoff_S0134Narh2020$variant_num / 
+  crt_1_wt$geoff_S0134Narh2020$total_num
+
+crt_1_wt <- do.call(rbind, crt_1_wt)
+# duels are due to survey_ID being non-unique across collection dates for Seans MIPs
+length(unique(c(crt_1_wt$survey_ID,
+                crt_1_correct$survey_ID,
+                crt_1_mut$survey_ID))) == length(unique(crt_1$survey_ID))
+
+# combine these back together
+crt_1 <- rbind(crt_1_wt, crt_1_correct, crt_1_mut)
+
+# now clean those with 2 mutations
+# 3 possible iterations of 2 mutations
+# add a column that indicates which of the three classes it falls into so that we can treat them separately
+crt_2_groups <- crt_2 %>%
+  group_by(survey_ID, collection_day) %>%
+  mutate(
+    pair = unique(variant_string) |> str_c(collapse = "+"),
+    pair_simple = case_when(
+      pair %in% c("crt:76:K+crt:76:T", "crt:76:T+crt:76:K")   ~ "K+T",
+      pair %in% c("crt:76:K+crt:76:K/T", "crt:76:K/T+crt:76:K") ~ "K+K/T",
+      pair %in% c("crt:76:T+crt:76:K/T", "crt:76:K/T+crt:76:T") ~ "T+K/T",
+      pair %in% c("crt:76:T+crt:76:T/K", "crt:76:T/K+crt:76:T") ~ "T+K/T",
+      TRUE                                                          ~ pair
+    )
+  ) %>%
+  ungroup() 
+
+crt_2_groups <-  crt_2_groups %>%
+  group_by(survey_ID, collection_day, total_num) %>%
+  mutate(xs = sum(variant_num)) %>%
+  mutate(correct = if_else(xs == total_num, "yes", "no"))
+
+table(crt_2_groups$correct)
+
+# most no -- fix these
+# check the break down of these -- don't want to fix if it is mutant + mixed
+crt_2_groups %>% filter(correct == "no") %>%
+  pull(pair_simple) %>% table()
+ 
+# fix these 6 rows where we have correct = no and K+T mutants
+# crt_2_groups %>% 
+#   filter(correct == "no") %>% 
+#   filter(pair_simple == "K+T") %>% View()
+
+crt_2 <- crt_2_groups %>% 
+  filter(study_ID != "geoff_S0053Issa")
+
+nrow(crt_2) == (nrow(crt_2_groups) - 6)
+
+# now look at when all three have been reported
+crt_3 <- crt %>% 
+  filter(num_variants == 3) %>%
+  group_by(collection_day, survey_ID, total_num) %>%
+  mutate(xs = sum(variant_num)) 
+
+crt_3 %>%
+  filter(xs != total_num) %>%
+  nrow()
+# if all three are reported they are correct so no cleaning required
+
+crt <- rbind(crt_1, 
+             crt_2, 
+             crt_3) %>%
+  select(names(mdr1))
+
+
+gene_keep <- rbind(gene_keep, mdr1, crt) 
+
 # Save the cleaned and formatted data
-saveRDS(master_table_simplified, here("analysis", "data-derived", "geoff_clean.rds"))
+saveRDS(gene_keep, here("analysis", "data-derived", "geoff_clean.rds"))
 saveRDS(master_table_formatted, here("analysis", "data-derived", "geoff_clean_complete.rds"))
+

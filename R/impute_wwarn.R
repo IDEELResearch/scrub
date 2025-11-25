@@ -35,7 +35,36 @@ extract_from_entry <- function(entry) {
 #' @details
 #' 
 #' This function adds additional rows to the dataframe. It keeps all column variables 
-#' the same except for x and mut.
+#' the same except for x and mut. This is a version of the function to be used in cleaning scripts
+#' There is a different version of this used in the imputation hence the different names
+#' TODO: get these aligned but most important for now that this works
+#' @name add_a_row_k13_clean
+#' @export
+#' 
+#' @param df WWARN dataframe that you want to add a row to. 
+#' Note: this will probably be a specific survey
+#' @param x_new The value of x in the new row. For imputing wild type, x_new == n
+#' @param mut_new The value of mut in the new row. For imputing wild type, these are the 
+#' WT encodings for codons not detected in the survey
+
+add_a_row_k13_clean <- function(df, x_new, mut_new) {
+  rows <- nrow(df) 
+  df <- df %>%
+    dplyr::bind_rows(df[1, ])
+  df$x[rows+1] <- x_new
+  df$mut[rows+1] <- mut_new
+  df$prev <- df$x/df$n
+  return(df)
+}
+
+#' Add a row to dataframe with all the same info except x and mut
+#' 
+#' @details
+#' 
+#' This function adds additional rows to the dataframe. It keeps all column variables 
+#' the same except for x and mut. This version of the function is for the imputation scripts 
+#' and functions specifically
+#' 
 #' @name add_a_row_k13
 #' @export
 #' 
@@ -112,6 +141,8 @@ impute_survey <- function(survey_df, impute_markers) {
     stop("Classification not eligible for imputation")
   }
   
+  denom <- round(mean(survey_df$n), digits = 0)
+  
   if(classification == "validated") {
     mutations <- survey_df$mut[survey_df$mut != "WT"]
     survey_mut <- unlist(lapply(mutations, extract_from_entry))
@@ -119,9 +150,10 @@ impute_survey <- function(survey_df, impute_markers) {
       dplyr::filter((codon %in% survey_mut) == FALSE) |>
       dplyr::pull(gene_mut) |>
       unique()
+    
     if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
-        survey_df <- add_a_row_k13(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+        survey_df <- add_a_row_k13(survey_df, x_new = denom, gene_mut_new = survey_imputation[i])
       }
     }
   } else {
@@ -135,7 +167,7 @@ impute_survey <- function(survey_df, impute_markers) {
       unique()
     if(length(survey_imputation) > 0) {
       for(i in 1:length(survey_imputation)) {
-        survey_df <- add_a_row_k13(survey_df, x_new = survey_df$n[1], gene_mut_new = survey_imputation[i])
+        survey_df <- add_a_row_k13(survey_df, x_new = denom, gene_mut_new = survey_imputation[i])
       }
     }
   }
@@ -228,4 +260,3 @@ impute_study <- function(study_df) {
   }
   return(surveys)
 }
-

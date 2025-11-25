@@ -132,15 +132,12 @@ k13wwdf <- bind_rows(
 # ---------------------------------------------------- o
 
 # before doing manual cleaning - one study corresponds to many of the issues
-# fails for Gina so commenting out for now
-# TODO: make sure this is in the PR
-# TODO: this file link is no longer valid
-# tf <- tempfile()
-# download.file("https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/jid/223/6/10.1093_infdis_jiaa687/1/jiaa687_suppl_supplementary_table_s3.xlsx?Expires=1754388885&Signature=i-ki9C7vUcYnDdPkAlDSIOVJX11um~Pxsz2OCQzaVJEq0cdW6tJN~QPLUOtQLs1aKX5Briv~xeZGvJ5QqKch08Ax5pNhO--K27-cp~XuXQYqMtSLLsgQN3bYKI75-HQWIIqQHRpCYxwjB8QcbRYt9BR~IbdW3f4fyi-56FiYjno0CA-Qim3k9FCwqZ3UAm8VLgngVNhJl5AfQPxcUFj0B0gMpIy6isT6Gjh0PxhQQytmIvlBu94ClDiBlWkQURw2y2K3N4nJHT9hbwTafJPy2O4E2yb0p7~93QCq7hx~0AT7G~7QSPOxBLXGORapXmkyDweBR3-YUBc-fSnFevQ1eQ__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA", tf)
-# 
-# # clean up and create our correct table
-# df <- readxl::read_excel("analysis/data-raw/asua.xlsx") %>% janitor::clean_names()
-df <- df %>% filter(gene_name == "k13") %>% filter(!(grepl("fs", mutation_name))) # remove frame shift
+# Gina has this data on her laptop but it is in .gitignore as already published
+# Victor Asua's paper, PMID 33146722, supplement 3
+df <- readxl::read_excel("analysis/data-raw/asua.xlsx") %>% janitor::clean_names()
+df <- df %>% 
+  filter(gene_name == "k13") %>% 
+  filter(!(grepl("fs", mutation_name))) # remove frame shift
 df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique()
 aa_lookup <- setNames(
   variantstring::allowed_amino_acids()$IUPAC_amino_acid_code,
@@ -498,8 +495,9 @@ k13wwdf_lfix$`648`$mut[1] <- "wildtype"
 k13wwdf_lfix$`648`$prev <- k13wwdf_lfix$`648`$x/k13wwdf_lfix$`648`$n
 
 # pmid 29582728 nid 458 and 466
-k13wwdf_lfix$`458` <- add_a_row_k13(k13wwdf_lfix$`458`, 1,
-                                "A676V")
+# updated the function to prevent some issues
+# TODO: check that these changes don't break anything in other scripts etc. 
+k13wwdf_lfix$`458` <- add_a_row_k13_clean(k13wwdf_lfix$`458`, 1, "A676V")
 
 # nid 466 n is wrong, missing mutations and ones extracted are also wrong...
 kisumu_cols <- data.frame(
@@ -517,11 +515,11 @@ k13wwdf_lfix$`466` <- k13wwdf_lfix$`466` %>%
 # nid 705 pmid 25537878 
 # n and tot mutants correct
 # based on the text (plus a typo FML) there is one D516Y mut
-k13wwdf_lfix$`705` <- add_a_row_k13(k13wwdf_lfix$`705`, 1,
+k13wwdf_lfix$`705` <- add_a_row_k13_clean(k13wwdf_lfix$`705`, 1,
                                 "D516Y")
 
 # 743 pmid 31833468 - missing one mutation
-k13wwdf_lfix$`743` <- add_a_row_k13(k13wwdf_lfix$`743`, 1,
+k13wwdf_lfix$`743` <- add_a_row_k13_clean(k13wwdf_lfix$`743`, 1,
                                 "G453D")
 
 # 877 34270452 -- I can't even find this site in study
@@ -529,7 +527,7 @@ k13wwdf_lfix$`743` <- add_a_row_k13(k13wwdf_lfix$`743`, 1,
 k13wwdf_lfix$`877` <- NULL
 
 # 1136 34551228 Table S7 https://www.nejm.org/doi/suppl/10.1056/NEJMoa2101746/suppl_file/nejmoa2101746_appendix.pdf
-k13wwdf_lfix$`1136` <- add_a_row_k13(k13wwdf_lfix$`1136`,
+k13wwdf_lfix$`1136` <- add_a_row_k13_clean(k13wwdf_lfix$`1136`,
                                  x_new = 1, mut_new = "V661I")
 
 # 682 - pmid 99999999 cannot find. 1 short of equal
@@ -538,7 +536,7 @@ k13wwdf_lfix$`1136` <- add_a_row_k13(k13wwdf_lfix$`1136`,
 k13wwdf_lfix$`683` <- NULL
 
 # 710 pmid 99999999 - no WT so assume missing val is WT
-k13wwdf_lfix$`710` <- add_a_row_k13(k13wwdf_lfix$`710`, 1,
+k13wwdf_lfix$`710` <- add_a_row_k13_clean(k13wwdf_lfix$`710`, 1,
                                 "wildtype")
 
 # 381 99% WT but cannot find out the missing mutant
@@ -617,7 +615,7 @@ k13wwdf <- k13wwdf |>
   bind_rows(k13wwdf_das) |>
   dplyr::mutate(iid = seq_len(n()))
 
-# TODO: still need to resolve pmid 31591113 - data still included but very wrong 
+# TODO: still need to resolve pmid 31591113 - excluded for the moment
 k13wwdf <- k13wwdf |>
   dplyr::filter(pmid != "31591113")
 
@@ -627,6 +625,7 @@ k13wwdf <- k13wwdf |>
 # ---------------------------------------------------- o
 
 # this should now be TRUE
+# TODO: figure out why this currently fails
 nrow(k13wwdf) == (k13wwdf %>% select(-uuid, -nid, -iid) %>%
                     group_by(across(c(-x, -n, -prev))) %>% 
                     group_indices() %>% unique() %>% length)
@@ -1484,6 +1483,7 @@ pdmdr1 %>% pull(mut) %>% unique()
 #  [10,] "pfmdr1 YYY" : the same as"pfmdr1 86Y" # KEEP but ensure no duplicates with 86Y -> EH
 #  [11,] "pfmdr1 NFD" : the same as"pfmdr1 N86" # KEEP but ensure no duplicates with N86
 
+# check all of the imputations here are complete
 # filter out those that do not report codon 86
 pdmdr1 <- pdmdr1 %>%
   filter(grepl("N|Y|86", mut)) %>%
@@ -1680,7 +1680,6 @@ pdmdr1spl5fixed <- do.call(rbind, pdmdr1spl5fix) %>%
   select(names(pdmdr1spl5correct)) 
 pdmdr1spl5 <- rbind(pdmdr1spl5correct, pdmdr1spl5fixed) # omitted removed, pmids fixed and combined with those correct
 
-# TODO: update so that we impute all of the studies at once
 complement <- NULL
 for(i in 1:nrow(pdmdr1spl5)) {
   df <- pdmdr1spl5[i,]
