@@ -33,8 +33,9 @@ who <- who %>%
   # happen to know that this is the Conrad paper early
   mutate(url = replace(url, url == "99999", "http://www.ncbi.nlm.nih.gov/pubmed/37611122")) %>%
   mutate(publication_year = replace(publication_year, url == "99999", 2023)) %>%
-  mutate(pmid = gsub(".*pubmed/(\\d+).*|.*gov/(\\d+).*","\\1",url)) %>%
-  mutate(pmid = replace(pmid, pmid == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7029593/", "32070355")) %>%
+  #NWY edits to extract as all pmids not getting pulled
+  mutate(pmid = str_extract(url, "(?<=pubmed/|gov/)\\d+")) %>%
+  mutate(pmid = case_when(grepl("PMC7029593", url) ~ "32070355",TRUE ~ pmid)) %>%
   mutate(pmid = replace(pmid, pmid == "", NA)) %>%
   mutate(database = "WHO") %>%
   rename(source = DATA_SOURCE) %>%

@@ -13,6 +13,19 @@ stave <- STAVE::STAVE_object$new()
 # append data
 data_stave <- convert_stave(data)
 
+## CHECK that pmids from WHO are arriving
+# 1. Filter to only the rows from WHO with the specific missing URL pattern
+# 2. Pull the pmid column that was missing earlier
+# 3. Check if the string is composed entirely of digits (Regex: ^\d+$)
+# 4. Use all() to ensure every single row passed
+
+data |>
+  filter(database == "WHO")%>%
+  filter(grepl("pubmed.ncbi.nlm.nih.gov", url)) %>% 
+  pull(pmid) %>%
+  grepl("^\\d+$", .) %>%  
+  all()                   
+
 # STAVE errors related to Geoff that we can fix now: ------------------------
 
 # Error 1 - Fixed Below: Not so much an error but a clean that should probably go into convert_stave
