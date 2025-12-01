@@ -65,7 +65,6 @@ for (project_dir in study_folders) {
   colnames(study_overview_t) <- (study_overview$FIELDS)
   study_overview_t <- janitor::clean_names(study_overview_t)
   
-  # TODO: fix the duplicate columns in the outputs created
   wide_data <- prev_table %>%
     left_join(site_overview, by = "site_uid") %>%
     mutate(study_key = study_uid) %>%
