@@ -1,0 +1,4 @@
+"study_id","survey_id","country_name","site_name","latitude","longitude","location_method","location_notes","collection_start","collection_end","collection_day","time_method","time_notes"
+"s0008a_MSMT_TZA_22","s0007_bukangara","Tanzania","bukangara",-1.7191994,31.024272,NA,NA,2022-01-01,2022-01-01,2022-01-01,"imputed as midpoint of collection range",NA
+"s0008a_MSMT_TZA_22","s0007_chivu","Tanzania","chivu",-2.4975722,30.598627,NA,NA,2022-01-01,2022-01-01,2022-01-01,"imputed as midpoint of collection range",NA
+"s0008a_MSMT_TZA_22","s0007_nshamba","Tanzania","nshamba",-1.8032641,31.550203,NA,NA,2022-01-01,2022-01-01,2022-01-01,"imputed as midpoint of collection range",NA
