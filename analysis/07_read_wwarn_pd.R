@@ -63,6 +63,15 @@ wwarn_pd <- wwarn_pd |>
 wwarn_pd <- wwarn_pd |>
   filter(!is.na(PMID))
 
+# drop studies already in GEOFF
+s <- readRDS(here("analysis", "data-derived", "geoff_STAVE.rds"))
+PMID_geoff <- s$get_studies() |>
+  filter(!is.na(PMID)) |>
+  pull(PMID)
+
+wwarn_pd <- wwarn_pd|>
+  filter(!(PMID %in% PMID_geoff))
+
 # remove specific PMIDs
 wwarn_pd <- wwarn_pd |>
   filter(PMID != 26236581) |> # data has some issues (numerator doesn't sum to denominator) and the original paper does not provide sufficient detail to correct
