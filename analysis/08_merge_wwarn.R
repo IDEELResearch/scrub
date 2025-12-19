@@ -35,13 +35,14 @@ wwarn_combined <- wwarn_k13 |>
   mutate(study_start = year,
          study_end = year) |>
   select(-year) |>
-  bind_rows(wwarn_pd)
+  bind_rows(wwarn_pd) |>
+  filter(tested != 0)
 
 # ------------------------------------------------------------------------
 # make STAVE objects
 
 # study-level data frame
-df_studies <- wwarn_k13 |>
+df_studies <- wwarn_combined |>
   group_by(study_id) |>
   summarise(study_label = study_name[1],
             contributors = authors[1],
@@ -55,16 +56,16 @@ df_studies <- wwarn_k13 |>
   select(study_id, study_label, description, access_level, contributors, reference, reference_year, PMID)
 
 # survey-level data frame
-df_surveys <- wwarn_k13 |>
-  group_by(study_id, survey_id, country, site, year) |>
+df_surveys <- wwarn_combined |>
+  group_by(study_id, survey_id, country, site, study_start, study_end) |>
   summarise(latitude = lat[1],
             longitude = lon[1],
             .groups = "drop") |>
   mutate(location_method = "WWARN coordinates",
          location_notes = NA,
-         collection_start = as.Date(sprintf("%s-01-01", year)),
-         collection_end = as.Date(sprintf("%s-12-31", year)),
-         collection_day = as.Date(sprintf("%s-07-01", year)),
+         collection_start = as.Date(sprintf("%s-01-01", study_start)),
+         collection_end = as.Date(sprintf("%s-12-31", study_end)),
+         collection_day = collection_start + (collection_end - collection_start) / 2,
          time_method = "Midpoint of WWARN recorded year",
          time_notes = NA) |>
   rename(country_name = country,
@@ -73,7 +74,7 @@ df_surveys <- wwarn_k13 |>
          collection_start, collection_end, collection_day, time_method, time_notes)
 
 # counts-level data frame
-df_counts <- wwarn_k13 |>
+df_counts <- wwarn_combined |>
   select(study_id, survey_id, variant_string, variant_num = present, total_num = tested, notes)
 
 # make STAVE object and append data
