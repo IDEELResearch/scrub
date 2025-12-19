@@ -87,7 +87,7 @@ l[[22]] <- s$get_prevalence("crt:76:T") |>
          collection_year = year(collection_day))
 l[[23]] <- s$get_prevalence("mdr1:86:Y") |>
   select(survey_id, collection_day, denominator) |>
-  mutate(target_variant = "crt:86:Y",
+  mutate(target_variant = "mdr1:86:Y",
          collection_year = year(collection_day))
 
 df_l <- bind_rows(l)
@@ -99,3 +99,24 @@ df_comb <- df_l |>
 
 # get total samples sequenced at any of our positions of interest
 sum(df_comb$denom_max)
+
+# get the equivalent number for k13 only
+bind_rows(l[1:21]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for crt only
+bind_rows(l[22]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for mdr1 only
+bind_rows(l[23]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()

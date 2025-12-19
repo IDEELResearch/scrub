@@ -85,6 +85,16 @@ wwarn_pd <- wwarn_pd |>
 wwarn_pd <- wwarn_pd |>
   mutate(site = ifelse(is.na(site), country, site))
 
+# replace study_end with study_start if NA
+wwarn_pd <- wwarn_pd |>
+  mutate(study_end = ifelse(is.na(study_end), study_start, study_end))
+
+# correct some mistakes in dates
+wwarn_pd <- wwarn_pd |>
+  mutate(study_start = ifelse(PMID == 19236701, 2003, study_start),
+         study_end = ifelse(PMID == 19236701, 2006, study_end)) |>
+  mutate(study_start = ifelse(PMID == 27646822, 2013, study_start))
+
 # make study and survey IDs
 wwarn_pd <- wwarn_pd |>
   left_join(data.frame(site = unique(wwarn_pd$site)) |>
