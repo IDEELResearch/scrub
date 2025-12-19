@@ -4,7 +4,7 @@
 # Date: 2025-12-17
 #
 # Inputs:
-# - data-raw/WWARN_K13_database_04-12-2033.xls
+# - data-raw/WWARN_K13_database_04-12-2023.xls
 # - data-derived/geoff_STAVE.rds
 # - data-raw/PMID_k13_replace.xlsx
 # - data-raw/paper_info.csv
@@ -31,7 +31,7 @@ library(variantstring)
 # ------------------------------------------------------------------------
 # read in data and apply initial filters
 
-wwarn_k13 <- readxl::read_xls(here("analysis", "data-raw", "WWARN_K13_database_04-12-2033.xls"), sheet = 1) |>
+wwarn_k13 <- readxl::read_xls(here("analysis", "data-raw", "WWARN_K13_database_04-12-2023.xls"), sheet = 1) |>
   mutate(tested = as.numeric(tested),
          present = as.numeric(present),
          year = as.numeric(year),

@@ -51,27 +51,51 @@ s$append_data(studies_dataframe = s_pf7$get_studies(),
               counts_dataframe = s_pf7$get_counts())
 
 # save combined object to file
-saveRDS(s, file = here("analysis", "data-out", "stave_data_2025.12.17.rds"))
+saveRDS(s, file = here("analysis", "data-out", "stave_data_2025.12.19.rds"))
 
-# ------------------------------------------------------------------------
-# sanity check plots
+# ------------------------------------------------------------------
+# Some basic stats on the final object
 
-# get prevalence of a target mutation
-p <- s$get_prevalence("k13:675:V")
+s
 
-# split studies into sources
-p$source <- mapply(function(x) {
-  match(x[1], c("WWARN", "WHO", "pf7"))
-}, strsplit(p$study_id, "_"))
-p$source[is.na(p$source)] <- 4
-p$source <- c("WWARN", "WHO", "pf7", "GEOFF")[p$source]
+# number of surveys, vs. number of distinct lat/lon/time points
+df_surveys <- s$get_surveys()
+df_surveys |>
+  group_by(latitude, longitude, collection_day) |>
+  summarise() |>
+  dim()
 
-# plot samples over time
-p |>
-  mutate(collection_year = year(collection_day)) |>
-  group_by(collection_year, source) |>
-  summarise(n = sum(denominator)) |>
-  ggplot() + theme_bw() +
-  geom_col(aes(x = collection_year, y = n, fill = source)) +
-  labs(x = "Collection Year", y = "Total Samples Sequenced")
+# get WHO positions
+k13_dictionary <- read.csv(here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")) |>
+  filter(!is.na(WHO_TARGET)) |>
+  mutate(WT_variant = sprintf("k13:%s:%s", CODON, REF))
 
+# get prevalence (of WT) over all positions
+l <- list()
+for (i in 1:nrow(k13_dictionary)) {
+  message(sprintf("%s of %s", i, nrow(k13_dictionary)))
+  l[[i]] <- s$get_prevalence(k13_dictionary$WT_variant[i]) |>
+    select(survey_id, collection_day, denominator) |>
+    mutate(target_variant = k13_dictionary$WT_variant[i],
+           collection_year = year(collection_day))
+}
+
+# also get prevalence of PD
+l[[22]] <- s$get_prevalence("crt:76:T") |>
+  select(survey_id, collection_day, denominator) |>
+  mutate(target_variant = "crt:76:T",
+         collection_year = year(collection_day))
+l[[23]] <- s$get_prevalence("mdr1:86:Y") |>
+  select(survey_id, collection_day, denominator) |>
+  mutate(target_variant = "crt:86:Y",
+         collection_year = year(collection_day))
+
+df_l <- bind_rows(l)
+
+# find max denominator over all markers
+df_comb <- df_l |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator))
+
+# get total samples sequenced at any of our positions of interest
+sum(df_comb$denom_max)
