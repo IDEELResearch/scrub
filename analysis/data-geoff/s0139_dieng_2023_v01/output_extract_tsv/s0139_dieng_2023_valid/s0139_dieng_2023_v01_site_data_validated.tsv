@@ -1,4 +1,0 @@
-site_uid	site_name	collection_location	country	iso3c	lat_n	lon_e	google_lat_long_site	coords_source	pretreatment_samples	site_study_type	study_design_age_min_years	study_design_age_max_years	study_design_sex	site_published_region	study_design_inclusion_criteria	study_design_exclusion_criteria	site_study_notes
-north	North	Pagaza	Ghana	GHA	9.39543471187303	-0.701950162611562	Pagazaa ghana	manual	yes	Community	3	13	both		afebrile,attended primary schools		
-central	Central	Duase	Ghana	GHA	6.75176793303243	-1.56447923204942	Duase ghana	manual	yes	Community	3	13	both		afebrile,attended primary schools		
-south	South	Dodowa	Ghana	GHA	5.8829	0.098	ghana Dodowa latitude longitude	manual	yes	Community	3	13	both		afebrile,attended primary schools		

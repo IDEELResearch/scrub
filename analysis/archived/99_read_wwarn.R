@@ -1,0 +1,1944 @@
+library(tidyverse)
+devtools::load_all()
+
+# A. ART
+# ---------------------------------------------------- o
+# 1. WWARN database compile ----
+# ---------------------------------------------------- o
+
+sf::sf_use_s2(FALSE)
+
+# as of 2 Jan 2024 ART-R markers (valid and candidate)
+## when we have new candidates of validated markers, simply update the csv
+validated <- read_csv("analysis/data-raw/mutation_dictionary.csv")
+validated <- validated %>%
+  dplyr::filter(mut != "CNV") %>% 
+  dplyr::filter(gene == "k13") %>% 
+  dplyr::mutate(gene_mut = paste0(gene, "-", substring(mut,2)))
+validated_mut <- paste0(validated$mut, collapse = "|")
+
+# read in WWARN study info
+k13ww <- readxl::read_xls("analysis/data-raw/WWARN_K13_database_04-12-2033.xls", sheet = 1)
+pdww <- readxl::read_xls("analysis/data-raw/WWARN_partnerdrug_database_04-12-2023.xls", sheet = 1)
+
+# add iso
+k13ww$iso <- countrycode::countrycode(k13ww$country, "country.name.en", "iso3c")
+pdww$iso <- countrycode::countrycode(pdww$country, "country.name.en", "iso3c") 
+# go to line # 665 for pd cleaning
+
+## 1.1. WWARN K13 admin mapping ----
+
+# We need to find admin 1 globally based on lat long.
+# file sourced from Malaria Atlas Project
+# map_1 <- malariaAtlas::getShp("ALL",admin_level = c("admin1")) %>% sf::st_as_sf()
+# saveRDS(map_1, file = "analysis/data-raw/alt_map.rds")
+map_1 <- readRDS("analysis/data-raw/alt_map.rds")
+k13_map <- map_1[map_1$iso %in% unique(k13ww$iso), ]
+k13_map <- sf::st_make_valid(k13_map)
+
+# create coords
+goodmap <- 4326
+k13coords <- sf::st_as_sf(k13ww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
+
+# identify k13 matches
+k13ins <- as.integer(sf::st_within(k13coords, k13_map, prepared = TRUE))
+
+# There are 2 samples in French Guiana that the approach below for nearest admin makes no sense for so correct after
+# Having gone to manuscript these represent travellers from FG that were sequenced in France
+ggplot() +
+  geom_sf(data = k13_map[,"name_0"], fill = "gray90", colour = "white") +
+  geom_point(data = k13ww[which(is.na(k13ins)), ], size = 2, aes(color = country, x = as.numeric(lon), y = as.numeric(lat))) +
+  ggrepel::geom_text_repel(data = k13ww[which(is.na(k13ins)), ], size = 2, aes(label = country, x = as.numeric(lon), y = as.numeric(lat)), max.overlaps = 30) +
+  theme_minimal() +
+  labs(title = "Distribution of samples with missing k13ins")
+
+k13nears <- as.integer(sf::st_nearest_feature(k13coords, k13_map))
+k13ins[which(is.na(k13ins))] <- k13nears[which(is.na(k13ins))]
+k13ww$admin_1 <- k13_map$name_1[k13ins]
+
+# These are the 2 samples that this approach makes no sense for
+k13ww$admin_1[which(k13ww$site == "Saint-Georges")] <- "Cayenne"
+
+## 1.2. WWARN PD admin mapping ----
+
+# start with the map and the coords
+pd_map <- map_1[map_1$iso %in% unique(pdww$iso), ]
+pdcoords <- sf::st_as_sf(pdww %>% select(lat, lon), coords = c("lon", "lat"), crs = sf::st_crs(goodmap))
+
+# identify pd matches
+pdins <- as.integer(sf::st_within(pdcoords, pd_map, prepared = TRUE))
+
+# There is a clump of samples in India that the approach below for nearest admin makes no sense for so correct after
+ggplot() +
+  geom_sf(data = pd_map[,"name_0"], fill = "gray90", colour = "white") +
+  geom_point(data = pdww[which(is.na(pdins)), ], size = 2, aes(color = country, x = as.numeric(lon), y = as.numeric(lat))) +
+  ggrepel::geom_text_repel(data = pdww[which(is.na(pdins)), ], size = 2, aes(label = country, x = as.numeric(lon), y = as.numeric(lat)), max.overlaps = 30) +
+  theme_minimal() +
+  labs(title = "Distribution of samples with missing pdins")
+
+pdnears <- as.integer(sf::st_nearest_feature(pdcoords, pd_map))
+pdins[which(is.na(pdins))] <- pdnears[which(is.na(pdins))]
+pdww$admin_1 <- pd_map$name_1[pdins]
+
+pdww$admin_1[which(pdww$site == "West Bengal")] <- "West Bengal"
+
+# Lastly save to make downstream analysis quicker as the above is a little slow...
+saveRDS(k13ww, "analysis/data-derived/k13ww.rds")
+saveRDS(pdww, "analysis/data-derived/pdww.rds")
+
+# ---------------------------------------------------- o
+# 2. Sort k13 ----
+# ---------------------------------------------------- o
+
+# GINA: Just start here as the above is long to run
+k13ww <- readRDS("analysis/data-derived/k13ww.rds")
+
+# sort names as wanted
+k13wwdf <- k13ww %>%
+  rename(admin_0 = country) %>%
+  mutate(iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c")) %>%
+  rename(long = lon) %>%
+  mutate(study_start_year = NA) %>% # start and end year do not exist in wwarn k13 - only "year"
+  mutate(study_end_year = NA) %>%
+  mutate(n = as.integer(tested)) %>%
+  mutate(x = as.integer(present)) %>%
+  mutate(prev = x/n) %>%
+  mutate(gene = "k13") %>%
+  rename(mut = mutation) %>%
+  mutate(pmid = pubMedId) %>%
+  mutate(url = paste0("https://pubmed.ncbi.nlm.nih.gov/", pmid)) %>%
+  mutate(url = replace(url, grepl("NA",url), NA)) %>%
+  mutate(database = "WWARN") %>%
+  rename(source = authors) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source)
+
+# sort out val grouping issue
+k13wwdf <- bind_rows(
+  k13wwdf %>% group_by(across(c(-x, -n, -prev))) %>% 
+    mutate(ns = n()) %>% 
+    filter(ns==1), # because we removed val, we have extra entries , 
+  k13wwdf %>% group_by(across(c(-x, -n, -prev))) %>% 
+    mutate(ns = n()) %>% 
+    filter(ns>1) %>% # because we removed val, we have extra entries 
+    summarise(x = sum(x), n = sum(x), prev = x/n)
+) %>% 
+  select(-ns) %>% 
+  ungroup()
+
+# ---------------------------------------------------- o
+## 2.1 Correct data extraction from source for known pubs  ----
+# ---------------------------------------------------- o
+
+# before doing manual cleaning - one study corresponds to many of the issues
+# Gina has this data on her laptop but it is in .gitignore as already published
+# Victor Asua's paper, PMID 33146722, supplement 3
+df <- readxl::read_excel("analysis/data-raw/asua.xlsx") %>% janitor::clean_names()
+df <- df %>% 
+  filter(gene_name == "k13") %>% 
+  filter(!(grepl("fs", mutation_name))) # remove frame shift
+df_mut <- df %>% filter(gene_name=="k13") %>% filter(!is.na(genotype)) %>% pull(mutation_name) %>% unique()
+aa_lookup <- setNames(
+  variantstring::allowed_amino_acids()$IUPAC_amino_acid_code,
+  variantstring::allowed_amino_acids()$three_letter_code
+)
+df <- df %>%
+  mutate(mutation_name = str_remove(mutation_name, "^k13-")) %>%
+  mutate(mutation_name = str_replace_all(mutation_name, aa_lookup))
+
+# function to split duplicated entries
+split_rows_by_and <- function(data, column) {
+  # Use tidyr's separate_rows to split the specified column
+  data %>%
+    separate_rows(!!sym(column), sep = "\\s*&&\\s*")
+}
+
+# combine per sample, split any multiple loci samples as assume these are unphased
+correct_st <- df %>% filter(!is.na(genotype)) %>% 
+  group_by(district, year, sample_id) %>% 
+  summarise(mut = paste(mutation_name[genotype==1], collapse = "&&")) %>% 
+  split_rows_by_and("mut") %>% 
+  group_by(district, year) %>% 
+  mutate(n = length(unique(sample_id))) %>% 
+  group_by(district, year, mut, n) %>% 
+  summarise(x = n()) %>% 
+  group_by(district, year) %>% 
+  mutate(mut = replace(mut, mut == "", "wildtype")) %>% 
+  mutate(prev = x/n) %>% 
+  rename(site = district) %>% 
+  mutate(pmid = "33146722") %>% 
+  mutate(year = as.character(year))
+
+# left join with the data in k13wwdf (no year as we have found new years for some sites)
+correct_k13st <- k13wwdf %>% filter(pmid=="33146722") %>% 
+  select(-x,-n,-prev, -mut, -year) %>% unique() %>% left_join(correct_st, .)
+
+k13wwdf <- bind_rows(k13wwdf %>% filter(pmid!="33146722" | is.na(pmid)), 
+                     correct_k13st)
+
+# ---------------------------------------------------- o
+## 2.2 Identify possible issues  ----
+# ---------------------------------------------------- o
+
+# assign to uuids 
+assign_ids <- function(x) {
+  x %>%
+    group_by(across(c(-x, -n, -prev, -mut))) %>%
+    mutate(uuid = cur_group_id()) %>%
+    ungroup %>% 
+    group_by(across(c(-x, -prev, -mut))) %>%
+    mutate(nid = cur_group_id()) %>%
+    ungroup() %>% 
+    mutate(iid = seq_len(n()))
+}
+
+# ---------------------------------------------------- o
+### 2.2.1 Creating list of possible concerns based on sum(x) != n  ----
+# ---------------------------------------------------- o
+
+# assign to uuids 
+k13wwdf <- assign_ids(k13wwdf)
+
+# Check 1 to scan over possible issues where sum of x equals n
+iss1 <- k13wwdf %>%
+  group_by(nid) %>%
+  mutate(xs = sum(x)) %>% 
+  filter(xs>n) %>% 
+  arrange(uuid) 
+
+# There are 62 nids where this fails... FML
+nid_concerns <- unique(iss1$nid)
+
+# Firstly, we can ignore any that have pmid 33146722 as we dealt with these before
+nid_concerns <- k13wwdf %>% filter(nid %in% nid_concerns) %>% filter(pmid!="33146722" | is.na(pmid)) %>% 
+  pull(nid) %>% unique()
+
+# Great now only 40 nids
+
+# Secondly, if there are only 3 entries, WT and two mutants, and the sum of x for the
+# highest two observations equals n, then there is a mixed infection. 
+# The only way to know if this is a double mutant or mixed infection is to look at the paper
+
+# Most will likely not have been phased as PCR but to be correct should look into these
+nids_maybe_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid) %>% 
+  lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% 
+  group_by(nid) %>% summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) == unique(n)) %>% 
+  filter(g) %>% pull(nid)
+
+# Okay nids based on paper's methods, i.e. they could not have detected double mutant
+# read through the methodology for these papers and figured out which are mixed mutants and which are explicitly double
+# nids_not_okay includes those with doubles to be fixed
+# more details here: https://docs.google.com/document/d/1SwLdHDbkhi-eLvf9BKe2fWlk0DfDdOG4tNCppdzTNf0/edit?usp=sharing
+nids_okay <- c(26, 227, 
+               # Gina added -- assuming this means that these are definitely mixed
+               939, 
+               1118, 1121) # both studies reported no double k13
+
+nids_not_okay <- c(192, 352, 353, 354, 738, 1189)
+# c("192"="R645T_E668K",
+# "352" = "M579T_N657H", # 12 double, 1 with M579T only
+# "353" = "M579T_N657H", # 16 double, 1 with M579T only - same pmid as above different year,
+# "354" = "M579T_N657H", # all double mutant - again, same pmid
+# "738" = "F446I_P574L", # 1 double, 2 single
+# "1189" = "S477F_T677I") # 1 double mutant
+
+# fix these ones manually
+k13wwdffix <- k13wwdf %>%
+  filter(nid %in% nids_not_okay) %>%
+  split(.$nid)
+
+k13wwdffix$`192` <- k13wwdffix$`192` |> 
+  dplyr::mutate(mut = c("wildtype", "R645T_E668K", "R645T_E668K")) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`352` <- k13wwdffix$`352` |> 
+  dplyr::mutate(mut = c("wildtype", "M579T", "M579T_N657H"),
+                x = c(26, 1, 12)) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`353` <- k13wwdffix$`353` |> 
+  dplyr::mutate(mut = c("wildtype", "M579T", "M579T_N657H"),
+                x = c(28, 1, 16)) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+# all double mutants
+k13wwdffix$`354` <- k13wwdffix$`354` |> 
+  dplyr::mutate(mut = c("wildtype", "M579T_N657H", "M579T_N657H"),
+                x = c(29, 22, 22)) |> 
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`738` <- k13wwdffix$`738` |> 
+  dplyr::mutate(mut = c("wildtype", "F446I", "F446I_P574L"),
+                x = c(2, 2, 1)) |># 2 WT, 2 single, 1 double
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+k13wwdffix$`1189` <- k13wwdffix$`1189` |> 
+  dplyr::mutate(mut = c("wildtype", "S477F_T677I", "S477F_T677I")) |>
+  distinct(x, n, gene, mut, .keep_all = TRUE) 
+
+# combine back in with the rest of k13wwdf
+k13wwdffix <- do.call(rbind, k13wwdffix) 
+k13wwdf <- rbind(filter(k13wwdf, (nid %in% nids_not_okay) == FALSE), k13wwdffix) # checked we have same # of nids
+
+# Last remove these from the list of concerns 
+nid_concerns <- nid_concerns[!(nid_concerns %in% nids_maybe_okay)]
+
+# ---------------------------------------------------- o
+### 2.2.2 3 rows where sum(x) != n and look weird ----
+# ---------------------------------------------------- o
+
+# There are 29 uuids where this fails... FML
+
+# Lets look at the remaning 3 ones
+nids_d_not_okay <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)  %>% 
+  lapply(function(x){x %>% mutate(n2 = n())}) %>% do.call(rbind, .) %>% filter(n2 == 3) %>% group_by(nid) %>% 
+  summarise(g = sum(sort(x, decreasing = TRUE)[1:2]) != unique(n)) %>% filter(g) %>% pull(nid)
+
+# these actually look like data entry issues
+
+# https://pubmed.ncbi.nlm.nih.gov/31132213/
+new_nid <- rbind(k13wwdf %>% filter(site == "Epe" & pmid == "31132213"),
+                 k13wwdf %>% filter(site == "Epe" & pmid == "31132213" & mut == "Q613H"))
+new_nid$mut[4] <- "D464N"
+new_nid$x[1] <- 190
+new_nid$x[new_nid$mut == "Q613H"] <- 3
+new_nid$n <- 195
+new_nid$prev <- new_nid$x/new_nid$n
+
+# update k13wwdf
+k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site == "Epe" & k13wwdf$pmid == "31132213"),], 
+                     new_nid)
+nid_concerns <- nid_concerns[which(nid_concerns != 833)]
+
+# https://pubmed.ncbi.nlm.nih.gov/31132213/
+# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-018-2625-6/tables/1
+# This study did actually work out whether infections were mixed or double mutations
+# FML - reading through, Thateng had 1 C580Y_Y493H and Khong had 1 C580Y_R539T
+
+# But below is correct correction for this site
+new_nid2 <- rbind(k13wwdf %>% filter(site == "Pathoumphone DH, Pathoumphone, Champasak" & pmid == "30587196"))
+new_nid2$x[new_nid2$mut == "wildtype"] <- 90
+new_nid2$x[new_nid2$mut == "R539T"] <- 33
+new_nid2$x[new_nid2$mut == "C580Y"] <- 219
+new_nid2$prev <- new_nid2$x/new_nid2$n
+
+# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-018-2625-6/tables/1
+# see also additional file 8 with msp1 and msp2
+# tot = 112; C580Y = 16; Y493H = 26; C580Y_R538T = 1 (double not mixed - double and mixed are conflated in table 1)
+new_nid2b <- rbind(k13wwdf %>% filter(site == "Thateng DH, Thateng, Sekong" & pmid == "30587196"))
+new_nid2b$mut[which(new_nid2b$mut == "C580C/Y")] <- "C580Y_Y493H"
+
+new_nid2b <- rbind(k13wwdf %>% filter(site == "Thateng DH, Thateng, Sekong" & pmid == "30587196"))
+# I think this was misextracted as mixed vs double. cross-referenced tab 1 and AF 8
+new_nid2b$mut[which(new_nid2b$mut == "C580C/Y")] <- "C580Y_Y493H"
+new_nid2b$prev <- new_nid2b$x/new_nid2b$n
+
+new_nid2c <- rbind(k13wwdf %>% filter(site == "Khong DH, Khong, Champasak" & pmid == "30587196"))
+new_nid2c$x[new_nid2$mut == "wildtype"] <- 20
+# duplicate a row to add a double mutant 
+new_nid2c <- new_nid2c %>%
+  bind_rows(slice(., 2))
+new_nid2c$mut[4] <- "C580Y_R539T"
+new_nid2c$x[4] <- 1
+new_nid2c$prev <- new_nid2c$x/new_nid2c$n
+
+# update k13wwdf
+k13wwdf <- bind_rows(k13wwdf[-which(k13wwdf$site %in% c("Pathoumphone DH, Pathoumphone, Champasak",
+                                                        "Thateng DH, Thateng, Sekong",
+                                                        "Khong DH, Khong, Champasak") & k13wwdf$pmid == "30587196"),], 
+                     rbind(new_nid2, new_nid2b, new_nid2c))
+nid_concerns <- nid_concerns[which(nid_concerns != 580)] # I think this was a typo - the nid of above is 580
+
+# https://pubmed.ncbi.nlm.nih.gov/32795367/
+# https://malariajournal.biomedcentral.com/articles/10.1186/s12936-020-03358-7/tables/1
+# was sanger so no way to know how so leave as okay
+nid_concerns <- nid_concerns[which(nid_concerns != 481)]
+
+# ---------------------------------------------------- o
+### 2.2.3 remaining sum(x) != n and look weird ----
+# ---------------------------------------------------- o
+
+# # pmid 99999999 doesn't seem to exist - I cannot find this paper. I'm going to exclude this paper. this removes a lot of the issues
+nid_removed <- k13wwdf |>
+  dplyr::filter(pmid == 99999999) |>
+  dplyr::filter(nid %in% nid_concerns) |>
+  dplyr::pull(nid) |> unique()
+# remove data that corresponds to this study and has an nid causing issues
+# TODO: check with OJ if this was actually the correct thing to do 
+k13wwdf <- k13wwdf |>
+  dplyr::filter((nid %in% nid_removed) == FALSE)
+
+nid_concerns <- nid_concerns[which((nid_concerns %in% nid_removed) == FALSE)]
+
+k13wwdffix <- k13wwdf %>% filter(nid %in% nid_concerns) %>% split(.$nid)
+
+# prioritise African studies for now
+# nids in Africa: 188, 186, 640, 644, 234, 274, 276, 452, 891, 895
+
+# pmid 26667053; nid 188 186; incorrect extraction fixing
+k13wwdffix$`186`$x[which(k13wwdffix$`186`$mut == "S477Y")] <- 0
+k13wwdffix$`186` <- k13wwdffix$`186` |>
+  dplyr::filter(x > 0) |>
+  dplyr::mutate(prev = x/n)
+
+# fixing incorrect extractions and double mutant
+k13wwdffix$`188`$x[which(k13wwdffix$`188`$mut == "A578S")] <- 1
+k13wwdffix$`188`$mut[which(k13wwdffix$`188`$mut == "I526M")] <- "I526M_A578S"
+k13wwdffix$`188`$prev <- k13wwdffix$`188`$x/k13wwdffix$`188`$n
+
+# pmid 29436339 nid 234 - two of the mutants were actually mixed infection, no doubles
+
+# nid = 640 or 644 - prev sums > 1 so I think some of these are mixed
+# impossible to disentangle what's happening
+
+# 28797235; nid 274 and 276 = mixed markers 
+# 452 is mixed also
+
+# nid 891 https://academic.oup.com/jid/article/225/8/1411/6314293#supplementary-data
+# incorrect extraction
+k13wwdffix$`891`$x[which(k13wwdffix$`891`$mut == "Q661E")] <- 1
+k13wwdffix$`891`$x[which(k13wwdffix$`891`$mut == "P667S")] <- 1
+k13wwdffix$`891`$prev <- k13wwdffix$`891`$x/k13wwdffix$`891`$n
+
+# nid 895 implies mixed infections vs double mutants - unclear from methods
+
+# studies outside of Africa
+# 665 - 668, 737 and 79 all have the same pmid and all mixed so leave 25927592
+
+# 493 27001814
+# https://journals.asm.org/doi/10.1128/aac.02370-15
+# states one of the parasites had two mutants but doesn't specify haplotype
+
+
+# 1180 27332904 https://pmc.ncbi.nlm.nih.gov/articles/instance/4955562/bin/NIHMS802595-supplement-app.pdf
+# V520I & T474I in the same sample
+k13wwdffix$`1180`$mut[which(k13wwdffix$`1180`$mut == "T474I")] <- "T474I_V520I"
+k13wwdffix$`1180`$x[which(k13wwdffix$`1180`$mut == "V520I")] <- 0
+k13wwdffix$`1180` <- k13wwdffix$`1180` |>
+  dplyr::filter(x > 0) |>
+  dplyr::mutate(prev = x/n)
+
+# 592 30587196
+k13wwdffix$`592`$x[which(k13wwdffix$`592`$mut == "wildtype")] <- 29
+k13wwdffix$`592`$prev <- k13wwdffix$`592`$x/k13wwdffix$`592`$n
+
+# 319 & 320  32393498 - talks about mixed infections and no mention of doubles 
+
+nid_fixed <- c(186, 188, 891, 1180, 592)
+nid_checked <- c(234, 640, 644,274, 276, 452, 895, 665:668, 737, 79, 493, 319, 320)
+
+nid_concerns <- nid_concerns[intersect(which(!nid_concerns %in% nid_fixed), which(! nid_concerns %in% nid_checked))]
+if(length(nid_concerns) == 0) {
+  print("nid_concerns all resolved in this section")
+}
+
+# bind everything back together
+k13wwdffix <- do.call(rbind, k13wwdffix) 
+k13wwdf <- rbind(filter(k13wwdf, (nid %in% c(nid_fixed, nid_checked) == FALSE)), k13wwdffix) # checked we have same # of nids
+
+# ---------------------------------------------------- o
+### 2.2.4 TODO: Decide how much we care about looking for where sum(x) == n, but they have not reported double mutants----
+# ---------------------------------------------------- o
+
+
+# ---------------------------------------------------- o
+### 2.3.1 Creating list of possible concerns based on sum(x) < n  ----
+# ---------------------------------------------------- o
+
+iss2 <- k13wwdf %>%
+  group_by(nid) %>%
+  mutate(xs = sum(x)) %>%
+  filter(xs < n) %>%
+  arrange(uuid) 
+
+# There are 23 nids where this fails... FML
+nid_lconcerns <- unique(iss2$nid)
+
+k13wwdf_lfix <- k13wwdf %>%
+  filter(nid %in% nid_lconcerns) %>%
+  split(.$nid)
+
+# TODO: Go through these and work out what the denominator should actually be
+# going through each pmid at a time because many from same study
+
+# however https://journals.asm.org/doi/full/10.1128/aac.00802-19?rfr_dat=cr_pub++0pubmed&url_ver=Z39.88-2003&rfr_id=ori%3Arid%3Acrossref.org
+# nid 250; pmid 31427297 - specific issue with "forest region" in paper
+# 10 mutations plus WT -- 11 rows
+
+k13wwdf_lfix$`250` <- k13wwdf_lfix$`250` %>%
+  bind_rows(slice(., 2:3))
+
+fixed_cols <- data.frame(
+  x = c(199,2,2,2,13,5,2,1,2,1),
+  mut = c("wildtype", "N408S", "L422F",
+          "S466N", "G496G", # removed the stop codon
+          "R515I", "R539I", "C542W",
+          "E606D", "K607E")
+)
+
+k13wwdf_lfix$`250` <- k13wwdf_lfix$`250` %>% 
+  dplyr::mutate(x = fixed_cols$x,
+                mut = fixed_cols$mut,
+                prev = x/n)
+
+# nid 414 pmid 25691626 - typo 
+k13wwdf_lfix$`414` <- k13wwdf_lfix$`414` %>% 
+  dplyr::mutate(x = c(15,1),
+                prev = x/n)
+
+# nid 648 pmid 28249583 - add wildtype
+k13wwdf_lfix$`648` <- k13wwdf_lfix$`648` %>%
+  bind_rows(slice(.,1)) # add a new top row
+k13wwdf_lfix$`648`$x[1] <-  k13wwdf_lfix$`648`$n[1] - sum(k13wwdf_lfix$`648`$x[2:5])
+k13wwdf_lfix$`648`$mut[1] <- "wildtype"
+k13wwdf_lfix$`648`$prev <- k13wwdf_lfix$`648`$x/k13wwdf_lfix$`648`$n
+
+# pmid 29582728 nid 458 and 466
+# updated the function to prevent some issues
+# TODO: check that these changes don't break anything in other scripts etc. 
+k13wwdf_lfix$`458` <- add_a_row_k13_clean(k13wwdf_lfix$`458`, 1, "A676V")
+
+# nid 466 n is wrong, missing mutations and ones extracted are also wrong...
+kisumu_cols <- data.frame(
+  x = c(32,1,1,2,4,1),
+  mut = c("wildtype", "E509G", "V568G",
+          "D584Y", "N585K", "T677R")
+)
+k13wwdf_lfix$`466` <- k13wwdf_lfix$`466` %>%
+  bind_rows(slice(.,5)) %>%
+  dplyr::mutate(x = kisumu_cols$x,
+                mut = kisumu_cols$mut, 
+                n = 41, 
+                prev = x/n)
+
+# nid 705 pmid 25537878 
+# n and tot mutants correct
+# based on the text (plus a typo FML) there is one D516Y mut
+k13wwdf_lfix$`705` <- add_a_row_k13_clean(k13wwdf_lfix$`705`, 1,
+                                "D516Y")
+
+# 743 pmid 31833468 - missing one mutation
+k13wwdf_lfix$`743` <- add_a_row_k13_clean(k13wwdf_lfix$`743`, 1,
+                                "G453D")
+
+# 877 34270452 -- I can't even find this site in study
+# remove this entry
+k13wwdf_lfix$`877` <- NULL
+
+# 1136 34551228 Table S7 https://www.nejm.org/doi/suppl/10.1056/NEJMoa2101746/suppl_file/nejmoa2101746_appendix.pdf
+k13wwdf_lfix$`1136` <- add_a_row_k13_clean(k13wwdf_lfix$`1136`,
+                                 x_new = 1, mut_new = "V661I")
+
+# 682 - pmid 99999999 cannot find. 1 short of equal
+# 683 is missing loads - leave 682 and omit 683
+
+k13wwdf_lfix$`683` <- NULL
+
+# 710 pmid 99999999 - no WT so assume missing val is WT
+k13wwdf_lfix$`710` <- add_a_row_k13_clean(k13wwdf_lfix$`710`, 1,
+                                "wildtype")
+
+# 381 99% WT but cannot find out the missing mutant
+
+# nids resolved so far
+nid_lresolved <- c(250, 414, 648, 466, 458, 705, 743, 
+                   877, 1136, 683, 710) |> as.character()
+
+# add the resolved nids back into WWARN
+k13wwdf_lfixed <- do.call(rbind, k13wwdf_lfix[nid_lresolved])
+
+# pmid 31591113 nid 442:450
+# all data in frequencies
+# for now, ignore N-terminal SNPs 
+# due to the different # sequenced, different ns.
+# TODO: decide how to handle this
+
+# it looks like 957 and all with source 
+# "Suttipat Srisutham, Nguyen Than Thuy-Nhien, Ranitha Vongpromek, Teeradet Khomvarn, Mayfong Mayxay, Olivo Miotto, Francois Nosten, Frank Smithuis, Rob van der Pluijm, Lorenz von Seidlein, Carol H Sibley, Philippe J. Guérin, Nicholas P. J. Day, Arjen Dondorp, Mehul Dhorda, Mallika Imwong"
+# may actually come from Das study: https://link.springer.com/article/10.1186/s12936-022-04095-9
+# this is based on shared authors, study year and location
+# looking at the Das study, almost all of the data is missing... ugh
+# fixing an additional issue 
+# Das study (PMID 35279140) is almost entirely missing (lots of datapoints in Chad)
+# source "Suttipat Srisutham, Nguyen Than Thuy-Nhien, Ranitha Vongpromek, Teeradet Khomvarn, Mayfong Mayxay, Olivo Miotto, Francois Nosten, Frank Smithuis, Rob van der Pluijm, Lorenz von Seidlein, Carol H Sibley, Philippe J. Guérin, Nicholas P. J. Day, Arjen Dondorp, Mehul Dhorda, Mallika Imwong"
+# looks like the same markers but also with missing info
+# removed Srisutham et al. and full extracted Das et al.
+# need to figure out a way to do this that won't break everything...
+
+# https://link.springer.com/article/10.1186/s12936-022-04095-9/tables/2
+fix_das <- data.frame(
+  year = c(rep("2016", 10), rep("2017", 14)),
+  x = c(6, 76, 8, 1, 1, 1, 1, 1, 6, 56,
+        1, 1, 2, 83, 1, 1, 1, 17,1, 1, 1, 5, 1, 76),
+  n = c(rep(157, 10), rep(192, 14)),
+  mut = c("K189N", "K189T", "K189T/K",
+          "K189T_I354V", # haplotypes
+          "K189T_N197D",
+          "L258M", "N197D", "Q633R", 
+          "R255K", "wildtype", # 2016 mutations
+          "A578S", "K189N", "K189N/K", "K189T",
+          "K189T_N197D/N",
+          "K189T_V636A/V",
+          "K189T_W660C",
+          "K189T/K",
+          "K189T/K_N197D/N",
+          "N195D/N",
+          "N195K/N",
+          "R255K", "S213G/S", "wildtype") # 2017 muts
+) |> dplyr::mutate(pmid = "35279140")
+
+
+k13wwdf_das <- k13wwdf |>
+  dplyr::filter(pmid == 35279140) |>
+  dplyr::select(-c(year, x, n, mut)) 
+
+# between studies had nids 
+k13wwdf_das <- rbind(k13wwdf_das,
+                     k13wwdf_das[rep(1, 22),]) |>
+  dplyr::mutate(x = fix_das$x,
+                year = fix_das$year,
+                n = fix_das$n,
+                mut = fix_das$mut) |>
+  dplyr::relocate(names(k13wwdf)) |>
+  dplyr::mutate(x = as.integer(x),
+                n = as.integer(n)) |>
+  dplyr::select(-iid) |> # need to add this back in after its added to rest of df
+  dplyr::mutate(nid = if_else(year == "2016", 952, 953)) |> # 952:959 is original nids
+  dplyr::mutate(pmid = "35279140")
+  
+# add Das back in 
+k13wwdf <- k13wwdf |>
+  dplyr::select(-iid) |>
+  dplyr::filter(pmid != "35279140") |>
+  dplyr::filter(source != "Suttipat Srisutham, Nguyen Than Thuy-Nhien, Ranitha Vongpromek, Teeradet Khomvarn, Mayfong Mayxay, Olivo Miotto, Francois Nosten, Frank Smithuis, Rob van der Pluijm, Lorenz von Seidlein, Carol H Sibley, Philippe J. Guérin, Nicholas P. J. Day, Arjen Dondorp, Mehul Dhorda, Mallika Imwong") |>
+  bind_rows(k13wwdf_das) |>
+  dplyr::mutate(iid = seq_len(n()))
+
+# TODO: still need to resolve pmid 31591113 - excluded for the moment
+k13wwdf <- k13wwdf |>
+  dplyr::filter(pmid != "31591113")
+
+
+# ---------------------------------------------------- o
+## 2.4 Now format after having assumed we have corrected all possible issues  ----
+# ---------------------------------------------------- o
+
+# this should now be TRUE
+# TODO: figure out why this currently fails
+nrow(k13wwdf) == (k13wwdf %>% select(-uuid, -nid, -iid) %>%
+                    group_by(across(c(-x, -n, -prev))) %>% 
+                    group_indices() %>% unique() %>% length)
+
+# and sort out the columns etc
+k13ww_final_res_df <- k13wwdf %>% 
+  select(-uuid, -nid, -iid) %>%
+  mutate(mut = if_else(mut == "wildtype", "WT", mut)) %>% 
+  ungroup() %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(gene_mut = wwarn_format_k13_for_stave(mut)) %>% 
+  ungroup() %>% 
+  mutate(mut = if_else(mut == "WT", "WT", substring(mut, 2))) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
+
+# TODO: update this so that it also includes the partner drug data
+saveRDS(k13ww_final_res_df, here::here("analysis/data-derived/wwarn_res.rds"))
+
+# ---------------------------------------------------- o
+# 3. Sort PD Names ----
+# ---------------------------------------------------- o
+
+pdww <- readRDS("analysis/data-derived/pdww.rds") 
+
+# sort names as wanted
+pdwwdf <- pdww %>%
+  rename(admin_0 = country) %>%
+  mutate(iso3c = countrycode::countrycode(admin_0, "country.name.en", "iso3c")) %>%
+  rename(long = lon) %>%
+  mutate(study_start_year = as.integer(`study start`)) %>%
+  mutate(study_end_year = as.integer(`study end`)) %>%
+  mutate(year = as.integer(study_start_year + ((study_end_year - study_start_year)/2))) %>%
+  mutate(n = as.integer(tested)) %>%
+  mutate(x = as.integer(present)) %>%
+  mutate(mix = as.integer(`Mixed present`)) %>%
+  mutate(prev = as.integer(percentage)/100) %>%
+  mutate(gene = "k13") %>%
+  rename(mut = `marker group`) %>%
+  mutate(pmid = notes) %>%
+  mutate(url = `publication URL`) %>%
+  mutate(database = "WWARN") %>%
+  rename(source = author) %>%
+  mutate(gene = NA) %>%
+  mutate(gene = replace(gene, grepl("crt", mut), "crt")) %>%
+  mutate(gene = replace(gene, grepl("mdr1", mut), "mdr1")) %>%
+  mutate(gene = replace(gene, grepl("pm2", mut), "pfpm23")) %>%
+  mutate(stuid = paste0(`study Id`, `site number`)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source,
+         prev, mix, stuid) %>%
+  unique() %>%
+  mutate(rowid = seq_len(n()))
+
+# Add URL for those with NA
+pdwwdf <- pdwwdf %>%
+  mutate(
+    pmid = as.character(pmid),
+    url = dplyr::case_when(
+      # keep existing non-empty URLs
+      !is.na(url) & url != "" ~ url,
+      # if URL is NA but we have a numeric PMID, build PubMed URL
+      !is.na(pmid) & grepl("^[0-9]+$", pmid) ~ paste0("https://pubmed.ncbi.nlm.nih.gov/", pmid, "/"),
+      # otherwise leave as NA
+      TRUE ~ NA_character_
+    )
+  )
+
+# Growing List of typos in their data entry
+# these have come from troubleshooting the cleans below and going back to papers
+
+# All the mdr1 typos... ----------------
+# A lot of from rounding errors from prev * n calculations
+# Others are from looking at barplots / pie charts without any numbers available...
+pdwwdf$x[which(pdwwdf$rowid == 7573)] <- pdwwdf$n[which(pdwwdf$rowid == 7573)]
+pdwwdf$x[which(pdwwdf$rowid == 6995)] <- pdwwdf$n[which(pdwwdf$rowid == 6995)]
+pdwwdf$x[which(pdwwdf$rowid == 1630)] <- 27
+pdwwdf$x[which(pdwwdf$rowid == 64)] <- 57
+pdwwdf$x[which(pdwwdf$rowid == 1372)] <- 0
+pdwwdf$x[which(pdwwdf$rowid == 1377)] <- 58
+pdwwdf$x[which(pdwwdf$rowid == 1380)] <- 2
+pdwwdf$x[which(pdwwdf$rowid == 1653)] <- 34
+pdwwdf$n[match(5131:5133, pdwwdf$rowid)] <- 74
+pdwwdf$n[match(6573:6575, pdwwdf$rowid)] <- 22
+pdwwdf$x[match(6573:6575, pdwwdf$rowid)] <- c(0,20,2)
+pdwwdf$x[match(2806:2808, pdwwdf$rowid)] <- c(39,23,46)
+pdwwdf$x[which(pdwwdf$rowid == 2742)] <- 8
+pdwwdf$x[match(2914:2916, pdwwdf$rowid)] <- c(548,112,85)
+pdwwdf$n[match(2983:2985, pdwwdf$rowid)] <- 19 # typo in the actual paper most likely
+pdwwdf$x[which(pdwwdf$rowid == 3007)] <- 57
+pdwwdf$x[which(pdwwdf$rowid == 3022)] <- 45
+pdwwdf$x[which(pdwwdf$rowid == 3019)] <- 84
+pdwwdf$x[which(pdwwdf$rowid == 1136)] <- 5
+pdwwdf$x[which(pdwwdf$rowid == 5045)] <- 83
+pdwwdf$x[which(pdwwdf$rowid == 4676)] <- 41
+pdwwdf$x[which(pdwwdf$rowid == 5914)] <- 16
+pdwwdf$n[match(4497:4499, pdwwdf$rowid)] <- 106
+pdwwdf$n[match(4503:4505, pdwwdf$rowid)] <- 107
+pdwwdf$x[which(pdwwdf$rowid == 6397)] <- 10
+pdwwdf$x[which(pdwwdf$rowid == 6147)] <- 140
+pdwwdf$x[which(pdwwdf$rowid == 5484)] <- 176
+pdwwdf$x[which(pdwwdf$rowid == 5485)] <- 17
+pdwwdf$x[which(pdwwdf$rowid == 5552)] <- 23
+pdwwdf$n[match(c(5551,5552,5554), pdwwdf$rowid)] <- 145
+pdwwdf$n[match(c(5458,5459,5461), pdwwdf$rowid)] <- 110
+pdwwdf$x[which(pdwwdf$rowid == 5642)] <- 14
+pdwwdf$n[which(pdwwdf$rowid == 5689)] <- 35
+
+# the next block of typos are where prevalence is reported using mixed infections
+# so we need to correct these
+pdwwdf$x[which(pdwwdf$rowid == 13)] <- 42 # F is not Y so assign to N
+pdwwdf$x[which(pdwwdf$rowid == 318)] <- 44
+pdwwdf$x[which(pdwwdf$rowid == 718)] <- 114 # typo in their paper
+pdwwdf$x[which(pdwwdf$rowid == 720)] <- 103
+
+# typos again
+pdwwdf$x[which(pdwwdf$rowid == 2475)] <- 5
+pdwwdf$x[match(c(7102,7103), pdwwdf$rowid)] <- c(66, 94)
+pdwwdf$n[match(c(7102,7103), pdwwdf$rowid)] <- 160
+pdwwdf$x[which(pdwwdf$rowid == 7714)] <- 42
+pdwwdf$x[which(pdwwdf$rowid == 7737)] <- 47
+pdwwdf$n[match(c(8283,8286), pdwwdf$rowid)] <- 119
+pdwwdf$x[match(c(8283,8286), pdwwdf$rowid)] <- c(7,112)
+pdwwdf$x[which(pdwwdf$rowid == 4451)] <- 14 # F is not Y so assign to N
+
+# duplicate studies
+pdwwdf <- pdwwdf %>% filter(pmid != 80002356)
+pdwwdf <- pdwwdf %>% filter(stuid != "265972541")
+pdwwdf <- pdwwdf %>% filter(rowid != 1526) # duplicate error
+
+# All the crt typos... ----------------
+pdwwdf$n[which(pdwwdf$rowid == 8822)] <- 40
+pdwwdf$n[which(pdwwdf$rowid == 8754)] <- 68
+pdwwdf <- pdwwdf %>% filter(rowid != 308) # duplicate error
+pdwwdf$x[which(pdwwdf$rowid == 7015)] <- 0.5 # mixed sample and swapping to mut type here
+pdwwdf$x[which(pdwwdf$rowid == 5763)] <- 0 # mixed sample double accounted for
+pdwwdf$mut[which(pdwwdf$rowid == 7015)] <- "pfcrt 76T" # mixed sample and swapping to mut type here
+
+# one study's fixes
+pdwwdf$x[match(c(1695,1696,1697,1698,1699,1700,2622,2623,2624,2625,2626,5650,5651,5652,5653,5654), 
+               pdwwdf$rowid)] <-
+  c(35, 15, 35, 15, 0, 0, 1.5, 48.5, 1.5, 0, 48.5, 0.5, 37.5, 0.5, 0, 37.5)
+
+# one study's fixes
+pdwwdf$x[match(c(1608,1609,1610,1611,1612,1616,1843,1844,1845,1846,3105,3106,3107), pdwwdf$rowid)] <-
+  c(27.5, 0, 21.5, 2, 29.5, 21.5, 3,0,4.5,25.5, 6,0,23)
+
+# one study's fixes
+pdwwdf$x[match(c(2792, 2816, 3016), pdwwdf$rowid)] <- c(33, 56, 73)
+
+# one study's fixes
+pdwwdf$x[match(c(1009,1010,1011,1015,1016,1017,8457,8458,8459), pdwwdf$rowid)] <-
+  c(30.5, 1.25, 1.25, 3.5, 0, 9.5, 12, 5, 3)
+
+# one study's fixes
+# WWARN missed some rows here so easiest way is to just adding the counts
+# frommissing haplotypes to the same 76 types
+pdwwdf$x[match(c(807, 808), pdwwdf$rowid)] <- c(67, 7)
+
+# one study's fixes
+# WWARN missed some rows here so easiest way is to just adding the counts
+# from missing haplotypes to the same 76 types
+pdwwdf$x[match(c(3965), pdwwdf$rowid)] <- 3
+
+# duplicate studies
+pdwwdf <- pdwwdf %>% filter(pmid != 80002356)
+pdwwdf <- pdwwdf %>% filter(stuid != "265972541")
+pdwwdf <- pdwwdf %>% filter(rowid != 3906) # duplicate error
+pdwwdf <- pdwwdf %>% filter(rowid != 3907) # duplicate error
+pdwwdf <- pdwwdf %>% filter(rowid != 3957) # duplicate error
+pdwwdf <- pdwwdf %>% filter(rowid != 3958) # duplicate error
+
+# OTHER TYPOS
+pdwwdf$study_start_year[match(c(3485,3486,9148,9161,9171,9205), pdwwdf$rowid)] <- 2003
+pdwwdf$study_end_year[match(c(3485,3486,9148,9161,9171,9205), pdwwdf$rowid)] <- 2006
+pdwwdf$study_start_year[match(c(6894,6895,6896,6897,6898,6899,6900,6901,6902,6903), pdwwdf$rowid)] <- 2011
+pdwwdf$year[match(c(6894,6895,6896,6897,6898,6899,6900,6901,6902,6903), pdwwdf$rowid)] <- 2012
+
+# split these out into each marker type
+pdwwspl <- pdwwdf %>% split(pdwwdf$gene)
+
+# ---------------------------------------------------- o
+# 4. Sort CRT ----
+# ---------------------------------------------------- o
+
+# Grab 76 etc
+pdcrt <- pdwwspl$crt %>%
+  filter(grepl("76", mut))
+
+# first put into study time lat points for looking at
+pdcrt <- pdcrt %>%
+  group_by(across(c(-x,-prev, -mut, -rowid, -mix))) %>%
+  mutate(uuid = cur_group_id()) %>%
+  ungroup() %>%
+  dplyr::distinct() # a lot of the issues with sum(x) =/= n are due to duplicate rows
+
+# TYPE 1 - sum(x) = n -- clean names and reformat
+pdcrtspl1 <- pdcrt %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+# TYPE 2 - wildtype only -- clean names and reformat (now covered in type 1)
+
+# now to focus on when sum of x does not equal n
+mut_loc <- "pfcrt 76T"
+wt_loc <- "pfcrt K76"
+mix_loc <- "pfcrt 76K/T"
+
+other_loc <- c("pfcrt 72-76 CxxxK", "pfcrt 72-76 CxxxT", "pfcrt 72-76 SxxxT")
+
+# TYPE 3 - sum(x) = n if EH are filtered out -- change EH names, clean and reformat
+# NOTE: EH = extended haplotypes 
+# The EH mutations for a number of samples are just extra information
+# determined by filtering these out and rechecking if sum of x equals n
+# These for these groups it is the same as above
+pdcrtspl3 <- pdcrt %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter((mut %in% c(mut_loc,wt_loc,mix_loc))) %>% # non-EH only
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+# TYPE 4 - sum(x) = n if non-EH are filtered out -- change EH names, clean and reformat
+pdcrtspl4 <- pdcrt %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter(!(mut %in% c(mut_loc,wt_loc,mix_loc))) %>% # EH only
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+# TYPE 5 - only one marker reported -- clean names and reformat
+# these are single record uuids so WWARN only captured one marker
+pdcrtspl5 <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid,pdcrtspl3$uuid,pdcrtspl4$uuid))) %>%
+  group_by(uuid) %>%
+  filter(n()==1) %>%
+  mutate(mut = replace(mut, mut == "pfcrt 72-76 CxxxT", "pfcrt 76T")) %>%
+  group_by(uuid) %>%
+  select(names(pdcrtspl3)) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# assuming that this is correct and omitting mixed
+complement <- NULL
+for(i in 1:nrow(pdcrtspl5)) {
+  df <- pdcrtspl5[i,]
+  df$x <- df$n - df$x
+  df$mut <- if_else(df$mut == "crt_76T", "crt_K76", "crt_76T")
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdcrtspl5 <- rbind(pdcrtspl5, complement) %>% arrange(pmid, uuid)
+
+
+t6pmid <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% 
+  pull(pmid) %>% unique()
+
+# TYPE 6 - sum(x) < n - check that these are missing mixed mutants and add these
+pdcrtspl6 <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% 
+  split(.$pmid)
+
+# examine each pmid and fix
+pdcrtspl6$`11926004`$x[3] <- 5
+# 
+pdcrtspl6$`12474488`$mut <- c("pfcrt 76T","pfcrt K76","pfcrt 76K/T")
+pdcrtspl6$`12474488`$x <- c(1, 28, 14) # fixed this by ensuring that the ratios were correct -- error in the paper itself
+# 15322628 - 100% had 76T - paper reported EHs but omit these
+pdcrtspl6$`15322628` <- pdcrtspl6$`15322628`[1,]
+pdcrtspl6$`15322628`$x <- pdcrtspl6$`15322628`$n
+pdcrtspl6$`15322628`$mut <- "pfcrt 76T"
+pdcrtspl6$`15322628`$prev <- pdcrtspl6$`15322628`$x / pdcrtspl6$`15322628`$n
+
+# this is an usual haplotype CVMNN
+pdcrtspl6$`18840753`[3,] <- pdcrtspl6$`18840753`[2,] 
+pdcrtspl6$`18840753`$x[3] <- 1
+pdcrtspl6$`18840753`$mut[3] <- "pfcrt 76N"
+pdcrtspl6$`18840753`$prev <- pdcrtspl6$`18840753`$x/pdcrtspl6$`18840753`$n
+
+# 19398039 -- this data is actually frequency not prevalence but don't think we can convert this back
+# data is extracted correctly, but just need to recalculate prevalence so they add to 1
+pdcrtspl6$`19398039`$prev <- pdcrtspl6$`19398039`$x/pdcrtspl6$`19398039`$n
+
+# 19704124 - convert percentages to raw numbers. error in n also
+pdcrtspl6$`19704124`$n <- 269
+pdcrtspl6$`19704124`$mut <- c("pfcrt K76", "pfcrt 76T")
+pdcrtspl6$`19704124`$x <- c(153,116)
+pdcrtspl6$`19704124`$prev <- pdcrtspl6$`19704124`$x/pdcrtspl6$`19704124`$n
+
+# 22839209 is just extracted wrong
+pdcrtspl6$`22839209`$n <- 106
+pdcrtspl6$`22839209`$mut <- c("pfcrt K76", "pfcrt 76T")
+pdcrtspl6$`22839209`$x <- c(5,101)
+pdcrtspl6$`22839209`$prev <- pdcrtspl6$`22839209`$x/pdcrtspl6$`22839209`$n
+
+# 24727053 - typo in the paper itself
+
+# 26392510 missing mixed infections
+pdcrtspl6$`26392510`[3,] <- pdcrtspl6$`26392510`[2,] # add a row
+pdcrtspl6$`26392510`$prev <- c(9.8/100, 76.5/100, 13.7/100)
+pdcrtspl6$`26392510`$x <- c(20,155,28)
+pdcrtspl6$`26392510`$prev <- pdcrtspl6$`26392510`$x/pdcrtspl6$`26392510`$n
+pdcrtspl6$`26392510`$mut <- c("pfcrt 76T", "pfcrt K76", "pfcrt 76K/T")
+
+# 1 mixed, the rest are K76
+pdcrtspl6$`27089479`$x[2] <- 1
+pdcrtspl6$`27089479`$mut <- c("pfcrt K76", "pfcrt 76K/T")
+pdcrtspl6$`27089479`$prev <- pdcrtspl6$`27089479`$x/pdcrtspl6$`27089479`$n
+
+# typo from text -- missed a haplotype
+pdcrtspl6$`27222806`$x[3] <- 2
+
+# clean this one up
+pdcrtspl6$`27222806` <- pdcrtspl6$`27222806` %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(mut) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# this study has extracted the two arms separately - combine them and recalculate
+pdcrtspl6$`27565897` <- pdcrtspl6$`27565897` %>%
+  group_by(mut) %>%
+  mutate(x = sum(x), n = 205, prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# need to add a row for mixed infections
+pdcrtspl6$`28347314`[3,] <- pdcrtspl6$`28347314`[2,]
+pdcrtspl6$`28347314`$x <- c(87,46,31)
+pdcrtspl6$`28347314`$prev <- pdcrtspl6$`28347314`$x/pdcrtspl6$`28347314`$n
+pdcrtspl6$`28347314`$mut <- c("pfcrt 76T", "pfcrt K76", "pfcrt 76K/T")
+
+# add in the mixed which were missing
+pdcrtspl6$`28916443`[3,] <- pdcrtspl6$`28916443`[2,]
+pdcrtspl6$`28916443`$x <- c(29,26,11)
+pdcrtspl6$`28916443`$prev <- pdcrtspl6$`28916443`$x/pdcrtspl6$`28916443`$n
+pdcrtspl6$`28916443`$mut <- c("pfcrt 76T", "pfcrt K76", "pfcrt 76K/T")
+
+# typo in the table -- assuming the percentage is correct and the value in the text
+pdcrtspl6$`29854394`$x[2] <- 86
+
+# 30404640 is correct because the remaining un-extracted values are other haplotypes. impossible to extract at site level
+
+# missing mixed infections
+pdcrtspl6$`31358591`[3,] <- pdcrtspl6$`31358591`[2,]
+pdcrtspl6$`31358591`$x[3] <- 6
+pdcrtspl6$`31358591`$mut <- "pfcrt 76K/T"
+pdcrtspl6$`31358591`$prev <- pdcrtspl6$`31358591`$x/pdcrtspl6$`31358591`$n
+
+
+# based on percentages in table 1 I think there's a typo -- 77/84 WT
+pdcrtspl6$`31932374`$x[1] <- 77
+pdcrtspl6$`31932374`$mut <- c("pfcrt K76", "pfcrt 76T")
+pdcrtspl6$`31932374`$prev <- pdcrtspl6$`31932374`$x/pdcrtspl6$`31932374`$n
+
+# mixed missing -- n - x_wt - x_mut
+pdcrtspl6$`32019571` <- pdcrtspl6$`32019571` %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  group_by(mut, admin_1) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl6$`32019571`)/2)) {
+  df <- pdcrtspl6$`32019571`[c(2*i-1,2*i),]
+  
+  mixed <- unique(df$n) - sum(df$x)
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+fixed %>% 
+  dplyr::group_by(iso3c) %>%
+  dplyr::reframe(sum(x) == unique(n))
+
+pdcrtspl6$`32019571` <- fixed
+
+# error in WT
+pdcrtspl6$`35135546`$x[2] <- 87-62
+pdcrtspl6$`35135546`$prev <- pdcrtspl6$`35135546`$x/pdcrtspl6$`35135546`$n
+sum(pdcrtspl6$`35135546`$x) == unique(pdcrtspl6$`35135546`$n)
+
+# combine all together
+fixed_pmid6 <- c(11926004, 12474488, 15322628, 18840753, 19398039, 19704124, 
+                 22839209, 26392510, 27089479, 27222806, 27565897, 28347314, 
+                 28916443, 29854394, 31358591, 31932374, 32019571, 35135546)
+
+setdiff(fixed_pmid6, t6pmid)  # meaning all of them are now fixed
+
+# join back together
+pdcrtspl6 <- do.call(rbind, pdcrtspl6) %>% 
+  dplyr::select(names(pdcrtspl1)) %>%
+  dplyr::filter(mut != "pfcrt 76N")
+pdcrtspl6$prev <- pdcrtspl6$x/pdcrtspl6$n
+
+# check that sum(x) == n
+## manually checked that all of those that fail are as accurate as possible and therefore all okay
+pdcrtspl6 %>%
+  group_by(pmid, lat, long, admin_1, study_start_year, study_end_year) %>%
+  dplyr::reframe(equal = ( sum(x) == unique(n))) %>%
+  dplyr::filter(equal == FALSE)
+
+# FIX TYPE 7 - sum(x) > n
+
+pdcrtspl7 <- pdcrt %>%
+  filter(!(uuid %in% c(pdcrtspl1$uuid, pdcrtspl3$uuid, pdcrtspl4$uuid, pdcrtspl5$uuid, pdcrtspl6$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) > n[1]) %>% 
+  split(.$pmid)
+
+# fix these one at a time
+# "15238686" - EH gives correct values
+pdcrtspl7$`15238686` <- pdcrtspl7$`15238686` %>%
+  dplyr::filter(mut %in% other_loc) %>% 
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  dplyr::group_by(mut) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# 15814601 - denominator is wrong -- this is the control group. assuming x is correct from figure
+pdcrtspl7$`15814601`$n <- 49
+pdcrtspl7$`15814601`$prev <- pdcrtspl7$`15814601`$x/pdcrtspl7$`15814601`$n
+
+# 16516311 correct from table 6 combining haplotypes
+pdcrtspl7$`16516311` <- pdcrtspl7$`16516311`[1:3,]
+pdcrtspl7$`16516311`$x <- c(21, 7, 20)
+pdcrtspl7$`16516311`$n <- 48
+pdcrtspl7$`16516311` <- pdcrtspl7$`16516311` %>%
+  mutate(mut = replace(mut, grepl("CxxxK", mut), "pfcrt K76")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("CxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("SxxxT", mut), "pfcrt 76T")) %>% # convert haplotypes
+  dplyr::group_by(mut) %>%
+  mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+  distinct(mut, .keep_all = TRUE)
+
+# 17158810 - only gives prevalence of 76T
+pdcrtspl7$`17158810` <- pdcrtspl7$`17158810`[1,] 
+pdcrtspl7$`17158810`$mut <- "pfcrt 76T"
+pdcrtspl7$`17158810`$x <- 104
+pdcrtspl7$`17158810`$n <- 130
+pdcrtspl7$`17158810`$prev <- pdcrtspl7$`17158810`$x / pdcrtspl7$`17158810`$n
+
+# correct but WT # is incorrect - typo
+pdcrtspl7$`17224049`$x[3] <- pdcrtspl7$`17224049`$n[1] - pdcrtspl7$`17224049`$x[1] - pdcrtspl7$`17224049`$x[2]
+pdcrtspl7$`17224049`$prev <- pdcrtspl7$`17224049`$x / pdcrtspl7$`17224049`$n
+
+
+pdcrtspl7$`17376240`$mut <- c("pfcrt 72-76 CxxxK", "pfcrt 72-76 SxxxT",
+                              "pfcrt 72-76 CxxxT", "pfcrt 76T",
+                              "pfcrt 76K/T", "pfcrt 76T") # all distinct haplotypes
+
+pdcrtspl7$`17376240`$prev <- c(0.097, 0.791, 0.013, 
+                               0.086, 0.002, 0.012)
+
+# TODO: try and get these to sum correctly -- when you convert and sum you get sum(x) = 596
+pdcrtspl7$`17376240`$x <- round(pdcrtspl7$`17376240`$n * pdcrtspl7$`17376240`$prev, digits = 0)
+sum(pdcrtspl7$`17376240`$x) == pdcrtspl7$`17376240`$n[1]
+# fix mutation names
+pdcrtspl7$`17376240`$mut <- c("pfcrt K76", "pfcrt 76T",
+                              "pfcrt 76T", "pfcrt 76K/T",
+                              "pfcrt 76K/T", "pfcrt 76T") 
+pdcrtspl7$`17376240` <-
+  pdcrtspl7$`17376240` %>%
+    dplyr::group_by(mut) %>%
+    mutate(x = sum(x), n = unique(n), prev = x/n) %>%
+    distinct(mut, .keep_all = TRUE)
+
+## https://d1wqtxts1xzle7.cloudfront.net/79635048/0760844-libre.pdf?1643531950=&response-content-disposition=inline%3B+filename%3DPlasmodium_falciparum_genotypes_associat.pdf&Expires=1753198742&Signature=GOBGCSa8gVB8FGdw-AM59OJqqdvnYil3lr1t7oPEX9qHGPwXCefTLp3u~woQzl3WX5key~bukoLgQzz7Aoe29J9CLb6z-U3mQDNQ979JRxQTlswGAXDeFLCXRHKuuU8e9vQk~nIdZNWYymsPc0Tvl6BRbydzRT2bAWMSsSMypvn7WfrGDXE7KtSqQWXED8IE8wT7rIxxc-B6JduNvbW8LQrh1hqi0vDU~YprB6OPcCdp9AL~PLBLM468UVTjyYtEPpf6adZKQBnd82OvWOw1J6Gbtuau~W2F6eh2uZh43k0aq9W7L1c29vzKk~nLEx8HyY-ty3PDhCJ4R67viM0j6w__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA
+# double count mixed in the text
+pdcrtspl7$`17488902`$x <- c(93, 368)
+pdcrtspl7$`17488902` <- add_a_row_pd(df = pdcrtspl7$`17488902`, 17, "pfcrt 76K/T")
+pdcrtspl7$`17488902`$prev <- pdcrtspl7$`17488902`$x/pdcrtspl7$`17488902`$n
+
+# Mixed infections contribute equally to the prevalence estimates for both alleles.
+pdcrtspl7$`18008244` 
+
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl7$`18008244`)/2)) {
+  df <- pdcrtspl7$`18008244`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+fixed %>% 
+  dplyr::group_by(year) %>%
+  dplyr::reframe(sum(x) == unique(n))
+
+pdcrtspl7$`18008244` <- fixed
+
+# the other uuids from this study are in pdcrtspl3 and are fixed
+pdcrtspl7$`19346369` <- pdcrtspl7$`19346369`[1:3,] 
+pdcrtspl7$`19346369`$x <- c(42,4,109) 
+pdcrtspl7$`19346369`$mut <- c("pfcrt 76K/T", "pfcrt K76", "pfcrt 76T")
+pdcrtspl7$`19346369`$n <- c(rep(155,3))
+pdcrtspl7$`19346369`$prev <- pdcrtspl7$`19346369`$x/pdcrtspl7$`19346369`$n
+
+
+# # If both alleles were identified at one locus both were included as numerators but only counted as one in the denominator.
+# i.e. mixed are double counted
+# pdcrtspl7$`19718439` %>% View()
+
+fixed <- NULL
+for(i in 1:(nrow(pdcrtspl7$`19718439`)/2)) {
+  df <- pdcrtspl7$`19718439`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+pdcrtspl7$`19718439` <- fixed
+
+# double counted EH
+pdcrtspl7$`21457533` <- pdcrtspl7$`21457533`[4:6,]
+pdcrtspl7$`21457533`$x <- c(28,1,2)
+pdcrtspl7$`21457533`$n <- 31
+pdcrtspl7$`21457533`$prev <- pdcrtspl7$`21457533`$x/pdcrtspl7$`21457533`$n
+
+# 21645634 - fixing this being extracted wrong. reclassifying day 0 mixed that was classified as WT in table
+pdcrtspl7$`21645634` <- pdcrtspl7$`21645634`[3:5,]
+pdcrtspl7$`21645634`$x <- c(4,32,7)
+pdcrtspl7$`21645634`$n <- 43
+pdcrtspl7$`21645634`$prev <- pdcrtspl7$`21645634`$x/pdcrtspl7$`21645634`$n
+
+
+# issues with mixed and numbers in text
+pdcrtspl7$`22004584`$x <- c(3, 140)
+pdcrtspl7$`22004584` <- add_a_row_pd(pdcrtspl7$`22004584`, 1, "pfcrt 76K/T")
+pdcrtspl7$`22004584`$prev <- pdcrtspl7$`22004584`$x / pdcrtspl7$`22004584`$n
+
+# two mixed
+pdcrtspl7$`22208458` <- pdcrtspl7$`22208458`[1:2,]
+pdcrtspl7$`22208458`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`22208458`$x <- c(3, 2)
+pdcrtspl7$`22208458`$n <- c(5, 5)
+pdcrtspl7$`22208458`$prev <- pdcrtspl7$`22208458`$x / pdcrtspl7$`22208458`$n
+
+### issues with this whole pmid but these are rectified in other pdcrtspl lists
+pdcrtspl7$`22453078`$x <- c(22,3)
+pdcrtspl7$`22453078`$n <- c(25, 25)
+pdcrtspl7$`22453078`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`22453078`$prev <- pdcrtspl7$`22453078`$x / pdcrtspl7$`22453078`$n
+
+# remove those that weren't amplified and combine haplotypes - table 2
+pdcrtspl7$`22641431` <- pdcrtspl7$`22641431` %>% 
+  dplyr::filter(!(mut %in% other_loc)) %>%
+  arrange(year, mut)
+
+pdcrtspl7$`22641431`$x <- c(16, 49,            # 1999
+                            8, 32, 32)         # 2008 
+pdcrtspl7$`22641431`$n <- c(65, 65,            # 1999
+                            72, 72, 72)        # 2008 
+
+pdcrtspl7$`22641431`$prev <- pdcrtspl7$`22641431`$x / pdcrtspl7$`22641431`$n
+
+# so many errors... table 4
+pdcrtspl7$`22904636` <- pdcrtspl7$`22904636`[4:5,] 
+pdcrtspl7$`22904636`$mut <- c("pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`22904636`$x <- c(40,1)
+pdcrtspl7$`22904636`$n <- c(42, 42)
+pdcrtspl7$`22904636` <- add_a_row_pd(pdcrtspl7$`22904636`, 1, "pfcrt K76")
+pdcrtspl7$`22904636`$prev <- pdcrtspl7$`22904636`$x / pdcrtspl7$`22904636`$n
+
+## correct numbers for extraction
+pdcrtspl7$`23537170`$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`23537170`$x <- c(25, 65, 23)
+pdcrtspl7$`23537170`$n <- rep(113, 3)
+pdcrtspl7$`23537170`$prev <- pdcrtspl7$`23537170`$x / pdcrtspl7$`23537170`$n
+
+# typo in paper itself -- the percentages total to 110%
+# assume the value in the text is correct and therefore subtract from CVIET
+pdcrtspl7$`23870667` <- pdcrtspl7$`23870667`[1:3,]
+pdcrtspl7$`23870667`$x <- c(19,41,3)
+pdcrtspl7$`23870667`$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+pdcrtspl7$`23870667`$prev <- pdcrtspl7$`23870667`$x / pdcrtspl7$`23870667`$n
+
+# duplicate EH and non EH
+pdcrtspl7$`24359280` <- pdcrtspl7$`24359280` %>%
+  dplyr::filter(mut == "pfcrt 76T") %>%
+  dplyr::mutate(n = 198, prev = x/n)
+pdcrtspl7$`24359280` <- add_a_row_pd(pdcrtspl7$`24359280`, x_new = 198 - 145, mut_new = "pfcrt K76")
+
+# this is the entire study -- mixed infections counted twice
+fixed <- NULL
+
+for(i in 1:(nrow(pdcrtspl7$`25421474`)/2)) {
+  df <- pdcrtspl7$`25421474`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfcrt 76K/T")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+fixed %>% 
+  dplyr::group_by(year) %>%
+  dplyr::reframe(sum(x) == unique(n))
+
+pdcrtspl7$`25421474` <- fixed
+
+# 33 or 100 rows of this study but have a look at the whole thing
+# other uuids are in the other pdcrtspl lists so fix only the ones here
+crt27160572 <- pdcrtspl7$`27160572` %>% 
+  split(.$iso3c)
+  
+# Angola
+crt27160572$AGO <- crt27160572$AGO[1:3,]
+crt27160572$AGO$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$AGO$x <- c(69, 26, 6)
+crt27160572$AGO$prev <- crt27160572$AGO$x / crt27160572$AGO$n
+
+# Ghana
+crt27160572$GHA <- crt27160572$GHA[1:3,]
+crt27160572$GHA$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$GHA$x <- c(19, 3, 1)
+crt27160572$GHA$prev <- crt27160572$GHA$x / crt27160572$GHA$n
+# sum(crt27160572$GHA$x) == crt27160572$GHA$n[1]
+
+# Guinea
+crt27160572$GIN <- crt27160572$GIN[1:3,]
+crt27160572$GIN$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$GIN$x <- c(21, 11, 1)
+crt27160572$GIN$prev <- crt27160572$GIN$x / crt27160572$GIN$n
+# sum(crt27160572$GIN$x) == crt27160572$GIN$n[1]
+
+# Equatorial Guinea 
+crt27160572$GNQ <- crt27160572$GNQ[1:3,]
+crt27160572$GNQ$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$GNQ$x <- c(58, 11, 6)
+crt27160572$GNQ$prev <- crt27160572$GNQ$x / crt27160572$GNQ$n
+# sum(crt27160572$GNQ$x) == crt27160572$GNQ$n[1]
+
+# Mali
+crt27160572$MLI <- crt27160572$MLI[1:3,]
+crt27160572$MLI$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$MLI$x <- c(2, 1, 1)
+crt27160572$MLI$prev <- crt27160572$MLI$x / crt27160572$MLI$n
+# sum(crt27160572$MLI$x) == crt27160572$MLI$n[1]
+
+# Nigeria
+crt27160572$NGA <- crt27160572$NGA[1:3,]
+crt27160572$NGA$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$NGA$x <- c(41, 31, 2)
+crt27160572$NGA$n <- 74
+crt27160572$NGA$prev <- crt27160572$NGA$x / crt27160572$NGA$n
+sum(crt27160572$NGA$x) == crt27160572$NGA$n[1]
+
+# Sierra Leone
+crt27160572$SLE <- crt27160572$SLE[1:3,]
+crt27160572$SLE$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$SLE$x <- c(9, 14, 2)
+crt27160572$SLE$prev <- crt27160572$SLE$x / crt27160572$SLE$n
+sum(crt27160572$SLE$x) == crt27160572$SLE$n[1]
+
+# Tanzania
+crt27160572$TZA <- crt27160572$TZA[1:3,]
+crt27160572$TZA$mut <- c("pfcrt K76", "pfcrt 76T", "pfcrt 76K/T")
+crt27160572$TZA$x <- c(6, 3, 1)
+crt27160572$TZA$prev <- crt27160572$TZA$x / crt27160572$TZA$n
+sum(crt27160572$TZA$x) == crt27160572$TZA$n[1]
+
+pdcrtspl7$`27160572` <- do.call(rbind, crt27160572)
+
+# typo -- no mixed reported
+pdcrtspl7$`28004634`$x[2] <- pdcrtspl7$`28004634`$n[1] - pdcrtspl7$`28004634`$x[1]
+pdcrtspl7$`28004634`$prev <- pdcrtspl7$`28004634`$x / pdcrtspl7$`28004634`$n
+
+# redigitised the bar chart and converted
+pdcrtspl7$`28039354`$x <- c(283, 48, 11)
+# sum(pdcrtspl7$`28039354`$x) == pdcrtspl7$`28039354`$n[1]
+
+# from figure 4 in paper
+pdcrtspl7$`28546554`$n <- c(278, 278)
+pdcrtspl7$`28546554`$x <- c(133, 145)
+pdcrtspl7$`28546554`$prev <- pdcrtspl7$`28546554`$x / pdcrtspl7$`28546554`$n
+
+
+# 76T = 25/94 - mixed = 11% 10/94 -- the rest is WT (using Table S3 and S4)
+pdcrtspl7$`31932374` <- pdcrtspl7$`31932374`[c(1,1,1),]
+pdcrtspl7$`31932374`$mut <- c("pfcrt 76T", "pfcrt 76K/T", "pfcrt K76")
+pdcrtspl7$`31932374`$x <- c(25, 10, 94-25-10)
+pdcrtspl7$`31932374`$n <- rep(94, 3)
+pdcrtspl7$`31932374`$prev <- pdcrtspl7$`31932374`$x/pdcrtspl7$`31932374`$n
+
+# checked that 100% prev is correct
+pdcrtspl7$`32310062` <- pdcrtspl7$`32310062` %>%
+  dplyr::filter(mut %in% c(mix_loc, mut_loc, wt_loc)) %>%
+  dplyr::mutate(n = 211, prev = x/n)
+
+# typo - table 4
+pdcrtspl7$`34906159`$x[2] <- pdcrtspl7$`34906159`$n[2] - pdcrtspl7$`34906159`$x[1] 
+pdcrtspl7$`34906159`$prev <- pdcrtspl7$`34906159`$x / pdcrtspl7$`34906159`$n
+
+
+pdcrtspl7$`35413937`$x[1] <- pdcrtspl7$`35413937`$n[1]
+pdcrtspl7$`35413937`$prev <- pdcrtspl7$`35413937`$x/pdcrtspl7$`35413937`$n
+
+fixed_pmid7 <- c(15238686, 15814601, 16516311, 17158810, 17224049, 17376240,
+                 17488902, 18008244, 19346369, 19718439, 21457533, 21645634,
+                 22004584, 22453078, 22641431, 22904636, 23537170, 23870667,
+                 24359280, 25421474, 27160572, 28004634, 28039354, 28546554,
+                 31932374, 32310062, 34906159, 35413937, 22208458)
+# check they're all fixed
+length(which(!(names(pdcrtspl7) %in% fixed_pmid7))) == 0
+
+pdcrtspl7 <- do.call(rbind, pdcrtspl7) %>% dplyr::select(names(pdcrtspl1))
+pdcrtspl7$prev <- pdcrtspl7$x/pdcrtspl7$n
+
+
+### TYPE 8 ------------------------------
+# the others...
+# only one uuid left -- 1067
+# pdcrtspl8 <- pdcrt %>%
+#   filter(!(uuid %in% c(pdcrtspl1$uuid,pdcrtspl3$uuid, pdcrtspl4$uuid,
+#                        pdcrtspl5$uuid, pdcrtspl6$uuid, pdcrtspl7$uuid)))
+
+## this pmid is already fixed within pdcrtspl6 so don't add
+# remove from pdcrt so that the sanity check works
+pdcrt <- pdcrt %>%
+  filter(uuid != 1067)
+
+## Complete. Bring all together again-------------------
+crtww_final_res_df <-
+  rbind(pdcrtspl1, pdcrtspl3, pdcrtspl4, 
+        pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
+  ungroup %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source) %>%
+  ungroup %>%
+  dplyr::mutate(mut = if_else(grepl("K76", mut), "WT", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("76T", mut), "76T", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("76K/T", mut), "76K/T", mut)) %>% 
+  dplyr::mutate(gene_mut = wwarn_format_crt_for_stave(mut)) %>%
+  dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
+
+
+(list(pdcrtspl1, pdcrtspl3, pdcrtspl4, pdcrtspl5, pdcrtspl6, pdcrtspl7) %>%
+    lapply(function(x){
+      x %>% ungroup %>% select(iso3c, admin_0, admin_1, site, lat, long,uuid,
+                               year, study_start_year, study_end_year,
+                               x, n, prev, gene, mut, database, pmid, url, source)
+    }) %>% do.call(rbind,.)  %>%
+    pull(uuid) %>% unique() %>% length()) ==
+  (pdcrt$uuid %>% unique()%>% length()) # for some reason this pmid is missing from pdcrt but it should be there... 
+
+
+# ---------------------------------------------------- o
+# 5. Sort MDR1 ----
+# ---------------------------------------------------- o
+
+# grab and fitler to just important SNPs
+pdmdr1 <- pdwwspl$mdr1 %>%
+  filter(grepl("86|NFD|NxxxD|YYXXY|YYY", mut))
+
+# first put into study time lat points for looking at
+pdmdr1 <- pdmdr1 %>%
+  group_by(across(c(-x,-prev, -mut, -rowid, -mix))) %>%
+  mutate(uuid = cur_group_id()) %>%
+  ungroup() 
+
+
+## STEP 1: Work out how to sort out the markers ------------------------------
+# mdr1 cleaning is restricted to codon 86 as this is the focus of this work
+
+pdmdr1 %>% pull(mut) %>% unique()
+
+#  [1,] "pfmdr1 86Y" # KEEP
+#  [2,] "pfmdr1 184F"
+#  [3,] "pfmdr1 copy number >1"
+#  [4,] "pfmdr1 NxxxD" : the same as"pfmdr1 N86" # KEEP but ensure no duplicates with N86
+#  [5,] "pfmdr1 N86" # KEEP
+#  [6,] "pfmdr1 86N/Y" # KEEP
+#  [7,] "pfmdr1 Y184"
+#  [8,] "pfmdr1 184Y/F"
+#  [9,] "pfmdr1 YYXXY" : the same as"pfmdr1 86Y" # KEEP but ensure no duplicates with 86Y -> EH
+#  [10,] "pfmdr1 YYY" : the same as"pfmdr1 86Y" # KEEP but ensure no duplicates with 86Y -> EH
+#  [11,] "pfmdr1 NFD" : the same as"pfmdr1 N86" # KEEP but ensure no duplicates with N86
+
+# check all of the imputations here are complete
+# filter out those that do not report codon 86
+pdmdr1 <- pdmdr1 %>%
+  filter(grepl("N|Y|86", mut)) %>%
+  filter(!(grepl("184", mut)))
+
+res_loc <- "pfmdr1 86Y"
+wt_loc <- "pfmdr1 N86"
+mix_loc <- "pfmdr1 86N/Y"
+
+other_loc <- c("pfmdr1 YYXXY", "pfmdr1 YYY", "pfmdr1 NFD", "pfmdr1 NxxxD")
+
+# TYPE 1: sum(x) == n
+
+pdmdr1spl1 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>%
+  mutate(mut = replace(mut, grepl("YYXXY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("YYY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NFD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NxxxD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+# TYPE 2: only WT -- clean names and reformat
+pdmdr1spl2 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(categorise = if_else(mut %in% c("N86", "NFD", "NxxxD"), "WT", "mut")) %>%
+  mutate(xn = length(unique(categorise))) %>%
+  filter(xn == 1) %>% 
+  filter(categorise == "WT") %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+# none reporting only WT
+
+
+# TYPE 3 - sum(x) = n if EH are filtered out -- change EH names, clean and reformat
+# NOTE: EH = extended haplotypes 
+# The EH mutations for a number of samples are just extra information
+# determined by filtering these out and rechecking if sum of x equals n
+# These for these groups it is the same as above
+pdmdr1spl3 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter((mut %in% c(res_loc,wt_loc,mix_loc))) %>% # non-EH only
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) # keep uuid and remove later
+
+
+# TYPE 4 - sum(x) = n if non-EH are filtered out -- change EH names, clean and reformat
+pdmdr1spl4 <- pdmdr1 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% # sum(x) =/= n if EH included
+  filter(!(mut %in% c(res_loc,wt_loc,mix_loc))) %>% # EH only
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(xn) %>% # sum(x) = n when we only consider EH
+  mutate(mut = replace(mut, grepl("YYXXY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("YYY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NFD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NxxxD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  group_by(across(c(-x, -n, -prev, -mix, -rowid))) %>%
+  summarise(x = sum(x), n = unique(n)) %>%
+  ungroup() %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# TYPE 5 - only one marker reported -- clean names and reformat
+# these are single record uuids so WWARN only captured one marker
+pdmdr1spl5 <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid,pdmdr1spl3$uuid,pdmdr1spl4$uuid))) %>%
+  group_by(uuid) %>%
+  filter(n()==1) %>%
+  mutate(mut = replace(mut, grepl("YYXXY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("YYY", mut), "pfmdr1 86Y")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NFD", mut), "pfmdr1 N86")) %>% # convert haplotypes
+  mutate(mut = replace(mut, grepl("NxxxD", mut), "pfmdr1 N86")) %>% # convert haplotypes  group_by(uuid) %>%
+  select(names(pdmdr1spl3)) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+# manually checked the pmids -- omitted rows that were fine and grouped omitted and those to be fixed
+# omission
+# pdmdr1spl5 %>% filter(pmid == "22850519") %>% View() # pmid already included correctly -- this has different n. omit
+# pdmdr1spl5 %>% filter(pmid == "12224572") %>% View() # pmid already included correctly -- this has different n. omit
+# pdmdr1spl5 %>% filter(pmid == "27538948") %>% View() # study has been retracted -- remove
+# pdmdr1spl5 %>% filter(pmid == "19704124") %>% View() # omit -- manually fixed this in spl6 already
+# pdmdr1spl5 %>% filter(pmid == "21881128") %>% View() # study correct, this is haplotype. remove
+# pdmdr1spl5 %>% filter(pmid == "29390014") %>% View() # pmid already extracted correctly. this is the NFD haplotype only so omit
+# pdmdr1spl5 %>% filter(pmid == "27562216") %>% View() # pmid already extracted correctly. this is the NFD haplotype only so omit
+# pdmdr1spl5 %>% filter(pmid == "35357271") %>% View() # pmid already extracted correctly. this is the NFD haplotype only so omit
+# 
+# fix these
+# pdmdr1spl5 %>% filter(pmid == "25348116") %>% View() # needs fixing manually -- do some haplotype maths here on table 2
+# pdmdr1spl5 %>% filter(pmid == "19187521") %>% View() # typo -- easy fix; x = 30; n = 55
+# pdmdr1spl5 %>% filter(pmid == "17467344") %>% View() # Tanzania rows extracted correctly already so needs cleaning up; Kenya correct
+# pdmdr1spl5 %>% filter(pmid == "25890383") %>% View() # needs fixing -- missing most of the data here
+# pdmdr1spl5 %>% filter(pmid == "25004442") %>% View() # extracted NFD correct but actually 100% N -- fix
+# pdmdr1spl5 %>% filter(pmid == "26988711") %>% View() # typo -- both ns should be 37
+# pdmdr1spl5 %>% filter(pmid == "31358591") %>% View() # needs fixing - error in 2016 year and 2012-2017 for N86
+
+
+# these pmids are already correctly extracted elsewhere. generally an EH with a different n to the rest of the study
+omit_pmids <- c("22850519", "12224572", "27538948", "19704124", "21881128", 
+                "29390014", "27562216", "35357271")
+# need to omit the uuids from the rest of the pdmdr1 data
+omit_uuids <- pdmdr1spl5 %>%
+  filter(pmid %in% omit_pmids) %>%
+  pull(uuid) %>% unique()
+
+omit_uuids <- c(omit_uuids, 726, 728) # these two causing problems but cannot figure out how they end up in final df. omit here?
+
+pdmdr1 <- pdmdr1 %>% filter(!(uuid %in% omit_uuids))
+
+fix_pmids <- c("25348116", "19187521", "17467344", "25890383", "25004442", 
+               "26988711", "31358591")
+
+pdmdr1spl5correct <- pdmdr1spl5 %>%
+  filter(!(pmid %in% c(omit_pmids, fix_pmids)))
+
+# sanity check
+# length(unique(pdmdr1spl5$pmid)) == length(pdmdr1spl5correct$pmid) + length(omit_pmids) + length(fix_pmids)
+
+# fix studies for fixing by splitting and recombine later
+pdmdr1spl5fix <- pdmdr1spl5 %>%
+  filter(pmid %in% fix_pmids) %>%
+  split(.$pmid)
+
+pdmdr1spl5fix$`17467344` <- pdmdr1spl5fix$`17467344`[1,] # keep only kenya row and then fix
+pdmdr1spl5fix$`17467344`$x <- 58
+pdmdr1spl5fix$`17467344`$n <- 91
+pdmdr1spl5fix$`17467344`$prev <- pdmdr1spl5fix$`17467344`$x/pdmdr1spl5fix$`17467344`$n
+# sum(pdmdr1spl5fix$`17467344`$x) == unique(pdmdr1spl5fix$`17467344`$n)
+
+pdmdr1spl5fix$`19187521`$x <- 30
+pdmdr1spl5fix$`19187521`$n <- 55
+pdmdr1spl5fix$`19187521`$prev <- pdmdr1spl5fix$`19187521`$x / pdmdr1spl5fix$`19187521`$n
+
+# typo
+pdmdr1spl5fix$`25004442`$x <- pdmdr1spl5fix$`25004442`$n
+
+# do some haplotype maths here from table 2 
+pdmdr1spl5fix$`25348116`$x <- 13+45 
+pdmdr1spl5fix$`25348116`$mut <- "mdr1_86Y" # so that the imputation works correctly
+pdmdr1spl5fix$`25348116`$prev <- pdmdr1spl5fix$`25348116`$x / pdmdr1spl5fix$`25348116`$n
+
+# most of the data is missing - manually worked this out from the info in the additional file
+pdmdr1spl5fix$`25890383`$year <- pdmdr1spl5fix$`25890383`$study_start_year
+pdmdr1spl5fix$`25890383`$study_end_year <- pdmdr1spl5fix$`25890383`$study_start_year
+pdmdr1spl5fix$`25890383`$x <- c(16, 75, 55, 7)
+pdmdr1spl5fix$`25890383`$n <- c(18, 87, 65, 8)
+pdmdr1spl5fix$`25890383`$prev <- pdmdr1spl5fix$`25890383`$x / pdmdr1spl5fix$`25890383`$n
+
+# typo
+pdmdr1spl5fix$`26988711`$n[2] <- 37
+pdmdr1spl5fix$`26988711`$prev <- pdmdr1spl5fix$`26988711`$x / pdmdr1spl5fix$`26988711`$n
+
+# remove incorrect imputation and fix typo
+pdmdr1spl5fix$`31358591` <- pdmdr1spl5fix$`31358591`[c(1,3),] # remove row with error -- N will be imputed correctly
+pdmdr1spl5fix$`31358591`$x[2] <- 19
+pdmdr1spl5fix$`31358591`$n[2] == 162 # sanity check
+pdmdr1spl5fix$`31358591`$prev <- pdmdr1spl5fix$`31358591`$x / pdmdr1spl5fix$`31358591`$n
+
+# TODO: combine correct and fixed
+pdmdr1spl5fixed <- do.call(rbind, pdmdr1spl5fix) %>%
+  select(names(pdmdr1spl5correct)) 
+pdmdr1spl5 <- rbind(pdmdr1spl5correct, pdmdr1spl5fixed) # omitted removed, pmids fixed and combined with those correct
+
+complement <- NULL
+for(i in 1:nrow(pdmdr1spl5)) {
+  df <- pdmdr1spl5[i,]
+  df$x <- df$n - df$x
+  df$mut <- if_else(df$mut == "mdr1_N86", "mdr1_86Y", "mdr1_N86")
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdmdr1spl5 <- rbind(pdmdr1spl5, complement) %>% arrange(pmid, uuid) %>% distinct()
+
+# sanity check
+(pdmdr1spl5 %>%
+  group_by(uuid) %>%
+  mutate(xn = all(sum(x) == n[1])) %>%
+  filter(!xn) %>% nrow()) == 0
+# [1] TRUE
+
+# t6pmid <- pdmdr1 %>%
+#   filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
+#   group_by(uuid) %>%
+#   filter(sum(x) < n[1]) %>% 
+#   pull(pmid) %>% unique()
+
+# TYPE 6 - sum(x) < n - check that these are missing mixed mutants and add these
+pdmdr1spl6 <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% 
+  split(.$pmid)
+
+# based on table 2 -- now spl6 contains whole study so fix the entire thing
+comoros <- pdmdr1spl6$`19704124` %>%
+  dplyr::filter(admin_0 == "Comoros")
+comoros$x <- c(7, 271-7)
+comoros$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+comoros$prev <- comoros$x / comoros$n
+
+madagascar <- pdmdr1spl6$`19704124` %>%
+  dplyr::filter(admin_0 != "Comoros") %>%
+  mutate(mut = "pfmdr1 N86") # all entries checked as correct
+
+# impute the mutant
+complement <- NULL
+for(i in 1:nrow(madagascar)) {
+  df <- madagascar[i,]
+  df$x <- df$n - df$x
+  df$mut <- "pfmdr1 86Y"
+  df$prev <- df$x / df$n
+  complement <- rbind(complement, df)
+}
+pdmdr1spl6$`19704124` <- rbind(comoros, madagascar, complement)
+pdmdr1spl6$`19704124` %>% group_by(uuid) %>%
+  reframe(xn = (sum(x) == unique(n))) # check
+
+
+# EHs -- the codon prev are correct and extracted -- different ns hence not picked up earlier
+# add uuids to a vector first
+fixed_uuids <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) < n[1]) %>% filter(pmid %in% c(20199676,
+                                               21996622,
+                                               25007802,
+                                               25917493,
+                                               27596849,
+                                               31932374,
+                                               34732201)) %>% pull(uuid) %>% unique()
+
+
+pdmdr1spl6$`20199676` <- NULL
+pdmdr1spl6$`21996622` <- NULL
+pdmdr1spl6$`25007802` <- NULL
+pdmdr1spl6$`25917493` <- NULL
+pdmdr1spl6$`27596849` <- NULL
+pdmdr1spl6$`31932374` <- NULL
+pdmdr1spl6$`34732201` <- NULL
+
+
+# from table 3 - N86 = 49; 86Y = 77
+pdmdr1spl6$`25070111`$x <- c(49,77)
+pdmdr1spl6$`25070111`$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+pdmdr1spl6$`25070111`$prev <- pdmdr1spl6$`25070111`$x / pdmdr1spl6$`25070111`$n
+
+# table 1 - Mitsoudje center hospital
+pdmdr1spl6$`27527604`$x <- c(45,70)
+pdmdr1spl6$`27527604`$mut <- c("pfmdr1 N86", "pfmdr1 86Y")
+pdmdr1spl6$`27527604`$prev <- pdmdr1spl6$`27527604`$x / pdmdr1spl6$`27527604`$n
+
+pdmdr1spl6$`27538948` <- NULL # retracted article
+pdmdr1 <- pdmdr1 %>% filter(pmid != 27538948)
+
+pdmdr1spl6 <- do.call(rbind, pdmdr1spl6) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+  
+
+# TYPE 7 - sum(x) > n - investigate
+pdmdr1spl7 <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid, pdmdr1spl3$uuid, pdmdr1spl4$uuid, pdmdr1spl5$uuid, pdmdr1spl6$uuid))) %>% 
+  group_by(uuid) %>%
+  filter(sum(x) > n[1]) %>% 
+  split(.$pmid)
+
+## look at each study
+
+# N = 250; Y/N = 86; Y = 141 -- study added mixed to single alleles
+pdmdr1spl7$`17488902`$x <- pdmdr1spl7$`17488902`$x - 86
+pdmdr1spl7$`17488902` <- add_a_row_pd(pdmdr1spl7$`17488902`, 86, "pfmdr1 86N/Y") # add mixed alleles
+
+# "Mixed infections contribute equally to the prevalence estimates for both alleles."
+fixed <- NULL
+for(i in 1:(nrow(pdmdr1spl7$`18008244`)/2)) {
+  df <- pdmdr1spl7$`18008244`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+
+# check if this is fixed now
+# fixed %>% 
+#   dplyr::group_by(year) %>%
+#   dplyr::reframe(sum(x) == unique(n))
+
+pdmdr1spl7$`18008244` <- fixed
+
+# # If both alleles were identified at one locus both were included as numerators but only counted as one in the denominator.
+# i.e. mixed are double counted
+# pdcrtspl7$`19718439` %>% View()
+
+fixed <- NULL
+for(i in 1:(nrow(pdmdr1spl7$`19718439`)/2)) {
+  df <- pdmdr1spl7$`19718439`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+pdmdr1spl7$`19718439` <- fixed
+
+## mixed contribute to both
+fixed <- NULL
+for(i in 1:(nrow(pdmdr1spl7$`24657918`)/2)) {
+  df <- pdmdr1spl7$`24657918`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+pdmdr1spl7$`24657918` <- fixed
+
+## mixed contribute to both
+fixed <- NULL
+for(i in 1:(nrow(pdmdr1spl7$`25421474`)/2)) {
+  df <- pdmdr1spl7$`25421474`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+pdmdr1spl7$`25421474` <- fixed
+
+# mixed double counted
+mixed <- sum(pdmdr1spl7$`28546554`$x) -  unique(pdmdr1spl7$`28546554`$n)
+pdmdr1spl7$`28546554`$x <- pdmdr1spl7$`28546554`$x - mixed
+pdmdr1spl7$`28546554` <- add_a_row_pd(df = pdmdr1spl7$`28546554`, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+
+pdmdr1spl7$`29458380` <- pdmdr1spl7$`29458380` %>%
+  filter(!(mut %in% other_loc))
+
+# mixed double counted
+fixed <- NULL
+for(i in 1:(nrow(pdmdr1spl7$`29458380`)/2)) {
+  df <- pdmdr1spl7$`29458380`[c(2*i-1,2*i),]
+  
+  mixed <- sum(df$x) -  unique(df$n)
+  
+  df$x <- df$x - mixed
+  
+  df <- add_a_row_pd(df = df, x_new = mixed, mut_new = "pfmdr1 86N/Y")
+  
+  fixed <- rbind(fixed, df)
+  
+}
+pdmdr1spl7$`29458380` <- fixed
+
+pdmdr1spl7$`29582732`$x <- pdmdr1spl7$`29582732`$x - 5
+pdmdr1spl7$`29582732` <- add_a_row_pd(pdmdr1spl7$`29582732`, 5, "pfmdr1 86N/Y")
+pdmdr1spl7$`29582732`$prev <- pdmdr1spl7$`29582732`$x / pdmdr1spl7$`29582732`$n
+
+# mixed haplotypes are double counted
+# 86Y = 89.8% ~ 80
+# N86 = 14.6 ~ 13
+# therefore, 4 mixed; 76 mutant and 9 N86
+pdmdr1spl7$`21896916` <- pdmdr1spl7$`21896916`[1:3,]
+pdmdr1spl7$`21896916`$x <- c(9, 76, 4)
+pdmdr1spl7$`21896916`$mut <- c("pfmdr1 N86", "pfmdr1 86Y", "pfmdr1 86N/Y")
+pdmdr1spl7$`21896916`$prev <- pdmdr1spl7$`21896916`$x / pdmdr1spl7$`21896916`$n
+
+pdmdr1spl7 <- do.call(rbind, pdmdr1spl7) %>%
+  mutate(prev = x/n) %>%
+  mutate(mut = gsub("pf","", mut)) %>%
+  mutate(mut = gsub(" ","_", mut)) %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source, uuid) 
+
+## TYPE 8 -- anything else -- all addressed
+(pdmdr1spl8 <- pdmdr1 %>%
+  filter(!(uuid %in% c(pdmdr1spl1$uuid,pdmdr1spl3$uuid, pdmdr1spl4$uuid,
+                       pdmdr1spl5$uuid, pdmdr1spl6$uuid, pdmdr1spl7$uuid))) %>%
+  filter(!(uuid %in% fixed_uuids)) %>%
+  nrow()) == 0
+
+# and group by to record prevalence of each mdr1 marker type
+# need mutant of the form WT; 86N/Y; 86Y
+
+mdr1ww_final_res_df <-
+  rbind(pdmdr1spl1, pdmdr1spl3, pdmdr1spl4, 
+        pdmdr1spl5, pdmdr1spl6, pdmdr1spl7) %>%
+  ungroup %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, database, pmid, url, source) %>%
+  ungroup %>%
+  dplyr::mutate(mut = if_else(grepl("N86", mut), "WT", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("86Y", mut), "86Y", mut)) %>% 
+  dplyr::mutate(mut = if_else(grepl("86N/Y", mut), "86N/Y", mut)) %>% 
+  dplyr::mutate(gene_mut = wwarn_format_mdr1_for_stave(mut)) %>%
+  dplyr::left_join(select(validated, c("gene_mut", "annotation")), by = "gene_mut") %>%
+  select(iso3c, admin_0, admin_1, site, lat, long,
+         year, study_start_year, study_end_year,
+         x, n, prev, gene, mut, gene_mut, database, pmid, url, source)
+
+# bring it all back together
+wwarn_res_df <- rbind(crtww_final_res_df, mdr1ww_final_res_df, k13ww_final_res_df)
+saveRDS(wwarn_res_df, here::here("analysis/data-derived/wwarn_res.rds"))
+
