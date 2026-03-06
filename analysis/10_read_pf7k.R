@@ -1,6 +1,6 @@
 # 10_read_who.R
 #
-# Author: Bob Verity
+# Author: OJ Watson, Bob Verity
 # Date: 2025-12-17
 #
 # Inputs:
@@ -92,6 +92,8 @@ mdf <- mdf |> select(
 # convert study into valid identifier
 mdf$study <- sprintf("pf7_%s", gsub("-", "_", mdf$study))
 
+# count studies
+length(unique(mdf$study))
 
 # ----------------------------
 # drop non-African samples
@@ -103,6 +105,9 @@ pf7_Africa <- c("Mauritania", "Gambia", "Guinea", "Kenya", "Tanzania", "Ghana",
 
 mdf <- mdf |>
   filter(admin_0 %in% pf7_Africa)
+
+# count studies
+length(unique(mdf$study))
 
 # ----------------------------
 # crt

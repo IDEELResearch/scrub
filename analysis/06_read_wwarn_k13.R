@@ -40,15 +40,25 @@ wwarn_k13 <- readxl::read_xls(here("analysis", "data-raw", "WWARN_K13_database_0
          PMID = as.numeric(pubMedId),
          notes = as.character(NA))
 
+# count studies
+length(unique(wwarn_k13$authors))
+
 # filter to Africa
 wwarn_k13 <- wwarn_k13 |>
   filter(continent == "Africa") |>
   arrange(country, site, year, mutation) |>
-  select(country, site, year, mutation, present, tested, lat, lon, PMID)
+  select(country, site, year, mutation, present, tested, lat, lon, PMID, authors)
+
+# count studies
+length(unique(wwarn_k13$authors))
 
 # drop studies with no PMID
 wwarn_k13 <- wwarn_k13 |>
-  filter(!is.na(PMID))
+  filter(!is.na(PMID)) |>
+  select(-authors)
+
+# count studies
+length(unique(wwarn_k13$PMID))
 
 # drop studies already in GEOFF
 s <- readRDS(here("analysis", "data-derived", "geoff_STAVE.rds"))
@@ -58,6 +68,9 @@ PMID_geoff <- s$get_studies() |>
 
 wwarn_k13 <- wwarn_k13|>
   filter(!(PMID %in% PMID_geoff))
+
+# count studies
+length(unique(wwarn_k13$PMID))
 
 # ------------------------------------------------------------------------
 # remove some studies and fix errors in others
@@ -92,10 +105,6 @@ wwarn_k13 <- wwarn_k13 |>
   bind_rows(readxl::read_excel(here("analysis", "data-raw", "PMID_k13_replace.xlsx"), sheet = "32795367")) |>
   filter(PMID != 33789667) |>
   bind_rows(readxl::read_excel(here("analysis", "data-raw", "PMID_k13_replace.xlsx"), sheet = "33789667"))
-
-# this study data has many errors, but replace at a later stage (see below)
-wwarn_k13 <- wwarn_k13 |>
-  filter(PMID != 33146722)
 
 # replace some bad characters in site names
 wwarn_k13 <- wwarn_k13 |>
@@ -138,9 +147,15 @@ wwarn_k13 <- wwarn_k13 |>
               select(PMID, WT_variant),
             by = join_by(PMID))
 
+# count studies
+length(unique(wwarn_k13$PMID))
+
 # drop studies for which WT is NA, implying that none of the target loci are covered
 wwarn_k13 <- wwarn_k13 |>
   filter(!is.na(WT_variant))
+
+# count studies
+length(unique(wwarn_k13$PMID))
 
 # overlay variant on top of WT
 wwarn_k13 <- wwarn_k13 |>
@@ -188,7 +203,10 @@ wwarn_k13 <- wwarn_k13 |>
 
 # ------------------------------------------------------------------------
 
-# read back in Asua et al. data
+# replace Asua et al. data
+wwarn_k13 <- wwarn_k13 |>
+  filter(PMID != 33146722)
+
 df_asua <- readxl::read_excel(here("analysis", "data-raw", "PMID_k13_replace.xlsx"), sheet = "33146722")
 
 # merge with data on paper and tidy up to match wwarn_k13 format 
@@ -205,6 +223,27 @@ df_asua <- df_asua |>
          publication_year = asua_info$publication_year)
 
 wwarn_k13 <- bind_rows(wwarn_k13, df_asua)
+
+# count studies
+length(unique(wwarn_k13$PMID))
+
+# ------------------------------------------------------------------------
+# import further cleaned datasets
+
+import_PMIDs <- c(28594879, 35144535, 33107096, 26483118, 31296223, 33864801, 33350925,
+                  27573632, 34216470, 32747827, 32822392, 34551228, 35477399, 31427297,
+                  31034031, 29458380, 32103124)
+
+wwarn_k13 <- wwarn_k13 |>
+  filter(!(PMID %in% import_PMIDs))
+for (i in seq_along(import_PMIDs)) {
+  wwarn_k13 <- wwarn_k13 |>
+    bind_rows(readxl::read_excel(here("analysis", "data-raw", "PMID_k13_replace.xlsx"),
+                                 sheet = as.character(import_PMIDs[i])))
+}
+
+# count studies
+length(unique(wwarn_k13$PMID))
 
 # ------------------------------------------------------------------------
 

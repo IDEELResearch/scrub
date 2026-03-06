@@ -100,7 +100,28 @@ df_comb <- df_l |>
 # get total samples sequenced at any of our positions of interest
 sum(df_comb$denom_max)
 
-# get the equivalent number for k13 only
+# get the equivalent number for k13 561 only
+bind_rows(l[16]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for k13 622 only
+bind_rows(l[20]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for k13 675 only
+bind_rows(l[21]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for all k13 only
 bind_rows(l[1:21]) |>
   group_by(survey_id, collection_year) |>
   summarise(denom_max = max(denominator)) |>
