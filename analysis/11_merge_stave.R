@@ -7,7 +7,7 @@
 # - data-derived/geoff_STAVE.rds
 # - data-derived/WWARN_STAVE.rds
 # - data-derived/WHO_STAVE.rds
-# - data-derived/pf7_STAVE.rds
+# - data-derived/pf8_STAVE.rds
 #
 # Outputs:
 # - data-out/stave_data (time stamped)
@@ -34,7 +34,7 @@ library(STAVE)
 s_geoff <- readRDS(file = here("analysis", "data-derived", "geoff_STAVE.rds"))
 s_wwarn <- readRDS(file = here("analysis", "data-derived", "WWARN_STAVE.rds"))
 s_who <- readRDS(file = here("analysis", "data-derived", "WHO_STAVE.rds"))
-s_pf7 <- readRDS(file = here("analysis", "data-derived", "pf7_STAVE.rds"))
+s_pf8 <- readRDS(file = here("analysis", "data-derived", "pf8_STAVE.rds"))
 
 s <- STAVE_object$new()
 s$append_data(studies_dataframe = s_geoff$get_studies(),
@@ -46,12 +46,12 @@ s$append_data(studies_dataframe = s_wwarn$get_studies(),
 s$append_data(studies_dataframe = s_who$get_studies(),
               surveys_dataframe = s_who$get_surveys(),
               counts_dataframe = s_who$get_counts())
-s$append_data(studies_dataframe = s_pf7$get_studies(),
-              surveys_dataframe = s_pf7$get_surveys(),
-              counts_dataframe = s_pf7$get_counts())
+s$append_data(studies_dataframe = s_pf8$get_studies(),
+              surveys_dataframe = s_pf8$get_surveys(),
+              counts_dataframe = s_pf8$get_counts())
 
 # save combined object to file
-saveRDS(s, file = here("analysis", "data-out", "stave_data_2025.12.19.rds"))
+saveRDS(s, file = here("analysis", "data-out", "stave_data_2026.03.08.rds"))
 
 # ------------------------------------------------------------------
 # Some basic stats on the final object
@@ -100,7 +100,28 @@ df_comb <- df_l |>
 # get total samples sequenced at any of our positions of interest
 sum(df_comb$denom_max)
 
-# get the equivalent number for k13 only
+# get the equivalent number for k13 561 only
+bind_rows(l[16]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for k13 622 only
+bind_rows(l[20]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for k13 675 only
+bind_rows(l[21]) |>
+  group_by(survey_id, collection_year) |>
+  summarise(denom_max = max(denominator)) |>
+  pull(denom_max) |>
+  sum()
+
+# get the equivalent number for all k13 only
 bind_rows(l[1:21]) |>
   group_by(survey_id, collection_year) |>
   summarise(denom_max = max(denominator)) |>
