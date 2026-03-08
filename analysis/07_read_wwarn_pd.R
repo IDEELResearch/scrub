@@ -43,6 +43,10 @@ wwarn_pd <- readxl::read_xls(here("analysis", "data-raw", "WWARN_partnerdrug_dat
   select(study_id, country, site, lon, lat, study_start, study_end, marker_type,
          tested, present, mixed_present, url)
 
+# count studies
+# have to go with url as I know some study_ids are duplicates of the same data
+length(unique(wwarn_pd$url))
+
 # filter to Africa countries
 wwarn_pd <- wwarn_pd |>
   filter(country %in% c("Angola", "Benin", "Burkina Faso", "Burundi", "Cameroon", "Central African Republic",
@@ -54,6 +58,9 @@ wwarn_pd <- wwarn_pd |>
                         "Zimbabwe", "Eritrea", "South sudan", "Libya", "Djibouti", "Algeria", "Botswana", 
                         "Somalia"))
 
+# count studies
+length(unique(wwarn_pd$url))
+
 # merge with data on PMID
 df_PMID <- read.csv(here("analysis", "data-raw", "WWARN_pd_PMID.csv"))
 wwarn_pd <- wwarn_pd |>
@@ -63,6 +70,9 @@ wwarn_pd <- wwarn_pd |>
 wwarn_pd <- wwarn_pd |>
   filter(!is.na(PMID))
 
+# count studies
+length(unique(wwarn_pd$PMID))
+
 # drop studies already in GEOFF
 s <- readRDS(here("analysis", "data-derived", "geoff_STAVE.rds"))
 PMID_geoff <- s$get_studies() |>
@@ -71,6 +81,9 @@ PMID_geoff <- s$get_studies() |>
 
 wwarn_pd <- wwarn_pd|>
   filter(!(PMID %in% PMID_geoff))
+
+# count studies
+length(unique(wwarn_pd$PMID))
 
 # remove specific PMIDs
 wwarn_pd <- wwarn_pd |>
@@ -119,13 +132,20 @@ wwarn_pd <- wwarn_pd |>
   select(study_id, survey_id, country, site, lon, lat, study_start, study_end,
          variant_string, present, tested, PMID)
 
+# count studies
+length(unique(wwarn_pd$PMID))
+
 # replace some values manually from file where there are mistakes in the original
+# note that this includes 5 studies identified through cleaning of WWARN k13 data where PD data are also available. Hence the total studies will increase by 5.
 sheet_names <- excel_sheets(here("analysis", "data-raw", "PMID_pd_replace.xlsx"))
 for (i in seq_along(sheet_names)) {
   wwarn_pd <- wwarn_pd |>
     filter(PMID != as.numeric(sheet_names[i])) |>
     bind_rows(readxl::read_excel(here("analysis", "data-raw", "PMID_pd_replace.xlsx"), sheet = sheet_names[i]))
 }
+
+# count studies
+length(unique(wwarn_pd$PMID))
 
 # merge with info on paper
 df_paper <- read.csv(here("analysis", "data-raw", "paper_info.csv")) |>
@@ -134,10 +154,10 @@ wwarn_pd <- wwarn_pd |>
   left_join(df_paper,
             by = join_by(PMID))
 
-# ------------------------------------------------------------------------
-
-# tidy up and save to file
+# tidy up
 wwarn_pd <- wwarn_pd |>
   select(-c(url, doi))
 
+# save to file
 saveRDS(wwarn_pd, file = here("analysis", "data-derived", "wwarn_pd_clean.rds"))
+

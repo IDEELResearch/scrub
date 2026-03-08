@@ -38,6 +38,16 @@ who <- left_join(who_res, who_df, by = "ID") |>
   mutate(LATITUDE = as.numeric(LATITUDE),
          LONGITUDE = as.numeric(LONGITUDE))
 
+# Filter to k13, as mdr1 is copy number info only, and no crt left after previous filters
+who <- who |>
+  filter(MM_TYPE == "Pfkelch13")
+
+# count studies
+who |>
+  group_by(DATA_SOURCE, CITATION_URL) |>
+  summarise() |>
+  nrow()
+
 # Subset to African samples
 who_countries <- c("Angola", "Benin", "Botswana", "Burkina Faso", "Burundi", "Côte d’Ivoire", 
                    "Cabo Verde", "Cameroon", "Central African Republic", "Chad", 
@@ -52,9 +62,11 @@ who_countries <- c("Angola", "Benin", "Botswana", "Burkina Faso", "Burundi", "C�
 who <- who |>
   filter(COUNTRY_NAME %in% who_countries)
 
-# Filter to k13, as mdr1 is copy number info only, and no crt left after previous filters
-who <- who |>
-  filter(MM_TYPE == "Pfkelch13")
+# count studies
+who |>
+  group_by(DATA_SOURCE, CITATION_URL) |>
+  summarise() |>
+  nrow()
 
 # filter to those with citation
 who <- who |>
@@ -67,6 +79,9 @@ who <- who |>
   rename(url = CITATION_URL) |>
   left_join(paper_info, by = join_by(url))
 
+# count studies
+length(unique(who$PMID))
+
 # drop studies already in GEOFF
 s <- readRDS(here("analysis", "data-derived", "geoff_STAVE.rds"))
 PMID_geoff <- s$get_studies()$PMID
@@ -75,12 +90,18 @@ PMID_geoff <- PMID_geoff[!is.na(PMID_geoff)]
 who <- who |>
   filter(!(PMID %in% PMID_geoff))
 
+# count studies
+length(unique(who$PMID))
+
 # drop studies already in WWARN
 s <- readRDS(here("analysis", "data-derived", "WWARN_STAVE.rds"))
 PMID_wwarn <- s$get_studies()$PMID
 
 who <- who |>
   filter(!(PMID %in% PMID_wwarn))
+
+# count studies
+length(unique(who$PMID))
 
 # get variant_num from proportion
 who <- who |>
@@ -133,6 +154,9 @@ who <- who |>
 # drop studies for which WT is NA, implying that none of the target loci are covered
 who <- who |>
   filter(!is.na(WT_variant))
+
+# count studies
+length(unique(who$PMID))
 
 # overlay variant on top of WT
 who <- who |>
