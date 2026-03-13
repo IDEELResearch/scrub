@@ -18,7 +18,7 @@ library(here)
 library(STAVE)
 
 # read in combined STAVE object
-s <- readRDS(here("analysis", "data-out", "stave_data_2026.03.08.rds"))
+s <- readRDS(here("analysis", "data-out", "stave_data_2026.03.13.rds"))
 
 # get WHO positions
 k13_dictionary <- read.csv(here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")) |>
