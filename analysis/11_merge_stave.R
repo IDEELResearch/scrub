@@ -51,7 +51,7 @@ s$append_data(studies_dataframe = s_pf8$get_studies(),
               counts_dataframe = s_pf8$get_counts())
 
 # save combined object to file
-saveRDS(s, file = here("analysis", "data-out", "stave_data_2026.03.08.rds"))
+saveRDS(s, file = here("analysis", "data-out", "stave_data_2026.03.13.rds"))
 
 # ------------------------------------------------------------------
 # Some basic stats on the final object
