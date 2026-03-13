@@ -28,6 +28,11 @@ library(writexl)
 study_folders <- list.dirs(here("analysis", "data-geoff"), recursive = FALSE) |>
   basename()
 
+# skip over some folders, where STAVE format was extracted directly
+study_folders <- setdiff(study_folders, c("s231_ali_2022_v01",
+                                          "s232_wamae_2022_v01",
+                                          "s233_issa_2022_v01"))
+
 # read k13 dictionary and filter to target mutations
 k13_dictionary <- read.csv(here("analysis", "data-raw", "k13_ref_protein_codon_dictionary.csv")) |>
   filter(!is.na(WHO_TARGET))
