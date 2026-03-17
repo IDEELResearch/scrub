@@ -76,6 +76,11 @@ mdf <- mdf |>
   mutate(country = ifelse(country == "C√¥te d'Ivoire", "Cote d'Ivoire", country)) |>
   filter(country %in% pf8_Africa)
 
+# drop one study that is duplicated with published paper (PMID 27899115
+# corresponding to MalariaGen study 1248-PF-MW-MCCANN-SM)
+mdf <- mdf |>
+  filter(study_id != "MalariaGEN_1248_PF_MW_MCCANN_SM")
+
 # count studies
 length(unique(mdf$study_id))
 
